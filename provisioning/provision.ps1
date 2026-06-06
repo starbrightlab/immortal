@@ -237,16 +237,16 @@ $StateFile = "/sdcard/immortal_restore.env"
 function Snapshot-Stock {
   if ("$(A shell "[ -f $StateFile ] && echo yes")".Trim() -eq "yes") { return }
   $pkg = $cfg["PKG"]
-  $home = ((A shell 'cmd package query-activities --components -a android.intent.action.MAIN -c android.intent.category.HOME') -split "`n" |
+  $stockHome = ((A shell 'cmd package query-activities --components -a android.intent.action.MAIN -c android.intent.category.HOME') -split "`n" |
     ForEach-Object { $_.Trim() } |
     Where-Object { $_ -match '^[A-Za-z0-9_.]+/' -and $_ -notmatch "^$pkg/" -and $_ -notmatch '^android/' -and $_ -notmatch '^com\.android\.settings/' } |
     Select-Object -First 1)
-  if (-not $home) { $home = $cfg["STOCK_HOME"] }
+  if (-not $stockHome) { $stockHome = $cfg["STOCK_HOME"] }
   $dream  = (A shell settings get secure screensaver_components).Trim()
   $ddream = (A shell settings get secure screensaver_default_component).Trim()
   if (-not $dream  -or $dream  -eq "null" -or $dream  -like "$pkg/*") { $dream  = $cfg["STOCK_DREAM"] }
   if (-not $ddream -or $ddream -eq "null" -or $ddream -like "$pkg/*") { $ddream = $cfg["STOCK_DEFAULT_DREAM"] }
-  "STOCK_HOME=$home`nSTOCK_DREAM=$dream`nSTOCK_DEFAULT_DREAM=$ddream`n" | A shell "cat > $StateFile" | Out-Null
+  "STOCK_HOME=$stockHome`nSTOCK_DREAM=$dream`nSTOCK_DEFAULT_DREAM=$ddream`n" | A shell "cat > $StateFile" | Out-Null
   Ok "Saved this device's stock launcher/screensaver for restore"
 }
 
@@ -283,7 +283,9 @@ if ($Apps) {
 if ($Status) {
   Wait-Device
   Step "Current state"
-  $home = (A shell 'cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME') -match "packageName=" | Out-Null
+  $homePkg = ((A shell 'cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME') -split "`n" |
+    Select-String 'packageName=' | Select-Object -First 1) -replace '.*packageName=', ''
+  Write-Host "  home:        $("$homePkg".Trim())"
   Write-Host "  screensaver: $((A shell settings get secure screensaver_components).Trim())"
   $disabled = (A shell pm list packages -d $cfg["VERIFIER_PKG"]).Trim()
   Write-Host "  verifier:    $(if ($disabled) {'disabled'} else {'enabled'})"

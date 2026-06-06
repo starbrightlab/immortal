@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Shell scripts are pushed verbatim to the Portal (Android sh) and MUST keep
+# LF endings regardless of host OS. CRLF makes the on-device shell fail with
+# "syntax error: unexpected 'do'" etc. Keep this even on Windows checkouts.
+*.sh text eol=lf
