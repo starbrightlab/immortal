@@ -49,6 +49,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -288,13 +290,21 @@ private fun LauncherScreen(
   var editMode by remember { mutableStateOf(false) }
   var openFolder by remember { mutableStateOf<String?>(null) }
 
-  // Tile size preference, re-read on resume so a change made in Immortal Settings
-  // applies the moment the user comes back to the home screen.
+  // Immortal Settings the home screen reflects (tile size, and the optional weather
+  // widget's mode/unit), re-read on resume so a change applies the moment the user
+  // comes back to the home screen.
   var tileSize by remember { mutableStateOf(ImmortalSettings.load(context).tileSize) }
+  var weatherWidget by remember { mutableStateOf(ImmortalSettings.load(context).weatherWidget) }
+  var weatherFahrenheit by remember { mutableStateOf(ImmortalSettings.useFahrenheit(context)) }
   val lifecycleOwner = LocalLifecycleOwner.current
   DisposableEffect(lifecycleOwner) {
     val obs = LifecycleEventObserver { _, e ->
-      if (e == Lifecycle.Event.ON_RESUME) tileSize = ImmortalSettings.load(context).tileSize
+      if (e == Lifecycle.Event.ON_RESUME) {
+        val s = ImmortalSettings.load(context)
+        tileSize = s.tileSize
+        weatherWidget = s.weatherWidget
+        weatherFahrenheit = ImmortalSettings.useFahrenheit(context)
+      }
     }
     lifecycleOwner.lifecycle.addObserver(obs)
     onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
@@ -439,7 +449,8 @@ private fun LauncherScreen(
       Spacer(Modifier.size(20.dp))
       Box(
           modifier =
-              Modifier.fillMaxSize()
+              Modifier.fillMaxWidth()
+                  .weight(1f)
                   .onGloballyPositioned { containerOrigin = it.boundsInWindow().topLeft }
                   .pointerInput(editMode) {
                     if (!editMode) return@pointerInput
@@ -527,6 +538,12 @@ private fun LauncherScreen(
             }
           }
         }
+      }
+      // Optional weather forecast, pinned full-width at the bottom of the screen
+      // below the (scrolling) app grid. Off by default.
+      if (weatherWidget != ImmortalSettings.WIDGET_OFF) {
+        Spacer(Modifier.size(16.dp))
+        WeatherWidget(mode = weatherWidget, fahrenheit = weatherFahrenheit)
       }
     }
 
@@ -736,6 +753,155 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
           fontSize = 18.sp,
           modifier = Modifier.padding(top = 4.dp),
       )
+    }
+  }
+}
+
+/** What the forecast widget currently has to show. */
+private sealed interface ForecastState {
+  /** First fetch still in flight — render nothing so the bar doesn't flash. */
+  object Loading : ForecastState
+  /** Tried and failed with nothing cached — show a friendly note instead. */
+  object Unavailable : ForecastState
+  data class Ready(val forecast: Weather.Forecast) : ForecastState
+}
+
+// The two swipeable forecast pages, in left-to-right order.
+private const val PAGE_HOURLY = 0
+private const val PAGE_DAILY = 1
+
+/**
+ * Optional home-screen forecast, shown full-width below the app grid when enabled in
+ * Immortal Settings ▸ Weather. One network call fetches both views; the user swipes
+ * left/right between the hourly and 7-day pages. [mode] picks which page shows first
+ * (and jumps to it if the setting changes). [fahrenheit] only keys a re-fetch when the
+ * unit changes — the unit itself is resolved inside [Weather.fetchForecast].
+ *
+ * Failure handling: the fetch retries every minute until it succeeds. While the very
+ * first attempt is in flight nothing is drawn (no flash). If it can't be reached and
+ * we have no forecast yet, a quiet "unavailable" note replaces the data; once a
+ * forecast has loaded, a later failed refresh keeps the last good one on screen rather
+ * than blanking it.
+ */
+@Composable
+private fun WeatherWidget(mode: String, fahrenheit: Boolean) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  // Keyed on the unit only: switching pages is a local swipe, not a re-fetch.
+  val state by
+      produceState<ForecastState>(initialValue = ForecastState.Loading, fahrenheit) {
+        while (true) {
+          val f = withContext(Dispatchers.IO) { Weather.fetchForecast(context) }
+          if (f != null) {
+            value = ForecastState.Ready(f)
+            delay(30L * 60 * 1000) // refresh every 30 min
+          } else {
+            // Keep showing the last good forecast if we have one; only surface the
+            // note when there's nothing to display.
+            if (value !is ForecastState.Ready) value = ForecastState.Unavailable
+            delay(60L * 1000) // retry in 1 min
+          }
+        }
+      }
+  if (state is ForecastState.Loading) return
+
+  val startPage = if (mode == ImmortalSettings.WIDGET_DAILY) PAGE_DAILY else PAGE_HOURLY
+  val pagerState = rememberPagerState(initialPage = startPage) { 2 }
+  // Follow the setting: if the user changes the default in Immortal Settings, jump to
+  // that page when they come back (no-op on first composition, where it already matches).
+  LaunchedEffect(mode) {
+    if (pagerState.currentPage != startPage) pagerState.scrollToPage(startPage)
+  }
+
+  val ready = state as? ForecastState.Ready
+  Surface(
+      color = Color(0x14FFFFFF),
+      shape = RoundedCornerShape(20.dp),
+      modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+  ) {
+    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+      // Header: the current page's title, plus a two-dot indicator hinting the swipe.
+      Row(
+          modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 12.dp),
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+            when {
+              ready == null -> "Forecast"
+              pagerState.currentPage == PAGE_DAILY -> "7-day forecast"
+              else -> "Hourly forecast"
+            },
+            color = Color(0xFFBFBFBF),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        if (ready != null) PageDots(selected = pagerState.currentPage, count = 2)
+      }
+      if (ready != null) {
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth()) { page ->
+          // Each page's cells share the width evenly, spanning the whole card.
+          Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            if (page == PAGE_HOURLY) {
+              ready.forecast.hours.forEach { HourCell(it, Modifier.weight(1f)) }
+            } else {
+              ready.forecast.days.forEach { DayCell(it, Modifier.weight(1f)) }
+            }
+          }
+        }
+      } else {
+        // Unavailable: no connection / location yet. Retries quietly in the
+        // background, so no action is needed from the user.
+        Text(
+            "Forecast unavailable. It'll appear once your Portal is back online.",
+            color = Color(0xFF9A9A9A),
+            fontSize = 14.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp),
+        )
+      }
+    }
+  }
+}
+
+/** Small page-position dots, hinting the forecast can be swiped between its pages. */
+@Composable
+private fun PageDots(selected: Int, count: Int) {
+  Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+    repeat(count) { i ->
+      Box(
+          modifier =
+              Modifier.size(7.dp)
+                  .clip(androidx.compose.foundation.shape.CircleShape)
+                  .background(if (i == selected) Color.White else Color(0x55FFFFFF)))
+    }
+  }
+}
+
+@Composable
+private fun HourCell(h: Weather.HourForecast, modifier: Modifier = Modifier) {
+  Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      modifier = modifier.padding(vertical = 4.dp),
+  ) {
+    Text(h.label, color = Color(0xFFCFCFCF), fontSize = 13.sp, maxLines = 1)
+    Text(Weather.emoji(h.code), fontSize = 26.sp, modifier = Modifier.padding(vertical = 6.dp))
+    Text("${h.temp}°", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+  }
+}
+
+@Composable
+private fun DayCell(d: Weather.DayForecast, modifier: Modifier = Modifier) {
+  Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      modifier = modifier.padding(vertical = 4.dp),
+  ) {
+    Text(d.label, color = Color(0xFFCFCFCF), fontSize = 13.sp, maxLines = 1)
+    Text(Weather.emoji(d.code), fontSize = 26.sp, modifier = Modifier.padding(vertical = 6.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+      Text("${d.hi}°", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+      Text("${d.lo}°", color = Color(0xFF9A9A9A), fontSize = 16.sp)
     }
   }
 }

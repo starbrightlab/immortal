@@ -124,6 +124,34 @@ private fun ImmortalSettingsScreen() {
               },
           )
         }
+        Divider()
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text("Home-screen forecast", color = Color.White, fontSize = 17.sp)
+            Text(
+                "Show a forecast below your apps. Off by default.",
+                color = Color(0xFF9A9A9A),
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+          }
+          Segmented(
+              options =
+                  listOf(
+                      "Off" to ImmortalSettings.WIDGET_OFF,
+                      "Hourly" to ImmortalSettings.WIDGET_HOURLY,
+                      "7-day" to ImmortalSettings.WIDGET_DAILY,
+                  ),
+              selected = settings.weatherWidget,
+              onSelect = {
+                ImmortalSettings.setWeatherWidget(context, it)
+                settings = settings.copy(weatherWidget = it)
+              },
+          )
+        }
       }
 
       Spacer(Modifier.size(26.dp))
@@ -189,6 +217,11 @@ private fun Card(content: @Composable () -> Unit) {
   ) {
     Column { content() }
   }
+}
+
+@Composable
+private fun Divider() {
+  Spacer(Modifier.fillMaxWidth().height(1.dp).background(Color(0x14FFFFFF)))
 }
 
 @Composable

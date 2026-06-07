@@ -10,6 +10,8 @@ package com.immortal.launcher
 import android.content.Context
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlin.math.roundToInt
 import org.json.JSONObject
 
@@ -70,6 +72,83 @@ object Weather {
       }
     }
     return null
+  }
+
+  /** One day of the multi-day forecast. [label] is "Today" then "Mon", "Tue", … */
+  data class DayForecast(val label: String, val code: Int, val hi: Int, val lo: Int)
+
+  /** One hour of the hourly forecast. [label] is "Now" then "1 PM", "2 PM", … */
+  data class HourForecast(val label: String, val code: Int, val temp: Int)
+
+  /** A combined forecast: both views are fetched in one call so the home-screen
+   * widget can switch between hourly and 7-day without re-hitting the network. */
+  data class Forecast(val days: List<DayForecast>, val hours: List<HourForecast>)
+
+  /**
+   * Fetches a 7-day daily forecast and the next ~12 hours of hourly forecast from
+   * Open-Meteo (keyless), for the home-screen weather widget. Returns null if it
+   * can't be fetched (caller can retry). `timezone=auto` makes Open-Meteo return
+   * local times, which we parse in the device's default zone.
+   */
+  fun fetchForecast(context: Context): Forecast? =
+      runCatching {
+            val (lat, lon) = location(context) ?: return null
+            // °F or °C per the user's setting (default: follow the device locale).
+            val unit = if (ImmortalSettings.useFahrenheit(context)) "fahrenheit" else "celsius"
+            val root =
+                JSONObject(
+                    httpGet(
+                        "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+                            "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+                            "&hourly=weather_code,temperature_2m" +
+                            "&forecast_days=7&temperature_unit=$unit&timezone=auto"))
+            Forecast(days = parseDays(root), hours = parseHours(root))
+          }
+          .getOrNull()
+
+  private fun parseDays(root: JSONObject): List<DayForecast> {
+    val d = root.getJSONObject("daily")
+    val time = d.getJSONArray("time")
+    val code = d.getJSONArray("weather_code")
+    val hi = d.getJSONArray("temperature_2m_max")
+    val lo = d.getJSONArray("temperature_2m_min")
+    val dayFmt = SimpleDateFormat("EEE", Locale.getDefault())
+    val isoDate = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    return (0 until time.length()).map { i ->
+      val label =
+          if (i == 0) "Today"
+          else runCatching { dayFmt.format(isoDate.parse(time.getString(i))!!) }.getOrDefault("")
+      DayForecast(
+          label = label,
+          code = code.getInt(i),
+          hi = hi.getDouble(i).roundToInt(),
+          lo = lo.getDouble(i).roundToInt())
+    }
+  }
+
+  private fun parseHours(root: JSONObject): List<HourForecast> {
+    val h = root.getJSONObject("hourly")
+    val time = h.getJSONArray("time")
+    val code = h.getJSONArray("weather_code")
+    val temp = h.getJSONArray("temperature_2m")
+    val isoHour = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US)
+    val hourFmt = SimpleDateFormat("h a", Locale.getDefault())
+    // Show the current hour onward; everything before "now" is in the past.
+    val cutoff = System.currentTimeMillis() - 60L * 60 * 1000
+    val out = ArrayList<HourForecast>(12)
+    var first = true
+    for (i in 0 until time.length()) {
+      val t = runCatching { isoHour.parse(time.getString(i))!!.time }.getOrNull() ?: continue
+      if (t < cutoff) continue
+      out.add(
+          HourForecast(
+              label = if (first) "Now" else hourFmt.format(time.getString(i).let { isoHour.parse(it)!! }),
+              code = code.getInt(i),
+              temp = temp.getDouble(i).roundToInt()))
+      first = false
+      if (out.size >= 12) break
+    }
+    return out
   }
 
   private fun httpGet(spec: String): String {

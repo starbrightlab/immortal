@@ -30,9 +30,15 @@ object ImmortalSettings {
   const val SIZE_LARGE = "large" // 5 columns, 110dp tiles (closer to the stock launcher)
   const val SIZE_XL = "xl" // 4 columns, 140dp tiles (for the big-screen Portal+)
 
+  // Optional home-screen weather forecast widget, shown below the app grid.
+  const val WIDGET_OFF = "off" // no forecast (default)
+  const val WIDGET_HOURLY = "hourly" // hour-by-hour for the next several hours
+  const val WIDGET_DAILY = "daily" // a high/low for each of the next 7 days
+
   data class Settings(
       val weatherUnit: String = UNIT_AUTO,
       val tileSize: String = SIZE_STANDARD,
+      val weatherWidget: String = WIDGET_OFF,
   )
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -42,6 +48,7 @@ object ImmortalSettings {
     return Settings(
         weatherUnit = p.getString("weather_unit", UNIT_AUTO) ?: UNIT_AUTO,
         tileSize = p.getString("tile_size", SIZE_STANDARD) ?: SIZE_STANDARD,
+        weatherWidget = p.getString("weather_widget", WIDGET_OFF) ?: WIDGET_OFF,
     )
   }
 
@@ -49,6 +56,9 @@ object ImmortalSettings {
       prefs(c).edit().putString("weather_unit", unit).apply()
 
   fun setTileSize(c: Context, size: String) = prefs(c).edit().putString("tile_size", size).apply()
+
+  fun setWeatherWidget(c: Context, mode: String) =
+      prefs(c).edit().putString("weather_widget", mode).apply()
 
   /** Resolved unit for a fetch: true → Fahrenheit, false → Celsius. */
   fun useFahrenheit(context: Context): Boolean =
