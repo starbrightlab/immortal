@@ -94,17 +94,29 @@ object Weather {
       runCatching {
             val (lat, lon) = location(context) ?: return null
             // °F or °C per the user's setting (default: follow the device locale).
-            val unit = if (ImmortalSettings.useFahrenheit(context)) "fahrenheit" else "celsius"
-            val root =
-                JSONObject(
-                    httpGet(
-                        "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
-                            "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-                            "&hourly=weather_code,temperature_2m" +
-                            "&forecast_days=7&temperature_unit=$unit&timezone=auto"))
-            Forecast(days = parseDays(root), hours = parseHours(root))
+            val json = httpGet(forecastUrl(lat, lon, ImmortalSettings.useFahrenheit(context)))
+            parseForecast(json, System.currentTimeMillis())
           }
           .getOrNull()
+
+  /** The Open-Meteo request for [fetchForecast]; split out so the unit choice can be
+   * verified in tests. `timezone=auto` makes the response use the location's local
+   * times, which [parseForecast] reads in the device's default zone. */
+  internal fun forecastUrl(lat: Double, lon: Double, fahrenheit: Boolean): String {
+    val unit = if (fahrenheit) "fahrenheit" else "celsius"
+    return "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
+        "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+        "&hourly=weather_code,temperature_2m" +
+        "&forecast_days=7&temperature_unit=$unit&timezone=auto"
+  }
+
+  /** Pure parse of an Open-Meteo forecast response. [nowMillis] is the reference "now"
+   * used to drop already-past hours, passed in (rather than read from the clock) so the
+   * hourly logic is deterministic under test. */
+  internal fun parseForecast(json: String, nowMillis: Long): Forecast {
+    val root = JSONObject(json)
+    return Forecast(days = parseDays(root), hours = parseHours(root, nowMillis))
+  }
 
   private fun parseDays(root: JSONObject): List<DayForecast> {
     val d = root.getJSONObject("daily")
@@ -126,7 +138,7 @@ object Weather {
     }
   }
 
-  private fun parseHours(root: JSONObject): List<HourForecast> {
+  private fun parseHours(root: JSONObject, nowMillis: Long): List<HourForecast> {
     val h = root.getJSONObject("hourly")
     val time = h.getJSONArray("time")
     val code = h.getJSONArray("weather_code")
@@ -134,7 +146,7 @@ object Weather {
     val isoHour = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US)
     val hourFmt = SimpleDateFormat("h a", Locale.getDefault())
     // Show the current hour onward; everything before "now" is in the past.
-    val cutoff = System.currentTimeMillis() - 60L * 60 * 1000
+    val cutoff = nowMillis - 60L * 60 * 1000
     val out = ArrayList<HourForecast>(12)
     var first = true
     for (i in 0 until time.length()) {
