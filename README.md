@@ -9,6 +9,8 @@ Package: `com.immortal.launcher` · Target: Meta Portal — **Android 9** (API 2
 Portal+ and the Portal TV) and **Android 10** (API 29: the 2019 and 2021 models), arm64, no Google
 services. Touch models and the remote-driven **Portal TV** are both supported.
 
+[![Get it on OpenPortal](https://andronedev.github.io/openportal/openportal-badge.svg)](https://andronedev.github.io/openportal/apps/com.immortal.launcher)
+
 ## What's in it
 
 - **Launcher** (`HomeActivity`) — a fullscreen app grid with a clock/date/weather header and an
@@ -60,6 +62,13 @@ services. Touch models and the remote-driven **Portal TV** are both supported.
 The easiest path is the [provisioning kit](provisioning/): connect the Portal over USB-C with
 ADB enabled, then double-click `Provision-Portal` (macOS/Linux) or `Provision-Portal.bat`
 (Windows). It fetches the latest release automatically.
+
+**No computer setup?** You can also install Immortal straight from your browser with
+[OpenPortal](https://andronedev.github.io/openportal/apps/com.immortal.launcher), a Chromium-based
+web app that drives the Portal over USB with WebUSB + ADB. Nothing to download or run on your
+machine: plug in the Portal, click install, and OpenPortal also runs Immortal's post-install setup
+for you (it sets the launcher as the home screen and applies the overlay tweak). Because it
+installs over the ADB protocol, it sidesteps the broken first-gen installer dialog entirely.
 
 To build from source instead:
 
