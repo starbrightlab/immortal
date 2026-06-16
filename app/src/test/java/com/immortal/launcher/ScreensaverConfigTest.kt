@@ -46,7 +46,34 @@ class ScreensaverConfigTest {
     assertEquals(ScreensaverConfig.SOURCE_DEFAULT, s.source)
     assertEquals(ScreensaverConfig.FIT_FILL, s.fit)
     assertEquals(30, s.intervalSec)
+    assertEquals(60, s.albumRefreshMin)
     assertFalse(s.shuffle)
     assertTrue(s.includeVideo)
+  }
+
+  @Test
+  fun usesUrl_requiresUrlSourceAndLink() {
+    assertTrue(
+        ScreensaverConfig.Settings(
+                source = ScreensaverConfig.SOURCE_URL,
+                albumUrl = "https://www.icloud.com/sharedalbum/#B1abcDEF")
+            .usesUrl)
+    assertFalse(
+        ScreensaverConfig.Settings(source = ScreensaverConfig.SOURCE_URL, albumUrl = null).usesUrl)
+    assertFalse(
+        ScreensaverConfig.Settings(source = ScreensaverConfig.SOURCE_URL, albumUrl = "").usesUrl)
+    assertFalse(
+        ScreensaverConfig.Settings(
+                source = ScreensaverConfig.SOURCE_DEFAULT,
+                albumUrl = "https://www.icloud.com/sharedalbum/#B1abcDEF")
+            .usesUrl)
+  }
+
+  @Test
+  fun clampAlbumRefresh_keepsWithinBounds() {
+    assertEquals(5, ScreensaverConfig.clampAlbumRefresh(1))
+    assertEquals(5, ScreensaverConfig.clampAlbumRefresh(-10))
+    assertEquals(60, ScreensaverConfig.clampAlbumRefresh(60))
+    assertEquals(24 * 60, ScreensaverConfig.clampAlbumRefresh(99999))
   }
 }

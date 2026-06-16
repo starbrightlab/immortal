@@ -47,11 +47,15 @@ import org.json.JSONObject
  *
  * Source is configurable via [ScreensaverConfig]:
  *  - **default** — the built-in keyless photo feed (Lorem Picsum, or Unsplash if a
- *    key is supplied). This is also the fallback whenever a local source is unset,
- *    empty, or unreachable (e.g. a USB drive was unplugged), so the frame is never
- *    blank.
+ *    key is supplied). This is also the fallback whenever any other source is unset,
+ *    empty, or unreachable (e.g. a USB drive was unplugged, a shared album was
+ *    unshared), so the frame is never blank.
  *  - **folder** — photos and videos from a folder the user picked (internal, SD, or
  *    a USB-C drive), read through the Storage Access Framework.
+ *  - **url** — a public share link to an iCloud Shared Album or a Google Photos
+ *    shared album. Fetched once on start; the screensaver rotates through the
+ *    returned direct image URLs and silently falls back to the default feed if the
+ *    album can't be resolved.
  *
  * Weather is Open-Meteo + IP geolocation (both keyless). All network is best-effort.
  */
@@ -83,6 +87,11 @@ class PhotoFrameController(
   // Bumped on every advance so a slow image-decode or an old video's completion
   // callback can tell it's been superseded and bow out.
   private var gen = 0
+
+  // Remote-album playback state (iCloud / Google Photos shared albums).
+  private var remoteMode = false
+  private var remoteUrls: List<String> = emptyList()
+  private var remoteIndex = -1
 
   // Web-feed history so swipes can go back as well as forward.
   private val history = ArrayList<Bitmap>()
@@ -122,30 +131,55 @@ class PhotoFrameController(
     applyFit()
     tick.run()
     refreshWeather.run()
-    if (settings.usesFolder) {
-      val path = settings.folderPath
-      if (path.isNullOrBlank()) {
-        startWeb()
-        return
-      }
-      io.execute {
-        val list =
-            if (LocalMedia.isAccessible(path)) LocalMedia.enumerate(path, settings.includeVideo)
-            else emptyList()
-        ui.post {
-          if (list.isNotEmpty()) {
-            playlist = if (settings.shuffle) list.shuffled() else list
-            localMode = true
-            localIndex = -1
-            advanceLocal(+1)
-          } else {
-            // Folder empty / unreachable → never leave the frame blank.
-            startWeb()
+    when {
+      settings.usesFolder -> {
+        val path = settings.folderPath
+        if (path.isNullOrBlank()) {
+          startWeb()
+          return
+        }
+        io.execute {
+          val list =
+              if (LocalMedia.isAccessible(path)) LocalMedia.enumerate(path, settings.includeVideo)
+              else emptyList()
+          ui.post {
+            if (list.isNotEmpty()) {
+              playlist = if (settings.shuffle) list.shuffled() else list
+              localMode = true
+              localIndex = -1
+              advanceLocal(+1)
+            } else {
+              // Folder empty / unreachable → never leave the frame blank.
+              startWeb()
+            }
           }
         }
       }
-    } else {
-      startWeb()
+      settings.usesUrl -> {
+        val shareUrl = settings.albumUrl
+        if (shareUrl.isNullOrBlank()) {
+          startWeb()
+          return
+        }
+        val m = context.resources.displayMetrics
+        io.execute {
+          val album = RemoteAlbum.fetch(shareUrl, m.widthPixels, m.heightPixels)
+          val urls = album?.photoUrls.orEmpty()
+          ui.post {
+            if (urls.isNotEmpty()) {
+              remoteUrls = if (settings.shuffle) urls.shuffled() else urls
+              remoteMode = true
+              remoteIndex = -1
+              advanceRemote(+1)
+              scheduleRemoteRefresh()
+            } else {
+              // Album unshared / unreachable → never leave the frame blank.
+              startWeb()
+            }
+          }
+        }
+      }
+      else -> startWeb()
     }
   }
 
@@ -270,11 +304,19 @@ class PhotoFrameController(
 
   // --- navigation (branches on the active source) -----------------------------
   fun next() {
-    if (localMode) advanceLocal(+1) else webNext()
+    when {
+      localMode -> advanceLocal(+1)
+      remoteMode -> advanceRemote(+1)
+      else -> webNext()
+    }
   }
 
   fun prev() {
-    if (localMode) advanceLocal(-1) else webPrev()
+    when {
+      localMode -> advanceLocal(-1)
+      remoteMode -> advanceRemote(-1)
+      else -> webPrev()
+    }
   }
 
   // --- local folder playback --------------------------------------------------
@@ -389,9 +431,76 @@ class PhotoFrameController(
     }
   }
 
+  // --- remote album playback (iCloud / Google Photos public shares) -----------
+  private val remoteTick =
+      object : Runnable {
+        override fun run() {
+          advanceRemote(+1)
+        }
+      }
+
+  // On transient failure we keep the existing list (don't drop to the web feed) and
+  // retry next interval.
+  private val remoteRefresh =
+      object : Runnable {
+        override fun run() {
+          if (!remoteMode) return
+          val shareUrl = settings.albumUrl
+          if (shareUrl.isNullOrBlank()) return
+          val m = context.resources.displayMetrics
+          io.execute {
+            val fresh = RemoteAlbum.fetch(shareUrl, m.widthPixels, m.heightPixels)
+            val urls = fresh?.photoUrls.orEmpty()
+            ui.post {
+              if (remoteMode && urls.isNotEmpty()) {
+                remoteUrls = if (settings.shuffle) urls.shuffled() else urls
+                // Keep our place if the album hasn't shrunk past the current index.
+                if (remoteIndex >= remoteUrls.size) remoteIndex = -1
+              }
+              scheduleRemoteRefresh()
+            }
+          }
+        }
+      }
+
+  private fun scheduleRemoteRefresh() {
+    ui.removeCallbacks(remoteRefresh)
+    ui.postDelayed(remoteRefresh, settings.albumRefreshMin * 60_000L)
+  }
+
+  private fun advanceRemote(dir: Int) {
+    ui.removeCallbacks(remoteTick)
+    if (remoteUrls.isEmpty()) {
+      startWeb()
+      return
+    }
+    gen++
+    remoteIndex = ((remoteIndex + dir) % remoteUrls.size + remoteUrls.size) % remoteUrls.size
+    val url = remoteUrls[remoteIndex]
+    val g = gen
+    stopVideo()
+    io.execute {
+      val bmp = runCatching { downloadBitmap(url) }.getOrNull()
+      ui.post {
+        if (g != gen) return@post // superseded by a newer advance
+        if (bmp == null) {
+          // Skip a broken URL; if the whole album is gone, fall back to the web feed.
+          advanceRemote(+1)
+          return@post
+        }
+        photo.visibility = View.VISIBLE
+        show(bmp)
+        ui.postDelayed(remoteTick, intervalMs())
+      }
+    }
+  }
+
   // --- web feed (default + fallback) ------------------------------------------
   private fun startWeb() {
     localMode = false
+    remoteMode = false
+    ui.removeCallbacks(remoteTick)
+    ui.removeCallbacks(remoteRefresh)
     stopVideo()
     rotate.run()
   }

@@ -15,8 +15,9 @@ import android.content.Context
  * The default source is Immortal's built-in photo feed; the user can instead point
  * the screensaver at a local folder of photos/videos — including one on a USB-C or
  * SD card plugged into the Portal (any folder reachable through the system file
- * picker). If the chosen folder can't be read (e.g. the drive is unplugged) the
- * screensaver falls back to the default feed, so it's never blank.
+ * picker) — or paste a public share link from iCloud or Google Photos. If the
+ * chosen source can't be read (e.g. the drive is unplugged, the album was unshared)
+ * the screensaver falls back to the default feed, so it's never blank.
  */
 object ScreensaverConfig {
 
@@ -24,9 +25,11 @@ object ScreensaverConfig {
 
   const val SOURCE_DEFAULT = "default"
   const val SOURCE_FOLDER = "folder"
+  const val SOURCE_URL = "url"
   const val FIT_FILL = "fill" // crop to fill the screen
   const val FIT_FIT = "fit" // letterbox to show the whole image
   const val DEFAULT_INTERVAL = 30
+  const val DEFAULT_ALBUM_REFRESH_MIN = 60
 
   data class Settings(
       // Master on/off for Immortal's photo-frame screensaver. When off, Immortal
@@ -35,8 +38,10 @@ object ScreensaverConfig {
       val enabled: Boolean = true,
       val source: String = SOURCE_DEFAULT,
       val folderPath: String? = null,
+      val albumUrl: String? = null,
       val fit: String = FIT_FILL,
       val intervalSec: Int = DEFAULT_INTERVAL,
+      val albumRefreshMin: Int = DEFAULT_ALBUM_REFRESH_MIN,
       val shuffle: Boolean = false,
       val includeVideo: Boolean = true,
       // Battery models (Portal Go) only: pause the screensaver while unplugged so
@@ -57,10 +62,16 @@ object ScreensaverConfig {
     /** True when the user has chosen a local folder for us to read. */
     val usesFolder: Boolean
       get() = source == SOURCE_FOLDER && !folderPath.isNullOrBlank()
+    /** True when the user has pasted a public album share link for us to fetch. */
+    val usesUrl: Boolean
+      get() = source == SOURCE_URL && !albumUrl.isNullOrBlank()
   }
 
   /** Keep the slideshow interval sane (5s … 10min). */
   fun clampInterval(sec: Int): Int = sec.coerceIn(5, 600)
+
+  /** Keep the album refresh sane (5 min … 24h). */
+  fun clampAlbumRefresh(min: Int): Int = min.coerceIn(5, 24 * 60)
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -70,8 +81,11 @@ object ScreensaverConfig {
         enabled = p.getBoolean("enabled", true),
         source = p.getString("source", SOURCE_DEFAULT) ?: SOURCE_DEFAULT,
         folderPath = p.getString("folder_path", null),
+        albumUrl = p.getString("album_url", null),
         fit = p.getString("fit", FIT_FILL) ?: FIT_FILL,
         intervalSec = clampInterval(p.getInt("interval_sec", DEFAULT_INTERVAL)),
+        albumRefreshMin =
+            clampAlbumRefresh(p.getInt("album_refresh_min", DEFAULT_ALBUM_REFRESH_MIN)),
         shuffle = p.getBoolean("shuffle", false),
         includeVideo = p.getBoolean("include_video", true),
         batterySaver = p.getBoolean("battery_saver", true),
@@ -91,12 +105,18 @@ object ScreensaverConfig {
   fun setFolder(c: Context, path: String) =
       prefs(c).edit().putString("folder_path", path).putString("source", SOURCE_FOLDER).apply()
 
+  fun setAlbumUrl(c: Context, url: String) =
+      prefs(c).edit().putString("album_url", url.trim()).putString("source", SOURCE_URL).apply()
+
   fun useDefault(c: Context) = prefs(c).edit().putString("source", SOURCE_DEFAULT).apply()
 
   fun setFit(c: Context, fit: String) = prefs(c).edit().putString("fit", fit).apply()
 
   fun setInterval(c: Context, sec: Int) =
       prefs(c).edit().putInt("interval_sec", clampInterval(sec)).apply()
+
+  fun setAlbumRefreshMin(c: Context, min: Int) =
+      prefs(c).edit().putInt("album_refresh_min", clampAlbumRefresh(min)).apply()
 
   fun setShuffle(c: Context, on: Boolean) = prefs(c).edit().putBoolean("shuffle", on).apply()
 

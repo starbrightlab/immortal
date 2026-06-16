@@ -141,6 +141,15 @@
             android:label="Choose a folder"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- One-field form for pasting a public iCloud / Google Photos shared-album
+             link, reachable from the "Shared album link" row in screensaver settings. -->
+        <activity
+            android:name=".AlbumUrlEntryActivity"
+            android:exported="false"
+            android:label="Shared album link"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- "Install an APK" file browser, opened from the App Store. -->
         <activity
             android:name=".ApkBrowserActivity"

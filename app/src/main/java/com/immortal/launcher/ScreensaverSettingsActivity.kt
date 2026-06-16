@@ -170,7 +170,7 @@ private fun ScreensaverSettingsScreen() {
         SelectableRow(
             title = "Immortal photos",
             subtitle = "A calming built-in photo feed (no setup).",
-            selected = !settings.usesFolder,
+            selected = !settings.usesFolder && !settings.usesUrl,
             onClick = {
               ScreensaverConfig.useDefault(context)
               settings = ScreensaverConfig.load(context)
@@ -187,12 +187,34 @@ private fun ScreensaverSettingsScreen() {
           Divider()
           TextButtonRow("Choose a different folder…") { openPicker() }
         }
+        Divider()
+        SelectableRow(
+            title = "Shared album link",
+            subtitle = albumUrlSubtitle(settings.usesUrl, settings.albumUrl),
+            selected = settings.usesUrl,
+            onClick = {
+              context.startActivity(Intent(context, AlbumUrlEntryActivity::class.java))
+            },
+        )
+        if (settings.usesUrl) {
+          Divider()
+          AlbumRefreshStepper(settings.albumRefreshMin) { v ->
+            val c = ScreensaverConfig.clampAlbumRefresh(v)
+            ScreensaverConfig.setAlbumRefreshMin(context, c)
+            settings = settings.copy(albumRefreshMin = c)
+          }
+          Divider()
+          TextButtonRow("Paste a different link…") {
+            context.startActivity(Intent(context, AlbumUrlEntryActivity::class.java))
+          }
+        }
       }
       Text(
           "Tip: put your photos and videos in a folder on your Portal and pick it here — for " +
               "example, copy them across while it's connected to your computer. (An SD card or " +
-              "USB-C drive can work too on models that support one.) If a folder can't be read, " +
-              "Immortal shows its built-in photos instead.",
+              "USB-C drive can work too on models that support one.) Or paste a public iCloud / " +
+              "Google Photos share link to pull from there. If a source can't be read, Immortal " +
+              "shows its built-in photos instead.",
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -347,6 +369,18 @@ private fun folderSubtitle(usesFolder: Boolean, name: String?, count: Int?): Str
       count == 0 -> "${name ?: "Selected folder"} — no photos or videos found"
       else -> "${name ?: "Selected folder"} — $count item${if (count == 1) "" else "s"}"
     }
+
+private fun albumUrlSubtitle(usesUrl: Boolean, url: String?): String =
+    when {
+      !usesUrl -> "Paste a public iCloud or Google Photos share link."
+      url.isNullOrBlank() -> "No link yet — tap to paste one."
+      else -> "${RemoteAlbum.providerName(url)} — ${shortUrl(url)}"
+    }
+
+private fun shortUrl(url: String): String {
+  val trimmed = url.trim()
+  return if (trimmed.length <= 56) trimmed else trimmed.take(53) + "…"
+}
 
 @Composable
 private fun SectionLabel(text: String) {
@@ -514,6 +548,63 @@ private fun MinuteStepper(minutes: Int, onChange: (Int) -> Unit) {
     ArrowButton("▶", focused) { onChange(minutes + 5) }
   }
 }
+
+// Non-uniform steps so every LEFT/RIGHT tap lands on a value users actually think in
+// (15m, 30m, 45m, 1h, 2h, ...), instead of a flat N-minute jump.
+@Composable
+private fun AlbumRefreshStepper(minutes: Int, onChange: (Int) -> Unit) {
+  val src = remember { MutableInteractionSource() }
+  val focused by src.collectIsFocusedAsState()
+  Row(
+      modifier =
+          Modifier.fillMaxWidth()
+              .onKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown) {
+                  when (e.key) {
+                    Key.DirectionLeft -> { onChange(prevAlbumRefreshStep(minutes)); true }
+                    Key.DirectionRight -> { onChange(nextAlbumRefreshStep(minutes)); true }
+                    else -> false
+                  }
+                } else false
+              }
+              .focusable(interactionSource = src)
+              .background(if (focused) Color(0x402E6BE6) else Color.Transparent)
+              .padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(
+        "Refresh album",
+        color = Color.White,
+        fontSize = 17.sp,
+        modifier = Modifier.weight(1f),
+    )
+    ArrowButton("◀", focused) { onChange(prevAlbumRefreshStep(minutes)) }
+    Text(
+        formatRefreshMinutes(minutes),
+        color = if (focused) Color.White else Color(0xFFDDDDDD),
+        fontSize = 17.sp,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.widthIn(min = 64.dp),
+    )
+    ArrowButton("▶", focused) { onChange(nextAlbumRefreshStep(minutes)) }
+  }
+}
+
+private val ALBUM_REFRESH_STEPS = listOf(15, 30, 45, 60, 120, 180, 240, 360, 720, 1440)
+
+private fun nextAlbumRefreshStep(minutes: Int): Int =
+    ALBUM_REFRESH_STEPS.firstOrNull { it > minutes } ?: ALBUM_REFRESH_STEPS.last()
+
+private fun prevAlbumRefreshStep(minutes: Int): Int =
+    ALBUM_REFRESH_STEPS.lastOrNull { it < minutes } ?: ALBUM_REFRESH_STEPS.first()
+
+private fun formatRefreshMinutes(minutes: Int): String =
+    when {
+      minutes < 60 -> "${minutes}m"
+      minutes % 60 == 0 -> "${minutes / 60}h"
+      else -> "${minutes / 60}h ${minutes % 60}m"
+    }
 
 /** Remote-friendly time-of-day stepper for the overnight window (15-min steps). */
 @Composable
