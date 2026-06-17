@@ -10,6 +10,22 @@ package com.immortal.launcher
 import android.content.Context
 
 /**
+ * How the frame relates to the Portal's presence-driven power policy.
+ *
+ *  - [ALWAYS_ON]  — pin the screen so the frame is permanent (the original wall-frame
+ *    behaviour). The dream/sleep presence proxy is masked, so presence reads UNKNOWN and the
+ *    music must defer to Home Assistant / a manual override.
+ *  - [PRESENCE]   — don't pin: let the Portal's presence policy sleep the screen when the room
+ *    empties and re-dream when someone returns. This is the shared baseline the screensaver and
+ *    the music both follow (see snapcast-multiroom.md → *Presence*). Confirmed on the Portal Go
+ *    on battery; verify empty-room sleep on a mains Portal before making it the global default.
+ */
+enum class FrameMode {
+  ALWAYS_ON,
+  PRESENCE,
+}
+
+/**
  * User configuration for the photo-frame screensaver, persisted across restarts.
  *
  * The default source is Immortal's built-in photo feed; the user can instead point
@@ -42,6 +58,10 @@ object ScreensaverConfig {
       // Battery models (Portal Go) only: pause the screensaver while unplugged so
       // the device can actually sleep, instead of showing photos until empty.
       val batterySaver: Boolean = true,
+      // Whether the frame is pinned on (ALWAYS_ON) or follows the Portal's presence policy
+      // (PRESENCE — the shared screensaver/music baseline). Defaults to ALWAYS_ON to preserve
+      // the original permanent-frame behaviour until PRESENCE is verified on mains hardware.
+      val presenceMode: FrameMode = FrameMode.ALWAYS_ON,
       // Idle screen-off (off by default): minutes the screensaver runs before the
       // screen turns off. 0 = never (Immortal's always-on photo frame).
       val idleSleepMin: Int = 0,
@@ -75,6 +95,9 @@ object ScreensaverConfig {
         shuffle = p.getBoolean("shuffle", false),
         includeVideo = p.getBoolean("include_video", true),
         batterySaver = p.getBoolean("battery_saver", true),
+        presenceMode =
+            runCatching { FrameMode.valueOf(p.getString("presence_mode", FrameMode.ALWAYS_ON.name)!!) }
+                .getOrDefault(FrameMode.ALWAYS_ON),
         idleSleepMin = p.getInt("idle_sleep_min", 0),
         overnightEnabled = p.getBoolean("overnight_enabled", false),
         overnightStartMin = p.getInt("overnight_start_min", 22 * 60),
@@ -105,6 +128,9 @@ object ScreensaverConfig {
 
   fun setBatterySaver(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("battery_saver", on).apply()
+
+  fun setPresenceMode(c: Context, mode: FrameMode) =
+      prefs(c).edit().putString("presence_mode", mode.name).apply()
 
   fun setEnabled(c: Context, on: Boolean) = prefs(c).edit().putBoolean("enabled", on).apply()
 

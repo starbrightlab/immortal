@@ -22,6 +22,11 @@ import android.content.IntentFilter
 class ImmortalApp : Application() {
   override fun onCreate() {
     super.onCreate()
+    // The shared presence source of truth: owns DREAMING_STARTED / SCREEN_OFF / POWER and
+    // exposes one PresenceState for the screensaver (in-process) and the Snapcast companion
+    // (broadcast). DREAMING_STOPPED stays here because it also drives the frame relaunch, and
+    // we feed its verdict into the hub from DreamPolicy.
+    PresenceHub.init(this)
     val receiver =
         object : BroadcastReceiver() {
           override fun onReceive(c: Context, intent: Intent) {

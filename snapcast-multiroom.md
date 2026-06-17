@@ -118,10 +118,12 @@ the launcher integrates it by **intent**, not by linking its code (see *Licensin
    and the off/presence/on mode below) living in Immortal's UI the way the screensaver
    settings do. Immortal sends the companion intents to connect/disconnect/select-stream and
    reads back status.
-5. **Screensaver cooperation.** Keep audio playing while the photo-frame `DreamService` is
-   up — music should outlast someone leaving the room and is independent of the screen state.
-   (Presence gating, when enabled, is handled server-side by Home Assistant — see *Presence*
-   — not by the Portal, which can't read its own presence sensor.)
+5. **Screensaver cooperation.** Audio and the photo frame are independent of raw screen
+   state — the frame coming and going for a slideshow or screen-bright change must not stutter
+   the music. They *do* share one signal: the `PresenceState` source of truth (see *Presence*).
+   In **Presence** mode both follow it together (present → frame + music; empty → screen off +
+   music stopped); in **Always-on**/manual modes the companion takes presence from HA or the
+   user override, never from raw screen on/off.
 6. **Self-heal watchdog.** A `WorkManager`/`AlarmManager` watchdog restarts the service if
    it's killed, on top of the in-service auto-reconnect. This handles the common failures
    (network blip, low-memory kill, reboot) **without any server cooperation**.
@@ -137,44 +139,149 @@ persist a tuned offset **per Portal model** and likely bump the default buffer (
 front. Cross-room sync should be good, but verify on real hardware before promising
 "Sonos-perfect."
 
-## Presence — off / presence / on (server-side, via Home Assistant)
+## Presence — off / presence / on
 
-### Access finding (determined)
+The behaviour we actually want is one rule shared by the screensaver *and* the music, so that
+both react to the same thing instead of being wedged together:
 
-**An unprivileged app on the Portal cannot read the presence sensor.** This is confirmed in
-Immortal's own `DreamPolicy` (measured on-device, `app/.../DreamPolicy.kt`): Meta's presence
-signal is gated behind `signature|privileged` permissions Immortal can't hold, and there's no
-root to escalate. Immortal only ever *reacts* to the system's presence-driven dream/sleep
-transitions; it never reads occupancy directly.
+| Screen idle and… | Screensaver | Music |
+|---|---|---|
+| **someone in the room** | photo frame up | playing |
+| **room empty** (after a grace period) | screen off | stopped |
 
-The only on-device presence *proxy* — screen truly asleep vs awake — exists solely on the
-**Portal Go on battery with battery-saver on**. On mains-powered Portals (the wall/counter
-case where you'd most want presence) Immortal deliberately **holds the screen on**, so there's
-no presence reflection at all. So a Portal-local presence signal is **not reliable** and we
-should not build on it. (A quick `SensorManager.getSensorList()` probe in Phase 0 will confirm
-nothing useful is exposed, but plan around HA regardless.)
+…with manual **on/off** overrides on top of that baseline. Getting this right means being
+precise about *where* the occupancy signal comes from. There are two viable sources — a
+**Portal-local proxy** (good enough for the common case, free) and **Home Assistant occupancy
+sensors** (authoritative, decoupled) — and one that's genuinely closed to us.
 
-### Reliable design
+### What's closed: reading Meta's presence directly
 
-Put presence where it actually works: **Home Assistant room occupancy sensors** (mmWave /
-motion / BLE — independent of the Portal) drive an HA automation that controls each room's
-Portal. This sidesteps the Portal's locked-down sensor entirely.
+We tore apart the native `Photos_superframe.apk` (and the `aloha-gen1` system dump) to settle
+this. Meta's presence is **front-camera computer vision**, not a discrete sensor:
 
-Your requested tri-state is a **per-room mode**, surfaced in the launcher settings and the room
-UI:
+- SuperFrame binds the **SmartCamera metadata service**
+  (`ISmartCameraInternalMetadataService`) and subscribes to on-device CV "World" topics —
+  `PersonCount`, `PersonIds`, `HeadBoxes`, `IsArmRaised`, `IsHandWaving`, `UpdateTimeMs`.
+- That CV result is written to a system-wide presence store, exposed as
+  `content://com.facebook.alohaservices.presence.state.PresenceStateContentProvider`
+  (tables `TABLE_NAME_PRESENCE_CAMERA`). The Portal's PowerManager reads this store to choose
+  *ambient (dream)* vs *sleep* at every screen timeout.
 
-- **On** — the Portal is always in its group (always a candidate to play). Manual override.
-- **Off** — the Portal is muted / removed from its group. Manual override.
-- **Presence** — HA's room occupancy sensor manages this Portal's group membership
-  automatically (occupied → joins/unmutes; empty after a grace period → leaves/mutes).
+Access is **platform-signature-gated**. The provider/service require
+`com.facebook.alohaservices.presence.fbpermission.ACCESS_APP_STATE` and
+`com.facebook.aloha.permission.SMART_CAMERA_METADATA`. Meta's own grant manifest
+(`assets/fbpermissions.json`) gates the presence service behind a hard-coded
+`sha256withrsa` signature check, and every aloha permission defined in the dump is
+`signature` / `signatureOrSystem`. So only an app signed with Meta's platform key can read
+presence; an unprivileged, non-root third-party app **cannot** — directly. That part of the
+old `DreamPolicy` comment was right.
 
-On/Off are immediate local overrides; **Presence** hands that room over to the HA automation.
-Mechanically, all three resolve to Snapcast group membership / mute, driven either locally
-(the companion) or by HA over the repair/command channel.
+What was *overstated* was concluding presence is therefore unachievable. We can't read Meta's
+signal, but we already receive events **derived** from it, and that's enough for the baseline.
 
-> Requires a room occupancy sensor in HA for any room set to **Presence**. Rooms without one
-> simply use On/Off. This is the one place the design may want a small hardware add (a cheap
-> mmWave or PIR sensor per room) — but it's optional and per-room.
+### What's open: the presence-derived proxy (Portal-local, free)
+
+Because the Portal's PowerManager makes its dream/sleep decision *from* that camera presence
+store, the dream/sleep lifecycle **is** presence, second-hand. Unprivileged apps receive it:
+`ACTION_DREAMING_STARTED` / `ACTION_DREAMING_STOPPED`, the `DreamService` lifecycle,
+`SCREEN_ON` / `SCREEN_OFF`, `PowerManager.isInteractive`. Read together:
+
+- **dream starts** → the presence service saw someone → **PRESENT**.
+- **dream stops → real sleep** (screen goes non-interactive) → empty room → **ABSENT**.
+- **dream stops → re-dreams** (the periodic transient force-wake) → still **PRESENT**.
+
+**Reliability and its one caveat.** This proxy is reliable *as long as we let the screen time
+out*. Today Immortal **defeats it on mains power**: `DreamPolicy.holdScreenOn` pins
+`FLAG_KEEP_SCREEN_ON` so the frame is permanent — which hides the very transition that signals
+"room emptied." That was a deliberate "always-on wall frame" choice, but it's an *override*
+masquerading as the default. The redesign (below) makes "let the Portal's presence policy run"
+the **baseline**, and "always-on frame" an explicit opt-in — so the proxy is available on every
+model, not just the Portal Go on battery-saver.
+
+> **Verify before flipping the default.** The empty-room→sleep path is confirmed on the Go on
+> battery; on mains-powered Portals it's *expected* (stock SuperFrame slept the wall units when
+> you left) but unconfirmed inside Immortal's relaunch loop. Phase 0 task: set a mains Portal to
+> Presence mode, leave the room, confirm it sleeps and re-dreams on return. Until then, ship
+> Presence as available-but-opt-in with Always-on as the safe fallback.
+
+We also no longer need a `SensorManager.getSensorList()` probe to "find" a sensor — the APK
+proves there isn't one; presence is camera-CV behind the platform signature. (A probe is still
+harmless confirmation, but don't expect it to surface anything.)
+
+### What's authoritative: Home Assistant occupancy (decoupled)
+
+For rooms where the local proxy isn't enough — a mains frame whose sleep behaviour we haven't
+verified, a room where you want occupancy independent of the screen, or finer grace tuning —
+**HA room occupancy sensors** (mmWave / motion / BLE) are the robust source. They're
+independent of the Portal entirely and drive group membership server-side. This is the
+recommended source for any room set to **Presence** that the proxy can't cover.
+
+### The tri-state, resolved against both sources
+
+The per-room mode lives in launcher settings (and the room UI):
+
+- **On** — always a candidate to play / frame always up. Manual override; ignores presence.
+- **Off** — muted / removed from its group; screensaver sleeps normally. Manual override.
+- **Presence** — occupancy manages this room automatically. Its signal comes from, in order of
+  preference: the **HA occupancy sensor** if the room has one (authoritative), else the
+  **Portal-local proxy** (free, good for the common case). When the proxy is masked
+  (Always-on frame) and there's no HA sensor, the room reports presence **UNKNOWN** and falls
+  back to On.
+
+On/Off are immediate local overrides; **Presence** defers to the resolved occupancy source.
+Mechanically all three resolve to Snapcast group membership / mute — and, on the Portal itself,
+to screensaver frame-vs-sleep — driven by the shared `PresenceState` source of truth (next
+section).
+
+> A room set to **Presence** wants *either* an HA occupancy sensor *or* a Portal whose local
+> proxy is enabled (Presence frame mode, verified to sleep when empty). A cheap per-room mmWave
+> / PIR into HA is the most reliable option and the only place the design may want a small
+> hardware add — optional and per-room.
+
+### One source of truth — `PresenceState`
+
+Both consumers (the screensaver frame and the Snapcast music companion) must react to the
+**same** presence signal, or they drift — music keeps playing to an empty room, or the frame
+sleeps while audio plays. Today the launcher has no such object: presence is implicit in
+scattered `@Volatile` flags in `DreamPolicy` (`userExitAt`, `bridgeAt`, `inStockHandoff`) and a
+lone `DREAMING_STOPPED` receiver, with no `DREAMING_STARTED` at all.
+
+The redesign introduces a single in-process source of truth, `PresenceState`, owned by a
+`PresenceHub` that the launcher initialises at startup:
+
+```
+                       Android system events (unprivileged)
+   DREAMING_STARTED ─┐  DREAMING_STOPPED ─┐  SCREEN_ON/OFF ─┐  POWER_* ─┐
+                     ▼                    ▼                 ▼           ▼
+                ┌──────────────────────────────────────────────────────┐
+                │  PresenceHub  — classifies events → PresenceState     │
+                │  { presence: PRESENT | ABSENT | UNKNOWN,              │
+                │    screen:   INTERACTIVE | DREAMING | OFF,            │
+                │    confident: Boolean,   // false when proxy masked   │
+                │    sinceMs }                                          │
+                └───────────────┬───────────────────────┬──────────────┘
+              in-process listener│                       │ broadcast intent
+                                 ▼                       ▼  com.immortal.launcher.PRESENCE
+                    ┌────────────────────────┐  ┌────────────────────────────┐
+                    │ Screensaver (frame)    │  │ Immortal Snapcast companion│
+                    │ PRESENT → keep/relaunch│  │ PRESENT → play / reclaim   │
+                    │ ABSENT  → let it sleep │  │ ABSENT  → pause / mute     │
+                    │                        │  │ UNKNOWN → defer to HA       │
+                    └────────────────────────┘  └────────────────────────────┘
+```
+
+- **In-process**, the screensaver subscribes directly: a `PRESENT` verdict keeps/relaunches the
+  frame, an `ABSENT` verdict lets the device sleep. This *replaces* the ad-hoc relaunch and
+  bridge-suppression logic in `DreamPolicy` — that logic becomes a pure classifier
+  (`classifyDreamStop`) feeding the hub, not a tangle of side-effecting flags.
+- **Cross-process**, the hub publishes a `com.immortal.launcher.PRESENCE` broadcast that the
+  GPL companion app subscribes to — staying inside the **intent-only** integration boundary
+  (no code linking; see *Licensing*). The companion maps `PRESENT → play`, `ABSENT → pause`,
+  and — crucially — `UNKNOWN → defer to HA`, so an Always-on wall frame never silently strands
+  the music; HA stays authoritative there.
+- **`confident`** encodes the honest caveat in one field: it's `false` exactly when the frame
+  is pinned on (proxy masked), telling every consumer "presence here is UNKNOWN — use HA or the
+  manual override." This is the single place the proxy-vs-HA decision is expressed.
 
 ## Managing rooms — reuse existing UIs
 
@@ -209,7 +316,9 @@ So repair is two layers, both anchored on the Portal:
 - **No GMS / no root is fine here.** `snapclient` is self-contained native code over plain
   TCP; none of the Portal's usual limitations bite.
 - **Apple Music** can only enter via AirPlay (no server-side provider) — see *Audio sources*.
-- **Presence** must come from HA room sensors, not the Portal — see *Presence*.
+- **Presence** has two viable sources — a free Portal-local proxy (the dream/sleep lifecycle,
+  reliable once we stop pinning the screen) and authoritative HA occupancy sensors. We *can't*
+  read Meta's camera presence directly (platform-signed) — see *Presence*.
 - **Network.** Everything on one LAN/subnet; mDNS/Avahi discovery works but mind WiFi
   multicast quirks on some routers — allow a manual host as a fallback.
 - **Android background limits.** A foreground service with a notification is mandatory on
@@ -236,16 +345,23 @@ catalog app.
 - **Phase 0 — validate (no new code).** ✅ *Done:* Snapcast (stock `de.badaix.snapcast`) is
   in the App Store. Next: stand up the server (MA as a Docker app on TrueNAS), install
   Snapcast on 2–3 Portals, tap-connect each, and confirm sync is acceptable on real hardware.
-  Also: a one-off `SensorManager.getSensorList()` probe on a Portal to confirm no occupancy
-  sensor is exposed, and a check of which rooms already have (or need) an HA occupancy sensor.
+  Also: **verify the presence proxy on a mains Portal** — set Presence mode, leave the room,
+  confirm it sleeps (and re-dreams on return); this is the gate for making Presence the default
+  (see *Presence*). And check which rooms already have (or need) an HA occupancy sensor for the
+  rooms the proxy can't cover. (The APK teardown already proved no occupancy *sensor* is
+  exposed — presence is camera-CV behind the platform signature — so no `getSensorList()` hunt
+  is needed.)
 - **Phase 1 — server + sources.** ✅ *Decided* (below). Stand up MA on TrueNAS with AirPlay +
   local library (+ Spotify), wire the HA *Music Assistant* integration on the Pi, and document
   the concrete setup in this repo.
 - **Phase 2 — companion app.** Build *Immortal Snapcast*: autostart + foreground service +
   audio-focus + watchdog + command listener, with the launcher tile/settings integration
-  (including the off/presence/on mode). GPL-licensed, intent-driven.
+  (including the off/presence/on mode). GPL-licensed, intent-driven. It subscribes to the
+  launcher's `com.immortal.launcher.PRESENCE` broadcast (the `PresenceState` source of truth,
+  scaffolded in the launcher under *Presence*) for the local-proxy occupancy signal.
 - **Phase 3 — orchestration.** Wire the HA automations: repair (offline → nudge) and presence
-  (room occupancy → group membership) onto the companion's command channel.
+  (room occupancy → group membership) onto the companion's command channel — the authoritative
+  occupancy source that overrides the local proxy where a room has an HA sensor.
 
 ## Decisions (resolved)
 
@@ -254,14 +370,20 @@ catalog app.
    HA box is under-resourced and MA is the heavy component.)
 2. **Audio sources** — **AirPlay** (primary; the path for Apple Music), **local library**, and
    **Spotify** via librespot (bonus). Apple Music has no server-side provider — AirPlay only.
-3. **Presence** — **off / presence / on** per room, driven **server-side by Home Assistant
-   room occupancy sensors** (the Portal can't read its own presence sensor). On/Off are manual
-   overrides; Presence defers to HA.
+3. **Presence** — **off / presence / on** per room, baseline behaviour shared by the
+   screensaver and the music via a single `PresenceState` source of truth. We *can't* read
+   Meta's camera presence (platform-signed), but the dream/sleep lifecycle is a free, reliable
+   **presence proxy** once we stop pinning the screen; **HA occupancy sensors** are the
+   authoritative source that overrides it per room. On/Off are manual overrides; Presence
+   resolves to HA-if-available, else the proxy. (Revised from the earlier "HA-only" decision
+   after the APK teardown — see *Presence*.)
 
 ### Still to confirm
 
+- **Does the presence proxy sleep a mains Portal when the room empties?** The gate for making
+  Presence the default frame mode (Go-on-battery is already confirmed) — see *Presence*.
 - Which rooms already have an HA occupancy sensor, and which would need one added (only rooms
-  set to **Presence** need one).
+  set to **Presence** *and* not covered by the local proxy need one).
 - Where the music library lives on TrueNAS (the path MA should index).
 
 ## Fallback

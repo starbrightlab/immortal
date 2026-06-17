@@ -60,9 +60,6 @@ object DreamPolicy {
    */
   @Volatile var inStockHandoff: Boolean = false
 
-  /** How long after a deliberate bridge we keep suppressing the frame relaunch. */
-  private const val BRIDGE_GRACE_MS = 8000L
-
   fun hasBattery(context: Context): Boolean =
       runCatching {
             context
@@ -81,48 +78,55 @@ object DreamPolicy {
 
   /**
    * Pure decision (unit-tested): should the frame hold the screen on?
-   * Holding means a permanent frame; not holding hands control back to the
-   * system's presence policy at every screen timeout.
    *
-   * Note: presence-driven "sleep when the room's empty" is NOT achievable for us —
-   * that decision was made by Meta's SuperFrame, which Immortal replaces, and the
-   * presence signal is gated behind signature|privileged permissions we can't hold.
-   * Instead, [SleepScheduler] offers an idle timeout and an overnight window that
-   * turn the screen off via device-admin lockNow().
+   *  - [FrameMode.PRESENCE] never holds: we hand control back to the Portal's presence policy
+   *    at every screen timeout, so it sleeps the screen when the room empties and re-dreams
+   *    when someone returns. This is the shared screensaver/music baseline.
+   *  - [FrameMode.ALWAYS_ON] holds on mains / while charging / with the saver off → a permanent
+   *    frame, at the cost of masking the presence proxy (presence then reads UNKNOWN; the music
+   *    defers to Home Assistant — see [PresenceHub] and snapcast-multiroom.md → *Presence*).
+   *
+   * Note on what we CAN'T do: we can't read Meta's presence signal directly — it's front-camera
+   * CV behind a platform-signature permission (proven by the SuperFrame APK teardown). But the
+   * dream/sleep lifecycle is *derived* from it and is observable, which is exactly what
+   * PRESENCE mode rides. [SleepScheduler] still offers a presence-free idle timeout and an
+   * overnight window via device-admin lockNow() on top of either mode.
    */
   internal fun holdScreenOn(
+      mode: FrameMode,
       hasBattery: Boolean,
       batterySaver: Boolean,
       powered: Boolean,
-  ): Boolean = !hasBattery || !batterySaver || powered
+  ): Boolean =
+      when (mode) {
+        FrameMode.PRESENCE -> false
+        FrameMode.ALWAYS_ON -> !hasBattery || !batterySaver || powered
+      }
 
-  /** Pure decision (unit-tested): should a dream-stop relaunch the frame? */
-  internal fun shouldRelaunch(userExitAgoMs: Long, interactive: Boolean): Boolean {
-    if (userExitAgoMs in 0..4000) return false // user tapped out of the dream
-    return interactive // power button / real sleep — leave it be
-  }
-
-  /** Pure decision (unit-tested): is a deliberate stock-home bridge still in flight? */
-  internal fun bridging(bridgeAgoMs: Long): Boolean = bridgeAgoMs in 0..BRIDGE_GRACE_MS
-
-  /** Called on ACTION_DREAMING_STOPPED: continue the frame unless the user ended it. */
+  /**
+   * Called on ACTION_DREAMING_STOPPED. Classifies the stop once ([classifyDreamStop]), records
+   * the presence consequence in the shared [PresenceHub] (which the music companion reads), and
+   * — as the screensaver's own reaction — re-asserts the holding frame only on a force-wake.
+   */
   fun onDreamingStopped(context: Context) {
     if (!ScreensaverConfig.load(context).enabled) {
       Log.i(TAG, "screensaver disabled; not relaunching frame")
       return
     }
-    if (inStockHandoff || bridging(System.currentTimeMillis() - bridgeAt)) {
-      Log.i(TAG, "stock-launcher handoff; suppressing frame relaunch")
-      return
-    }
+    val now = System.currentTimeMillis()
     val pm = context.getSystemService(PowerManager::class.java)
-    val relaunch =
-        shouldRelaunch(
-            userExitAgoMs = System.currentTimeMillis() - userExitAt,
+    val verdict =
+        classifyDreamStop(
+            userExitAgoMs = now - userExitAt,
+            bridgeAgoMs = now - bridgeAt,
+            inStockHandoff = inStockHandoff,
             interactive = pm?.isInteractive == true,
         )
-    Log.i(TAG, "dream stopped; relaunch frame = $relaunch")
-    if (!relaunch) return
+    Log.i(TAG, "dream stopped; verdict = $verdict")
+    // Single source of truth: tell the hub the presence consequence (it broadcasts to the
+    // companion). SUPPRESSED (a Calls handoff) leaves presence untouched.
+    PresenceHub.onDreamStopped(context, verdict)
+    if (verdict != DreamStopVerdict.REDREAM) return
     runCatching {
       context.startActivity(
           Intent(context, PhotoFramePreviewActivity::class.java)

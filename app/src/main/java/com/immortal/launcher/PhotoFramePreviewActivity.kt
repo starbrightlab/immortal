@@ -25,11 +25,11 @@ import androidx.core.view.WindowInsetsControllerCompat
  *  - the continuation frame: when the system force-wakes the real screensaver
  *    (see [DreamPolicy]), this activity takes over seamlessly.
  *
- * Keep-screen-on policy: held on mains-powered Portals, while charging, or with
- * the battery saver off → the frame is permanent. On the Go on battery with the
- * saver on, the flag is NOT held: at each screen timeout the system's presence
- * policy decides — someone around → the dream (same visuals) takes over again;
- * empty room → the device truly sleeps. Plug/unplug just re-evaluates the flag.
+ * Keep-screen-on policy ([DreamPolicy.holdScreenOn], keyed on [FrameMode]): in PRESENCE mode
+ * the flag is never held — at each screen timeout the Portal's presence policy decides (someone
+ * around → the dream, same visuals, takes over again; empty room → the device truly sleeps),
+ * which is the baseline the music companion follows too. In ALWAYS_ON mode the flag is held on
+ * mains / while charging / with the saver off → a permanent frame. Plug/unplug re-evaluates it.
  */
 class PhotoFramePreviewActivity : ComponentActivity() {
   private lateinit var frame: PhotoFrameController
@@ -77,6 +77,7 @@ class PhotoFramePreviewActivity : ComponentActivity() {
     val cfg = ScreensaverConfig.load(this)
     val keep =
         DreamPolicy.holdScreenOn(
+            mode = cfg.presenceMode,
             hasBattery = DreamPolicy.hasBattery(this),
             batterySaver = cfg.batterySaver,
             powered = DreamPolicy.isPowered(this),

@@ -245,6 +245,28 @@ private fun ScreensaverSettingsScreen() {
       SectionLabel("Power")
       Surface(color = Color(0xFF1C1C1E), shape = RoundedCornerShape(18.dp)) {
         Column {
+          // Presence-driven baseline (all models): let the Portal sleep the screen when the
+          // room empties and re-show photos when someone returns — the same signal the
+          // multi-room music follows. ALWAYS_ON is the original permanent-frame behaviour.
+          ToggleRow(
+              "Follow presence (sleep when the room's empty)",
+              settings.presenceMode == FrameMode.PRESENCE) {
+                val mode = if (it) FrameMode.PRESENCE else FrameMode.ALWAYS_ON
+                ScreensaverConfig.setPresenceMode(context, mode)
+                settings = settings.copy(presenceMode = mode)
+              }
+          Text(
+              "On: the frame follows the Portal's own presence — photos while someone's " +
+                  "around, screen off (and multi-room music paused) when the room empties, on " +
+                  "every model. Off: a permanent photo frame on mains power. Newer behaviour — " +
+                  "confirm a wall-powered Portal actually sleeps when you leave before relying " +
+                  "on it.",
+              fontSize = 13.sp,
+              color = Color(0xFF9A9A9A),
+              modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+          )
+          Divider()
+
           if (hasBattery) {
             // Battery models (Portal Go): battery life vs always-on frame unplugged.
             ToggleRow("Sleep on battery when nobody's around", settings.batterySaver) {
