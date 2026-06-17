@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updated": "2026-06-13",
+  "updated": "2026-06-17",
   "note": "Portal app catalog, schema v2. All v2 fields are ADDITIVE so v1 clients keep working. Entries with source 'fdroid' resolve the current APK at install time via the F-Droid API, so they never go stale. Entries with source 'url' use a direct apkUrl (use this for your own custom Portal apps). Multi-ABI apps (e.g. VLC) ship separate per-architecture APKs on F-Droid; pin the arm64-v8a build with 'versionCode' since Portal is arm64. New in v2: iconUrl (https PNG; omit to get a monogram tile), author, homepage, submittedBy (community credit), longDescription (detail page), devices (['touch','tv'] — omit when the app runs on every Portal). minSdk drives the compatibility badge: the first-gen Portal/Portal+ and Portal TV are API 28, the 2019/2021 models are API 29.",
   "categories": [
     {
@@ -66,6 +66,18 @@
           "iconUrl": "https://f-droid.org/repo/org.y20k.transistor/en-US/icon.png",
           "author": "y20k",
           "homepage": "https://codeberg.org/y20k/transistor"
+        },
+        {
+          "name": "Snapcast",
+          "packageName": "de.badaix.snapcast",
+          "source": "fdroid",
+          "fdroidId": "de.badaix.snapcast",
+          "minSdk": 21,
+          "description": "Synchronized multi-room audio — play music in perfect sync across Portals.",
+          "longDescription": "The official Snapcast client and player. Point it at a Snapcast (or Music Assistant) server on your network and the Portal becomes a synchronized speaker — every room plays the same audio in sync, Sonos-style. Bundles the native player, needs no Google services, and runs on every Portal. Note: this is the stock app for testing the multi-room setup; an Immortal-native always-on companion is on the roadmap (see snapcast-multiroom.md).",
+          "iconUrl": "https://f-droid.org/repo/de.badaix.snapcast/en-US/icon.png",
+          "author": "badaix",
+          "homepage": "https://github.com/badaix/snapcast"
         }
       ]
     },
