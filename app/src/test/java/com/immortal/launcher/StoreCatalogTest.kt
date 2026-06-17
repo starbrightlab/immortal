@@ -125,6 +125,65 @@ class StoreCatalogTest {
   }
 
   @Test
+  fun latestVersionCode_usesCatalogPinForUrlSource_noNetwork() {
+    // A direct-URL app declares its latest versionCode in the catalog; the bump
+    // is what lights up the Update badge. No network call should be made.
+    val app =
+        CatalogApp(
+            name = "Portal Calendar",
+            packageName = "com.thefloppytaco.portalcalendar",
+            source = "url",
+            fdroidId = null,
+            apkUrl = "https://x/portal-calendar.apk",
+            versionCode = 23L,
+            description = "",
+            category = "Tools",
+        )
+    val latest =
+        StoreCatalog.latestVersionCode(app) { error("must not hit the network for a declared pin") }
+    assertEquals(23L, latest)
+  }
+
+  @Test
+  fun latestVersionCode_urlSourceWithoutVersionCode_isUncheckable() {
+    // No versionCode + no F-Droid metadata = nothing to compare against, so the
+    // app is skipped (rather than spuriously offered an update).
+    val app =
+        CatalogApp(
+            name = "Shizuku",
+            packageName = "moe.shizuku.privileged.api",
+            source = "url",
+            fdroidId = null,
+            apkUrl = "https://x/shizuku.apk",
+            versionCode = null,
+            description = "",
+            category = "Tools",
+        )
+    assertNull(StoreCatalog.latestVersionCode(app) { error("must not hit the network") })
+  }
+
+  @Test
+  fun latestVersionCode_fdroidWithoutPin_readsSuggestedVersionFromApi() {
+    val app =
+        CatalogApp(
+            name = "SmartTube",
+            packageName = "com.teamsmart.videomanager.tv",
+            source = "fdroid",
+            fdroidId = "com.teamsmart.videomanager.tv",
+            apkUrl = null,
+            versionCode = null,
+            description = "",
+            category = "Media",
+        )
+    val latest =
+        StoreCatalog.latestVersionCode(app) { url ->
+          assertTrue(url.endsWith("/packages/com.teamsmart.videomanager.tv"))
+          """{"suggestedVersionCode": 1234, "packageName":"x"}"""
+        }
+    assertEquals(1234L, latest)
+  }
+
+  @Test
   fun resolveApkUrl_buildsFdroidUrlFromPinnedVersion() {
     // A pinned versionCode avoids any network call (the arm64 build of a multi-ABI app).
     val app =

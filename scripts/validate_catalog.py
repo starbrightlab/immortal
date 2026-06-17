@@ -104,6 +104,14 @@ def main():
         vc = a.get("versionCode")
         if vc is not None and not isinstance(vc, int):
             err(f"{ctx} versionCode must be an integer, found {vc!r}")
+        # A direct-URL app has no live version source, so without a declared
+        # versionCode the store can't tell when it's out of date — it'll never
+        # show an Update. F-Droid apps don't need one (resolved from the API).
+        # The launcher itself ships a separate self-updater, so it's exempt.
+        if source == "url" and vc is None and pkg != "com.immortal.launcher":
+            warn(f"{ctx} source 'url' without versionCode won't get update detection — "
+                 f"add versionCode (and bump it on each release) so the store can "
+                 f"offer updates without a delete-and-reinstall")
 
         devices = a.get("devices", [])
         if not isinstance(devices, list) or any(d not in ALLOWED_DEVICES for d in devices):

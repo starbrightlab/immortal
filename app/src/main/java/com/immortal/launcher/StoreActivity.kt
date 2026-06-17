@@ -272,7 +272,18 @@ private fun BrowseScreen(
         else Modifier
 
     if (showUpdates) {
-      item { SectionHeader("Updates available") }
+      item {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          SectionHeader(
+              if (updateApps.size == 1) "1 update available"
+              else "${updateApps.size} updates available")
+          Spacer(Modifier.weight(1f))
+          if (updateApps.size > 1) ActionButton("Update all") { updateApps.forEach(onInstall) }
+        }
+      }
       items(updateApps, key = { "u:" + it.packageName }) { app ->
         AppCard(
             app, status[app.packageName], updates, onOpenDetail, onInstall,
