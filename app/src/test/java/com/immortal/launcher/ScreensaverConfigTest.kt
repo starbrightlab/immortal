@@ -71,8 +71,8 @@ class ScreensaverConfigTest {
 
   @Test
   fun clampAlbumRefresh_keepsWithinBounds() {
-    assertEquals(5, ScreensaverConfig.clampAlbumRefresh(1))
-    assertEquals(5, ScreensaverConfig.clampAlbumRefresh(-10))
+    assertEquals(15, ScreensaverConfig.clampAlbumRefresh(1))
+    assertEquals(15, ScreensaverConfig.clampAlbumRefresh(-10))
     assertEquals(60, ScreensaverConfig.clampAlbumRefresh(60))
     assertEquals(24 * 60, ScreensaverConfig.clampAlbumRefresh(99999))
   }

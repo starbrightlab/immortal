@@ -67,11 +67,13 @@ object RemoteAlbum {
 
   private fun fetchIcloud(url: String, screenW: Int, screenH: Int): Album? {
     val token = icloudToken(url) ?: return null
-    val host = resolveIcloudHost(token) ?: return null
+    val (host, streamJson) = resolveIcloudHost(token) ?: return null
     val base = "https://$host/$token/sharedstreams"
 
-    val streamJson = postJson("$base/webstream", "{\"streamCtag\":null}") ?: return null
-    val stream = JSONObject(streamJson)
+    // Reuse the body resolveIcloudHost already fetched on a 200; on 330 we still
+    // need to call /webstream against the redirected host.
+    val body = streamJson ?: postJson("$base/webstream", "{\"streamCtag\":null}") ?: return null
+    val stream = JSONObject(body)
     val title = stream.optString("streamName", "").ifBlank { null }
     val photos = stream.optJSONArray("photos") ?: return null
     if (photos.length() == 0) return Album(title, emptyList())
@@ -124,7 +126,9 @@ object RemoteAlbum {
     return Album(title, out)
   }
 
-  private fun resolveIcloudHost(token: String): String? {
+  // body is non-null on a 200 hit (caller can skip its own /webstream POST), null
+  // on a 330 redirect (the request never landed on the right host).
+  private fun resolveIcloudHost(token: String): Pair<String, String?>? {
     val firstGuess = "p${icloudPartition(token)}-sharedstreams.icloud.com"
     val c =
         URL("https://$firstGuess/$token/sharedstreams/webstream").openConnection()
@@ -139,11 +143,19 @@ object RemoteAlbum {
     c.outputStream.use { it.write("{\"streamCtag\":null}".toByteArray()) }
     val code = runCatching { c.responseCode }.getOrDefault(0)
     val redirect = c.getHeaderField("X-Apple-MMe-Host")
-    runCatching { c.disconnect() }
-    return when {
-      code == 200 -> firstGuess
-      code == 330 && !redirect.isNullOrBlank() -> redirect
-      else -> null
+    return try {
+      when {
+        code == 200 -> {
+          val body = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+          firstGuess to body
+        }
+        code == 330 && !redirect.isNullOrBlank() -> redirect to null
+        else -> null
+      }
+    } catch (_: Throwable) {
+      null
+    } finally {
+      runCatching { c.disconnect() }
     }
   }
 

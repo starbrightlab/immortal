@@ -70,8 +70,8 @@ object ScreensaverConfig {
   /** Keep the slideshow interval sane (5s … 10min). */
   fun clampInterval(sec: Int): Int = sec.coerceIn(5, 600)
 
-  /** Keep the album refresh sane (5 min … 24h). */
-  fun clampAlbumRefresh(min: Int): Int = min.coerceIn(5, 24 * 60)
+  /** Keep the album refresh sane (15 min … 24h). Floor matches the settings stepper. */
+  fun clampAlbumRefresh(min: Int): Int = min.coerceIn(15, 24 * 60)
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 

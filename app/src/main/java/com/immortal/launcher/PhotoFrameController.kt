@@ -92,6 +92,7 @@ class PhotoFrameController(
   private var remoteMode = false
   private var remoteUrls: List<String> = emptyList()
   private var remoteIndex = -1
+  private var remoteFailStreak = 0
 
   // Web-feed history so swipes can go back as well as forward.
   private val history = ArrayList<Bitmap>()
@@ -170,6 +171,7 @@ class PhotoFrameController(
               remoteUrls = if (settings.shuffle) urls.shuffled() else urls
               remoteMode = true
               remoteIndex = -1
+              remoteFailStreak = 0
               advanceRemote(+1)
               scheduleRemoteRefresh()
             } else {
@@ -439,8 +441,8 @@ class PhotoFrameController(
         }
       }
 
-  // On transient failure we keep the existing list (don't drop to the web feed) and
-  // retry next interval.
+  // Shuffle is applied once at start, not on refresh — re-shuffling every tick
+  // would scramble the user's current position.
   private val remoteRefresh =
       object : Runnable {
         override fun run() {
@@ -453,9 +455,9 @@ class PhotoFrameController(
             val urls = fresh?.photoUrls.orEmpty()
             ui.post {
               if (remoteMode && urls.isNotEmpty()) {
-                remoteUrls = if (settings.shuffle) urls.shuffled() else urls
-                // Keep our place if the album hasn't shrunk past the current index.
+                remoteUrls = urls
                 if (remoteIndex >= remoteUrls.size) remoteIndex = -1
+                remoteFailStreak = 0
               }
               scheduleRemoteRefresh()
             }
@@ -474,6 +476,12 @@ class PhotoFrameController(
       startWeb()
       return
     }
+    // One failure per URL = the whole album is unreachable; bail to the web feed
+    // so a dead share doesn't spin 8-12s timeouts indefinitely.
+    if (remoteFailStreak >= remoteUrls.size) {
+      startWeb()
+      return
+    }
     gen++
     remoteIndex = ((remoteIndex + dir) % remoteUrls.size + remoteUrls.size) % remoteUrls.size
     val url = remoteUrls[remoteIndex]
@@ -483,11 +491,13 @@ class PhotoFrameController(
       val bmp = runCatching { downloadBitmap(url) }.getOrNull()
       ui.post {
         if (g != gen) return@post // superseded by a newer advance
+        if (!remoteMode) return@post // raced with startWeb() flipping us off
         if (bmp == null) {
-          // Skip a broken URL; if the whole album is gone, fall back to the web feed.
+          remoteFailStreak++
           advanceRemote(+1)
           return@post
         }
+        remoteFailStreak = 0
         photo.visibility = View.VISIBLE
         show(bmp)
         ui.postDelayed(remoteTick, intervalMs())
