@@ -247,6 +247,12 @@
             android:name=".FleetAgentService"
             android:exported="false" />
 
+        <!-- MQTT publisher: exposes this Portal to Home Assistant via MQTT Discovery.
+             Off until the user configures a broker in Immortal settings. -->
+        <service
+            android:name=".MqttService"
+            android:exported="false" />
+
         <!-- Multi-room now-playing relay: reads the Snapcast group's track off the
              snapserver and publishes it as a media session so the now-playing card shows
              on every Portal. Foreground so it survives backgrounding; started by

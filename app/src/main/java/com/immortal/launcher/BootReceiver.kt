@@ -24,6 +24,8 @@ class BootReceiver : BroadcastReceiver() {
       // Re-open the WiFi fleet channel after the reboot (the whole point of an
       // in-app agent: it comes back without USB, unlike adb-over-WiFi here).
       FleetAgentService.ensureRunning(context)
+      // Reconnect the Home Assistant MQTT publisher (no-op unless configured).
+      MqttService.sync(context)
       // (Re)launch apps that can't restart themselves (e.g. the MA/Sendspin player,
       // which has no boot receiver). Wait a few seconds first so WiFi is up for their
       // first connect, then hand the screen back to our home so the Portal doesn't sit

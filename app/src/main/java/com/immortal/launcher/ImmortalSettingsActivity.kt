@@ -85,6 +85,7 @@ private fun ImmortalSettingsScreen() {
   val context = LocalContext.current
   var showBootApps by remember { mutableStateOf(false) }
   var showMultiRoom by remember { mutableStateOf(false) }
+  var showMqtt by remember { mutableStateOf(false) }
   var bootSelected by remember { mutableStateOf(BootLaunch.packages(context).toSet()) }
 
   if (showBootApps) {
@@ -102,16 +103,26 @@ private fun ImmortalSettingsScreen() {
     MultiRoomScreen(onBack = { showMultiRoom = false })
     return
   }
+  if (showMqtt) {
+    MqttScreen(onBack = { showMqtt = false })
+    return
+  }
 
   SettingsMain(
       bootCount = bootSelected.size,
       onOpenBootApps = { showBootApps = true },
       onOpenMultiRoom = { showMultiRoom = true },
+      onOpenMqtt = { showMqtt = true },
   )
 }
 
 @Composable
-private fun SettingsMain(bootCount: Int, onOpenBootApps: () -> Unit, onOpenMultiRoom: () -> Unit) {
+private fun SettingsMain(
+    bootCount: Int,
+    onOpenBootApps: () -> Unit,
+    onOpenMultiRoom: () -> Unit,
+    onOpenMqtt: () -> Unit,
+) {
   val context = LocalContext.current
   var settings by remember { mutableStateOf(ImmortalSettings.load(context)) }
 
@@ -319,6 +330,8 @@ private fun SettingsMain(bootCount: Int, onOpenBootApps: () -> Unit, onOpenMulti
       }
 
       MultiRoomNavRow(onOpen = onOpenMultiRoom)
+
+      MqttNavRow(onOpen = onOpenMqtt)
 
       Spacer(Modifier.size(26.dp))
       BootAppsNavRow(count = bootCount, onOpen = onOpenBootApps)
@@ -668,6 +681,254 @@ private fun MultiRoomScreen(onBack: () -> Unit) {
       Text(
           "Join this Portal to the same Snapcast group as your other rooms, then point it " +
               "at your Music Assistant server. The synced audio is played by the Snapcast app.",
+          color = Color(0xFF7C7C7C),
+          fontSize = 13.sp,
+          modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
+      )
+    }
+  }
+}
+
+/**
+ * Nav row into the Home Assistant (MQTT) subpage. Always shown — no companion app needed;
+ * the subtitle reflects whether publishing is on and the live connection status.
+ */
+@Composable
+private fun MqttNavRow(onOpen: () -> Unit) {
+  val context = LocalContext.current
+  Spacer(Modifier.size(26.dp))
+  SectionLabel("Home Assistant")
+  Card {
+    Row(
+        modifier = Modifier.fillMaxWidth().tvFocusableRow { onOpen() }.padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text("Home Assistant (MQTT)", color = Color.White, fontSize = 17.sp)
+        Text(
+            if (MqttConfig.isEnabled(context)) MqttStatus.text.ifBlank { "On" } else "Off",
+            color = Color(0xFF9A9A9A),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+      }
+      Text("›", color = Color(0xFF7C7C7C), fontSize = 26.sp)
+    }
+  }
+}
+
+/**
+ * The Home Assistant (MQTT) subpage: publish this Portal to Home Assistant as auto-
+ * discovered entities (presence, screen, battery, now-playing, controls) over a local
+ * MQTT broker. Off by default; Back returns to the main settings page.
+ */
+@Composable
+private fun MqttScreen(onBack: () -> Unit) {
+  val context = LocalContext.current
+  var enabled by remember { mutableStateOf(MqttConfig.isEnabled(context)) }
+  var host by remember { mutableStateOf(MqttConfig.host(context)) }
+  var port by remember { mutableStateOf(MqttConfig.port(context).toString()) }
+  var user by remember { mutableStateOf(MqttConfig.username(context)) }
+  var pass by remember { mutableStateOf(MqttConfig.password(context)) }
+  // MqttStatus is a plain holder updated off the main thread, so poll it for live
+  // "Connecting… → Connected" feedback (Compose won't recompose on its writes).
+  var status by remember { mutableStateOf(MqttStatus.text) }
+  LaunchedEffect(Unit) {
+    while (true) {
+      status = MqttStatus.text
+      kotlinx.coroutines.delay(800)
+    }
+  }
+
+  val firstFocus = remember { FocusRequester() }
+  LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+  val focusManager = LocalFocusManager.current
+  val portFocus = remember { FocusRequester() }
+  val userFocus = remember { FocusRequester() }
+  val passFocus = remember { FocusRequester() }
+
+  fun apply() {
+    MqttConfig.setHost(context, host)
+    MqttConfig.setPort(context, port.toIntOrNull() ?: MqttConfig.DEFAULT_PORT)
+    MqttConfig.setUsername(context, user)
+    MqttConfig.setPassword(context, pass)
+    MqttService.sync(context)
+  }
+
+  Column(
+      modifier =
+          Modifier.fillMaxSize()
+              .onPreviewKeyEvent { e ->
+                if (e.key == Key.Back) {
+                  if (e.type == KeyEventType.KeyUp) onBack()
+                  true
+                } else false
+              }
+              .background(Color(0xFF101012))
+              .verticalScroll(rememberScrollState())
+              .padding(horizontal = 28.dp, vertical = 32.dp),
+  ) {
+    Column(modifier = Modifier.widthIn(max = 1100.dp).focusGroup()) {
+      Surface(
+          color = Color(0xFF1C1C1E),
+          shape = RoundedCornerShape(12.dp),
+          modifier =
+              Modifier.focusRequester(firstFocus).tvFocusable(RoundedCornerShape(12.dp)) { onBack() },
+      ) {
+        Text(
+            "‹  Back",
+            color = Color.White,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+        )
+      }
+      Spacer(Modifier.size(18.dp))
+
+      Text("Home Assistant", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+      Text(
+          "Publish this Portal to Home Assistant as auto-discovered entities — presence, " +
+              "screen, battery, now-playing, and controls — over your MQTT broker.",
+          color = Color(0xFF9A9A9A),
+          fontSize = 16.sp,
+          modifier = Modifier.padding(top = 6.dp),
+      )
+      Spacer(Modifier.size(22.dp))
+      Card {
+        Column(modifier = Modifier.padding(18.dp)) {
+          Text("Setting it up", color = Color.White, fontSize = 17.sp)
+          MultiRoomStep(
+              "1",
+              "In Home Assistant, add the Mosquitto broker add-on (Settings → Add-ons) and the " +
+                  "MQTT integration. New to MQTT? See home-assistant.io/integrations/mqtt")
+          MultiRoomStep(
+              "2", "Turn on the toggle below and enter your broker's address (and login, if any).")
+          MultiRoomStep(
+              "3",
+              "This Portal appears automatically under Settings → Devices as a new MQTT device — " +
+                  "no YAML needed.")
+        }
+      }
+      Spacer(Modifier.size(26.dp))
+      Card {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text("Publish to Home Assistant", color = Color.White, fontSize = 17.sp)
+            Text(
+                "Exposes this Portal's state and controls as Home Assistant entities over MQTT.",
+                color = Color(0xFF9A9A9A),
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+          }
+          Segmented(
+              options = listOf("Off" to "off", "On" to "on"),
+              selected = if (enabled) "on" else "off",
+              onSelect = {
+                val on = it == "on"
+                enabled = on
+                MqttConfig.setEnabled(context, on)
+                if (on) apply() else MqttService.sync(context)
+              },
+          )
+        }
+        if (enabled) {
+          Divider()
+          Row(
+              modifier = Modifier.fillMaxWidth().padding(18.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            OutlinedTextField(
+                value = host,
+                onValueChange = {
+                  host = it
+                  MqttConfig.setHost(context, it)
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { portFocus.requestFocus() }),
+                label = { Text("MQTT broker IP / host") },
+                modifier = Modifier.weight(1f),
+            )
+            Surface(
+                color = Color(0xFF2E6BE6),
+                shape = RoundedCornerShape(10.dp),
+                modifier =
+                    Modifier.padding(start = 12.dp).tvFocusable(RoundedCornerShape(10.dp)) { apply() },
+            ) {
+              Text(
+                  "Apply",
+                  color = Color.White,
+                  fontSize = 15.sp,
+                  modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+              )
+            }
+          }
+          OutlinedTextField(
+              value = port,
+              onValueChange = {
+                port = it.filter { ch -> ch.isDigit() }
+                MqttConfig.setPort(context, port.toIntOrNull() ?: MqttConfig.DEFAULT_PORT)
+              },
+              singleLine = true,
+              keyboardOptions =
+                  KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+              keyboardActions = KeyboardActions(onNext = { userFocus.requestFocus() }),
+              label = { Text("Port (default 1883)") },
+              modifier =
+                  Modifier.fillMaxWidth()
+                      .padding(start = 18.dp, end = 18.dp, top = 4.dp)
+                      .focusRequester(portFocus),
+          )
+          OutlinedTextField(
+              value = user,
+              onValueChange = {
+                user = it
+                MqttConfig.setUsername(context, it)
+              },
+              singleLine = true,
+              keyboardOptions =
+                  KeyboardOptions(
+                      capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Next),
+              keyboardActions = KeyboardActions(onNext = { passFocus.requestFocus() }),
+              label = { Text("Username (optional)") },
+              modifier =
+                  Modifier.fillMaxWidth()
+                      .padding(start = 18.dp, end = 18.dp, top = 8.dp)
+                      .focusRequester(userFocus),
+          )
+          OutlinedTextField(
+              value = pass,
+              onValueChange = {
+                pass = it
+                MqttConfig.setPassword(context, it)
+              },
+              singleLine = true,
+              visualTransformation = PasswordVisualTransformation(),
+              keyboardOptions =
+                  KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+              keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); apply() }),
+              label = { Text("Password (optional)") },
+              modifier =
+                  Modifier.fillMaxWidth()
+                      .padding(start = 18.dp, end = 18.dp, top = 8.dp)
+                      .focusRequester(passFocus),
+          )
+          // Live connection status — gives Apply visible feedback (Connecting… → Connected).
+          Text(
+              status.ifBlank { "Starting…" },
+              color = Color(0xFF8AB4F8),
+              fontSize = 13.sp,
+              modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 16.dp),
+          )
+        }
+      }
+      Text(
+          "Connects to a broker on your LAN (plain MQTT). Your Portal shows up in Home " +
+              "Assistant automatically as a device with presence, screen, battery, now-playing " +
+              "and a few controls — no configuration.yaml editing.",
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),

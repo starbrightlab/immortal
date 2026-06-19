@@ -55,5 +55,9 @@ class ImmortalApp : Application() {
     // speaker (no-op until the user configures a server). Surfaces the group's track on
     // the now-playing card even when the Music Assistant app isn't running here.
     MultiRoomService.sync(this)
+
+    // Publish this Portal to Home Assistant over MQTT if the user configured a broker
+    // (no-op otherwise). Off by default.
+    MqttService.sync(this)
   }
 }
