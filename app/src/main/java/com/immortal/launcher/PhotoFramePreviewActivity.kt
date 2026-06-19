@@ -52,6 +52,20 @@ class PhotoFramePreviewActivity : ComponentActivity() {
     applyKeepScreenOn()
     frame = PhotoFrameController(this)
     frame.onExit = { finish() }
+    // Debug preview harness: render an arbitrary face (mantelframe WidgetConfig shape) instead
+    // of the classic one, for fast on-device iteration. The face JSON is passed base64-encoded
+    // ("face_b64") to survive adb's shell quoting; plain "face_json" is also accepted. Only the
+    // debug build exports this activity (src/debug/AndroidManifest.xml), so it's a no-op in
+    // release where the extra can't be supplied.
+    val faceJson =
+        intent?.getStringExtra("face_b64")?.let {
+          runCatching { String(android.util.Base64.decode(it, android.util.Base64.DEFAULT)) }
+              .getOrNull()
+        } ?: intent?.getStringExtra("face_json")
+    faceJson?.let { json ->
+      runCatching { frame.faceOverride = Face.fromJson("preview", org.json.JSONObject(json)) }
+          .onFailure { android.util.Log.w("FacePreview", "face parse failed", it) }
+    }
     setContentView(frame.view)
     frame.start()
     // A screensaver session is running: start (or keep) the idle screen-off countdown.

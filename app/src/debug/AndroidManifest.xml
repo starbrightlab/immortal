@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only overrides. Exports the screensaver preview activity so the face-renderer
+  iteration harness can launch it over adb with a "face_json" string extra (a mantelframe
+  WidgetConfig-shaped face). Not merged into release builds, so the activity stays
+  unexported there. See PhotoFramePreviewActivity for how the extra is read.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <activity
+            android:name=".PhotoFramePreviewActivity"
+            android:exported="true"
+            tools:replace="android:exported" />
+    </application>
+</manifest>

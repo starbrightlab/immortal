@@ -87,6 +87,9 @@ class PhotoFrameController(
   /** Host (dream / preview activity) sets this to dismiss the frame on tap. */
   var onExit: (() -> Unit)? = null
 
+  /** Debug/preview override: render this face instead of the built-in classic one. */
+  var faceOverride: Face? = null
+
   // Deterministic gesture from raw down/up deltas (robust to synthetic input
   // that omits MOVE events): clear horizontal swipe = prev/next, clear tap = exit.
   private var downX = 0f
@@ -117,8 +120,9 @@ class PhotoFrameController(
     settings = ScreensaverConfig.load(context)
     applyFit()
     // Build + drive the overlay from the face descriptor (the classic built-in for now;
-    // synced Pro faces will be selected here later).
-    faceRenderer.start(Face.immortalClassic(context))
+    // synced Pro faces will be selected here later). faceOverride lets the debug preview
+    // harness render an arbitrary face.
+    faceRenderer.start(faceOverride ?: Face.immortalClassic(context))
     when {
       settings.usesFolder -> {
         val path = settings.folderPath
