@@ -1,0 +1,420 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+package com.immortal.launcher
+
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.Outline
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.os.BatteryManager
+import android.os.Handler
+import android.os.Looper
+import android.text.TextUtils
+import android.view.Gravity
+import android.view.View
+import android.view.ViewOutlineProvider
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import java.net.HttpURLConnection
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.Executors
+
+/**
+ * Builds and drives the screensaver **overlay** from a [Face] — clock, date, weather,
+ * battery, and the now-playing card — laid out on the 9-point grid. The photo/video layer
+ * and all source/power logic stay in [PhotoFrameController]; this owns only what's drawn on
+ * top, plus the per-second tick, the weather fetch, and the now-playing subscription.
+ *
+ * This is the new render path that replaces the original hardcoded overlay. [Face.immortalClassic]
+ * reproduces that original face through it; richer modes (flip / analog / word / gradient /
+ * neon) extend the widget builders here. See [docs/screensaver-face-descriptor.md].
+ */
+class FaceRenderer(
+    private val context: Context,
+    private val weatherRefreshMs: Long = 30 * 60_000L,
+) {
+  private val io = Executors.newSingleThreadExecutor()
+  private val ui = Handler(Looper.getMainLooper())
+  private val assets = AssetResolver(context)
+
+  private var face: Face = Face("immortal-classic")
+
+  /** The overlay container, added above the photo layer by the host. */
+  val view: FrameLayout by lazy {
+    FrameLayout(context).apply { layoutParams = FrameLayout.LayoutParams(MATCH, MATCH) }
+  }
+
+  // Position buckets (a vertical stack per used grid cell), created on demand.
+  private val buckets = HashMap<GridPosition, LinearLayout>()
+
+  // Time-bearing views the tick refreshes; null when the face omits them.
+  private var timeView: TextView? = null
+  private var dateView: TextView? = null
+  private var batteryView: TextView? = null
+  private var batteryDivider: View? = null
+  private var weatherView: TextView? = null
+  private var weatherDivider: View? = null
+  private var weatherText: String = ""
+  private var blinkOn = true
+
+  // Now-playing card.
+  private var nowPlayingCard: LinearLayout? = null
+  private var npArt: ImageView? = null
+  private var npTitle: TextView? = null
+  private var npArtist: TextView? = null
+  private var lastArtUrl: String = ""
+  private var lastArtBitmap: Bitmap? = null
+  private var npListener: NowPlayingHub.Listener? = null
+
+  fun start(face: Face) {
+    this.face = face
+    buildOverlay()
+    tick.run()
+    refreshWeather.run()
+    if (face.nowPlaying.enabled) {
+      npListener = NowPlayingHub.Listener { state -> ui.post { updateNowPlaying(state) } }
+      NowPlayingHub.addListener(npListener!!)
+    }
+  }
+
+  fun stop() {
+    ui.removeCallbacksAndMessages(null)
+    npListener?.let { NowPlayingHub.removeListener(it) }
+    npListener = null
+    io.shutdownNow()
+  }
+
+  // --- overlay assembly -------------------------------------------------------
+  private fun buildOverlay() {
+    view.removeAllViews()
+    buckets.clear()
+
+    // Legibility scrim under the bottom cluster, matching the original frame.
+    val scrim = View(context)
+    scrim.background =
+        GradientDrawable(
+            GradientDrawable.Orientation.BOTTOM_TOP,
+            intArrayOf(0xCC000000.toInt(), 0x00000000),
+        )
+    view.addView(scrim, FrameLayout.LayoutParams(MATCH, dp(320), Gravity.BOTTOM))
+
+    buildClockCluster(face.clock)
+    buildStandaloneWidgets(face)
+    if (face.nowPlaying.enabled) buildNowPlaying(face.nowPlaying)
+  }
+
+  /**
+   * The clock and any small meta fields (date / battery / weather) that share its grid
+   * position: the time on top, then a single horizontal "date • battery • weather" row,
+   * reproducing the original overlay. Each optional field owns the divider that precedes it,
+   * so a dot never orphans when its field is hidden (e.g. a battery-less Portal).
+   */
+  private fun buildClockCluster(clock: ClockSpec) {
+    val col = bucket(clock.position)
+
+    timeView =
+        textView(baseSp = 96f, spec = clock).also {
+          it.text = formatTime(clock, blinkOn)
+          col.addView(it)
+        }
+
+    val row = LinearLayout(context)
+    row.gravity = Gravity.CENTER_VERTICAL
+
+    if (clock.showDate) {
+      dateView =
+          textView(baseSp = 22f, spec = clock, light = false).also { row.addView(it) }
+    }
+    if (face.battery.enabled && face.battery.position == clock.position) {
+      batteryDivider = divider().also { row.addView(it) }
+      batteryView =
+          textView(baseSp = 22f, spec = clock, light = false).also { row.addView(it) }
+    }
+    if (face.weather.enabled && face.weather.position == clock.position) {
+      weatherDivider = divider().also { row.addView(it) }
+      weatherView =
+          textView(baseSp = 22f, spec = clock, light = false).also { row.addView(it) }
+    }
+    if (row.childCount > 0) col.addView(row)
+  }
+
+  /** Weather / battery that aren't co-located with the clock get their own line in their bucket. */
+  private fun buildStandaloneWidgets(face: Face) {
+    if (face.battery.enabled && face.battery.position != face.clock.position) {
+      batteryView =
+          textView(baseSp = 22f, spec = face.clock, light = false).also {
+            bucket(face.battery.position).addView(it)
+          }
+    }
+    if (face.weather.enabled && face.weather.position != face.clock.position) {
+      weatherView =
+          textView(baseSp = 22f, spec = face.clock, light = false).also {
+            bucket(face.weather.position).addView(it)
+          }
+    }
+  }
+
+  /** Now-playing card (album art + track / artist), hidden until something is playing. */
+  private fun buildNowPlaying(spec: NowPlayingSpec) {
+    val scale = spec.sizeScale / 100f
+    val card = LinearLayout(context)
+    card.orientation = LinearLayout.HORIZONTAL
+    card.gravity = Gravity.CENTER_VERTICAL
+    card.visibility = View.GONE
+
+    // Text first, art at the right edge: title/artist hug the cover (right-aligned).
+    val npCol = LinearLayout(context)
+    npCol.orientation = LinearLayout.VERTICAL
+    npCol.gravity = Gravity.END
+    card.addView(npCol, LinearLayout.LayoutParams(WRAP, WRAP))
+
+    val title = text(26f * scale, Color.WHITE, false)
+    title.typeface = Typeface.DEFAULT_BOLD
+    title.maxLines = 1
+    title.ellipsize = TextUtils.TruncateAt.END
+    title.gravity = Gravity.END
+    title.maxWidth = dp(560)
+    npCol.addView(title, LinearLayout.LayoutParams(WRAP, WRAP))
+
+    val artist = text(18f * scale, 0xCCFFFFFF.toInt(), false)
+    artist.maxLines = 1
+    artist.ellipsize = TextUtils.TruncateAt.END
+    artist.gravity = Gravity.END
+    artist.maxWidth = dp(560)
+    npCol.addView(artist, LinearLayout.LayoutParams(WRAP, WRAP))
+
+    val art = ImageView(context)
+    art.scaleType = ImageView.ScaleType.CENTER_CROP
+    art.clipToOutline = true
+    art.outlineProvider =
+        object : ViewOutlineProvider() {
+          override fun getOutline(v: View, o: Outline) {
+            o.setRoundRect(0, 0, v.width, v.height, dp(10).toFloat())
+          }
+        }
+    val artLp = LinearLayout.LayoutParams((dp(72) * scale).toInt(), (dp(72) * scale).toInt())
+    artLp.setMarginStart(dp(16))
+    if (spec.showArt) card.addView(art, artLp)
+
+    bucket(spec.position).addView(card)
+    nowPlayingCard = card
+    npTitle = title
+    npArtist = artist
+    npArt = art
+  }
+
+  /** Reflect the latest now-playing state (main thread). Mirrors the original behaviour. */
+  private fun updateNowPlaying(s: NowPlayingState?) {
+    val card = nowPlayingCard ?: return
+    if (s == null || !s.active) {
+      card.visibility = View.GONE
+      lastArtUrl = ""
+      lastArtBitmap = null
+      return
+    }
+    card.visibility = View.VISIBLE
+    npTitle?.text = s.title
+    npArtist?.text = s.artist
+    npArtist?.visibility = if (s.artist.isBlank()) View.GONE else View.VISIBLE
+    val art = npArt ?: return
+    val bitmap = s.artBitmap
+    if (bitmap != null) {
+      if (bitmap !== lastArtBitmap) {
+        lastArtBitmap = bitmap
+        lastArtUrl = ""
+        art.visibility = View.VISIBLE
+        art.setImageBitmap(bitmap)
+      }
+    } else if (s.artUrl != lastArtUrl) {
+      lastArtBitmap = null
+      lastArtUrl = s.artUrl
+      art.setImageBitmap(null)
+      val want = s.artUrl
+      art.visibility = if (want.isNotBlank()) View.VISIBLE else View.GONE
+      if (want.isNotBlank())
+          io.execute {
+            val bmp = runCatching { downloadBitmap(want) }.getOrNull()
+            ui.post { if (lastArtUrl == want) art.setImageBitmap(bmp) }
+          }
+    }
+  }
+
+  // --- periodic loops ---------------------------------------------------------
+  private val tick =
+      object : Runnable {
+        override fun run() {
+          val now = Date()
+          face.clock.let { c ->
+            blinkOn = !blinkOn
+            timeView?.text = formatTime(c, blinkOn)
+            if (c.showDate)
+                dateView?.text =
+                    SimpleDateFormat(c.dateFormat.pattern(), Locale.getDefault()).format(now)
+          }
+          val pct = batteryPct()
+          val hasBattery = pct >= 0
+          batteryView?.text = if (hasBattery) "$pct%" else ""
+          batteryView?.visibility = if (hasBattery) View.VISIBLE else View.GONE
+          batteryDivider?.visibility = if (hasBattery) View.VISIBLE else View.GONE
+          val hasWeather = weatherText.isNotBlank()
+          weatherView?.text = weatherText
+          weatherView?.visibility = if (hasWeather) View.VISIBLE else View.GONE
+          weatherDivider?.visibility = if (hasWeather) View.VISIBLE else View.GONE
+          ui.postDelayed(this, 1_000L)
+        }
+      }
+
+  private val refreshWeather =
+      object : Runnable {
+        override fun run() {
+          io.execute {
+            val w = Weather.fetch(context)
+            if (w.isNotBlank()) weatherText = w
+          }
+          ui.postDelayed(this, weatherRefreshMs)
+        }
+      }
+
+  // --- formatting / styling ---------------------------------------------------
+  /** Build the time string, honouring format / leading-zero / seconds / am-pm / separator. */
+  private fun formatTime(c: ClockSpec, blink: Boolean): String {
+    val hourPat = if (c.is24h) (if (c.leadingZero) "HH" else "H") else (if (c.leadingZero) "hh" else "h")
+    val sep =
+        when (c.separator) {
+          Separator.COLON -> ":"
+          Separator.DOT -> "."
+          Separator.NONE -> ""
+          Separator.BLINK -> if (blink) ":" else " "
+        }
+    val now = Date()
+    val fmt = StringBuilder()
+    fmt.append(SimpleDateFormat(hourPat, Locale.getDefault()).format(now))
+    fmt.append(sep)
+    fmt.append(SimpleDateFormat("mm", Locale.getDefault()).format(now))
+    if (c.showSeconds) fmt.append(sep).append(SimpleDateFormat("ss", Locale.getDefault()).format(now))
+    if (c.showAmPm) fmt.append(" ").append(SimpleDateFormat("a", Locale.getDefault()).format(now))
+    return fmt.toString()
+  }
+
+  /** A styled text view honouring the clock spec's font / weight / colour / shadow / size. */
+  private fun textView(baseSp: Float, spec: ClockSpec, light: Boolean = true): TextView {
+    val t = TextView(context)
+    t.textSize = baseSp * spec.sizeScale / 100f
+    t.setTextColor(colorWithOpacity(spec.color, spec.opacity))
+    t.typeface =
+        if (light && spec.font == Face.FONT_SANS_LIGHT)
+            assets.font(Face.FONT_SANS_LIGHT, spec.fontWeight)
+        else assets.font(spec.font, spec.fontWeight)
+    applyShadow(t, spec.shadow, spec.color)
+    return t
+  }
+
+  /** Plain styled text (now-playing), matching the original helper. */
+  private fun text(sizeSp: Float, color: Int, lightFont: Boolean): TextView {
+    val t = TextView(context)
+    t.textSize = sizeSp
+    t.setTextColor(color)
+    if (lightFont) t.typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+    t.setShadowLayer(8f, 0f, 2f, 0x99000000.toInt())
+    return t
+  }
+
+  private fun applyShadow(t: TextView, shadow: Shadow, colorHex: String) {
+    when (shadow) {
+      Shadow.NONE -> t.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+      Shadow.SOFT -> t.setShadowLayer(8f, 0f, 2f, 0x99000000.toInt())
+      Shadow.STRONG -> t.setShadowLayer(12f, 0f, 3f, 0xCC000000.toInt())
+      // Halo / neon glow in (roughly) the text colour — the premium look.
+      Shadow.HALO -> t.setShadowLayer(20f, 0f, 0f, 0x66FFFFFF)
+      Shadow.NEON -> t.setShadowLayer(24f, 0f, 0f, colorWithOpacity(colorHex, 0.9f))
+    }
+  }
+
+  private fun divider(): View {
+    val v = TextView(context)
+    v.text = "   •   "
+    v.textSize = 22f
+    v.setTextColor(0x88FFFFFF.toInt())
+    return v
+  }
+
+  private fun colorWithOpacity(hex: String, opacity: Float): Int {
+    val base = runCatching { Color.parseColor(hex) }.getOrDefault(Color.WHITE)
+    val a = (opacity.coerceIn(0f, 1f) * 255).toInt()
+    return (a shl 24) or (base and 0x00FFFFFF)
+  }
+
+  // --- grid -------------------------------------------------------------------
+  /** Get (or create) the vertical stack for a grid position, placed with the right gravity. */
+  private fun bucket(pos: GridPosition): LinearLayout =
+      buckets.getOrPut(pos) {
+        val col = LinearLayout(context)
+        col.orientation = LinearLayout.VERTICAL
+        col.gravity = horizontalGravity(pos)
+        val lp = FrameLayout.LayoutParams(WRAP, WRAP, gravityFor(pos))
+        lp.setMargins(dp(40), dp(40), dp(40), dp(40))
+        view.addView(col, lp)
+        col
+      }
+
+  private fun gravityFor(pos: GridPosition): Int =
+      when (pos) {
+        GridPosition.TOP_LEFT -> Gravity.TOP or Gravity.START
+        GridPosition.TOP_CENTER -> Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        GridPosition.TOP_RIGHT -> Gravity.TOP or Gravity.END
+        GridPosition.MIDDLE_LEFT -> Gravity.CENTER_VERTICAL or Gravity.START
+        GridPosition.MIDDLE_CENTER -> Gravity.CENTER
+        GridPosition.MIDDLE_RIGHT -> Gravity.CENTER_VERTICAL or Gravity.END
+        GridPosition.BOTTOM_LEFT -> Gravity.BOTTOM or Gravity.START
+        GridPosition.BOTTOM_CENTER -> Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        GridPosition.BOTTOM_RIGHT -> Gravity.BOTTOM or Gravity.END
+      }
+
+  private fun horizontalGravity(pos: GridPosition): Int =
+      when (pos) {
+        GridPosition.TOP_RIGHT,
+        GridPosition.MIDDLE_RIGHT,
+        GridPosition.BOTTOM_RIGHT -> Gravity.END
+        GridPosition.TOP_CENTER,
+        GridPosition.MIDDLE_CENTER,
+        GridPosition.BOTTOM_CENTER -> Gravity.CENTER_HORIZONTAL
+        else -> Gravity.START
+      }
+
+  // --- data -------------------------------------------------------------------
+  private fun batteryPct(): Int {
+    val i =
+        context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return -1
+    if (!i.getBooleanExtra(BatteryManager.EXTRA_PRESENT, false)) return -1
+    val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+    val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+    return if (level >= 0 && scale > 0) level * 100 / scale else -1
+  }
+
+  private fun downloadBitmap(spec: String): Bitmap? {
+    val c = URL(spec).openConnection() as HttpURLConnection
+    c.connectTimeout = 8000
+    c.readTimeout = 12000
+    c.instanceFollowRedirects = true
+    c.setRequestProperty("User-Agent", "PortalPhotoFrame/1.0")
+    return c.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
+  }
+
+  private val MATCH = FrameLayout.LayoutParams.MATCH_PARENT
+  private val WRAP = FrameLayout.LayoutParams.WRAP_CONTENT
+  private fun dp(v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
+}

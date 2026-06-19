@@ -8,35 +8,21 @@
 package com.immortal.launcher
 
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Matrix
-import android.graphics.Outline
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.os.BatteryManager
 import android.os.Handler
 import android.os.Looper
-import android.text.TextUtils
-import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.VideoView
 import androidx.exifinterface.media.ExifInterface
 import java.net.HttpURLConnection
 import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.math.abs
 import org.json.JSONObject
@@ -73,22 +59,10 @@ class PhotoFrameController(
 
   private lateinit var photo: ImageView
   private lateinit var videoView: VideoView
-  private lateinit var clock: TextView
-  private lateinit var battery: TextView
-  private lateinit var date: TextView
-  private lateinit var weather: TextView
-  private lateinit var batteryDot: View
-  private lateinit var weatherDot: View
-  private var weatherText: String = ""
 
-  // Now-playing card (driven by the device's media session; hidden when nothing plays).
-  private lateinit var nowPlayingCard: LinearLayout
-  private lateinit var npArt: ImageView
-  private lateinit var npTitle: TextView
-  private lateinit var npArtist: TextView
-  private var lastArtUrl: String = ""
-  private var lastArtBitmap: Bitmap? = null
-  private var npListener: NowPlayingHub.Listener? = null
+  // The overlay (clock / date / weather / battery / now-playing) is built and driven by the
+  // FaceRenderer from a Face descriptor; this controller owns only the photo/video layer.
+  private val faceRenderer = FaceRenderer(context, weatherRefreshMs)
 
   private var settings = ScreensaverConfig.Settings()
 
@@ -142,11 +116,9 @@ class PhotoFrameController(
   fun start() {
     settings = ScreensaverConfig.load(context)
     applyFit()
-    tick.run()
-    refreshWeather.run()
-    // Listen for now-playing updates (replays the current track immediately).
-    npListener = NowPlayingHub.Listener { state -> ui.post { updateNowPlaying(state) } }
-    NowPlayingHub.addListener(npListener!!)
+    // Build + drive the overlay from the face descriptor (the classic built-in for now;
+    // synced Pro faces will be selected here later).
+    faceRenderer.start(Face.immortalClassic(context))
     when {
       settings.usesFolder -> {
         val path = settings.folderPath
@@ -202,13 +174,14 @@ class PhotoFrameController(
 
   fun stop() {
     ui.removeCallbacksAndMessages(null)
-    npListener?.let { NowPlayingHub.removeListener(it) }
-    npListener = null
+    faceRenderer.stop()
     if (this::videoView.isInitialized) runCatching { videoView.stopPlayback() }
     io.shutdownNow()
   }
 
   // --- UI ---------------------------------------------------------------------
+  // The photo/video layer lives here; the overlay (clock / widgets / now-playing) is the
+  // FaceRenderer's [view], stacked on top from a Face descriptor.
   private fun buildUi(): View {
     val root = FrameLayout(context)
     root.setBackgroundColor(Color.BLACK)
@@ -221,128 +194,8 @@ class PhotoFrameController(
     videoView.visibility = View.GONE
     root.addView(videoView, FrameLayout.LayoutParams(MATCH, MATCH, Gravity.CENTER))
 
-    val scrim = View(context)
-    scrim.background =
-        GradientDrawable(
-            GradientDrawable.Orientation.BOTTOM_TOP,
-            intArrayOf(0xCC000000.toInt(), 0x00000000),
-        )
-    root.addView(scrim, FrameLayout.LayoutParams(MATCH, dp(320), Gravity.BOTTOM))
-
-    val col = LinearLayout(context)
-    col.orientation = LinearLayout.VERTICAL
-    val colLp = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.BOTTOM or Gravity.START)
-    colLp.setMargins(dp(40), 0, 0, dp(40))
-    root.addView(col, colLp)
-
-    clock = text(96f, Color.WHITE, true)
-    col.addView(clock)
-
-    val row = LinearLayout(context)
-    row.gravity = Gravity.CENTER_VERTICAL
-    // Date is always present; battery and weather are optional. Each optional
-    // field owns the divider that precedes it, so the dot disappears with the
-    // field (no orphaned "•" when a battery-less Portal reports no charge).
-    date = text(22f, Color.WHITE, false)
-    battery = text(22f, Color.WHITE, false)
-    weather = text(22f, Color.WHITE, false)
-    batteryDot = divider()
-    weatherDot = divider()
-    row.addView(date)
-    row.addView(batteryDot)
-    row.addView(battery)
-    row.addView(weatherDot)
-    row.addView(weather)
-    col.addView(row)
-
-    buildNowPlaying(root)
+    root.addView(faceRenderer.view)
     return root
-  }
-
-  /** A now-playing card bottom-right (album art + track / artist), over the scrim.
-   *  Hidden until something is playing. */
-  private fun buildNowPlaying(root: FrameLayout) {
-    nowPlayingCard = LinearLayout(context)
-    nowPlayingCard.orientation = LinearLayout.HORIZONTAL
-    nowPlayingCard.gravity = Gravity.CENTER_VERTICAL
-    nowPlayingCard.visibility = View.GONE
-    val lp = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.BOTTOM or Gravity.END)
-    lp.setMargins(0, 0, dp(40), dp(44))
-    root.addView(nowPlayingCard, lp)
-
-    // Text first, art second: the cover sits at the right edge and the title/artist
-    // hug it (right-aligned), so there's no dead horizontal space on a bottom-right card.
-    val npCol = LinearLayout(context)
-    npCol.orientation = LinearLayout.VERTICAL
-    npCol.gravity = Gravity.END
-    nowPlayingCard.addView(npCol, LinearLayout.LayoutParams(WRAP, WRAP))
-
-    // Explicit WRAP params: a vertical LinearLayout otherwise defaults children to
-    // MATCH_PARENT width, which pins the column to its first width and re-truncates
-    // longer titles when the track changes.
-    npTitle = text(26f, Color.WHITE, false)
-    npTitle.typeface = Typeface.DEFAULT_BOLD
-    npTitle.maxLines = 1
-    npTitle.ellipsize = TextUtils.TruncateAt.END
-    npTitle.gravity = Gravity.END
-    npTitle.maxWidth = dp(560)
-    npCol.addView(npTitle, LinearLayout.LayoutParams(WRAP, WRAP))
-
-    npArtist = text(18f, 0xCCFFFFFF.toInt(), false)
-    npArtist.maxLines = 1
-    npArtist.ellipsize = TextUtils.TruncateAt.END
-    npArtist.gravity = Gravity.END
-    npArtist.maxWidth = dp(560)
-    npCol.addView(npArtist, LinearLayout.LayoutParams(WRAP, WRAP))
-
-    npArt = ImageView(context)
-    npArt.scaleType = ImageView.ScaleType.CENTER_CROP
-    npArt.clipToOutline = true
-    npArt.outlineProvider =
-        object : ViewOutlineProvider() {
-          override fun getOutline(v: View, o: Outline) {
-            o.setRoundRect(0, 0, v.width, v.height, dp(10).toFloat())
-          }
-        }
-    val artLp = LinearLayout.LayoutParams(dp(72), dp(72))
-    artLp.setMarginStart(dp(16))
-    nowPlayingCard.addView(npArt, artLp)
-  }
-
-  /** Reflect the latest now-playing state (called on the main thread). */
-  private fun updateNowPlaying(s: NowPlayingState?) {
-    if (s == null || !s.active || !settings.showNowPlaying) {
-      nowPlayingCard.visibility = View.GONE
-      lastArtUrl = ""
-      lastArtBitmap = null
-      return
-    }
-    nowPlayingCard.visibility = View.VISIBLE
-    npTitle.text = s.title
-    npArtist.text = s.artist
-    npArtist.visibility = if (s.artist.isBlank()) View.GONE else View.VISIBLE
-    val bitmap = s.artBitmap
-    if (bitmap != null) {
-      // Native art is a ready, downscaled bitmap — set it directly (no decode/network).
-      if (bitmap !== lastArtBitmap) {
-        lastArtBitmap = bitmap
-        lastArtUrl = ""
-        npArt.visibility = View.VISIBLE
-        npArt.setImageBitmap(bitmap)
-      }
-    } else if (s.artUrl != lastArtUrl) {
-      // Fallback for URI-only metadata (no embedded bitmap): download/decode off-thread.
-      lastArtBitmap = null
-      lastArtUrl = s.artUrl
-      npArt.setImageBitmap(null)
-      val want = s.artUrl
-      npArt.visibility = if (want.isNotBlank()) View.VISIBLE else View.GONE
-      if (want.isNotBlank())
-          io.execute {
-            val bmp = runCatching { downloadBitmap(want) }.getOrNull()
-            ui.post { if (lastArtUrl == want) npArt.setImageBitmap(bmp) }
-          }
-    }
   }
 
   private fun applyFit() {
@@ -352,59 +205,14 @@ class PhotoFrameController(
         else ImageView.ScaleType.CENTER_CROP
   }
 
-  private fun text(sizeSp: Float, color: Int, light: Boolean): TextView {
-    val t = TextView(context)
-    t.textSize = sizeSp
-    t.setTextColor(color)
-    if (light) t.typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
-    t.setShadowLayer(8f, 0f, 2f, 0x99000000.toInt())
-    return t
-  }
-
-  private fun divider(): View {
-    val v = TextView(context)
-    v.text = "   •   "
-    v.textSize = 22f
-    v.setTextColor(0x88FFFFFF.toInt())
-    return v
-  }
-
   private fun intervalMs(): Long = settings.intervalSec * 1000L
 
   // --- periodic loops ---------------------------------------------------------
-  private val tick =
-      object : Runnable {
-        override fun run() {
-          val now = Date()
-          val clockPattern = if (ImmortalSettings.use24HourClock(context)) "H:mm" else "h:mm"
-          clock.text = SimpleDateFormat(clockPattern, Locale.getDefault()).format(now)
-          date.text = SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(now)
-          val pct = batteryPct()
-          val hasBattery = pct >= 0
-          battery.text = if (hasBattery) "$pct%" else ""
-          battery.visibility = if (hasBattery) View.VISIBLE else View.GONE
-          batteryDot.visibility = if (hasBattery) View.VISIBLE else View.GONE
-          val hasWeather = weatherText.isNotBlank()
-          weather.text = weatherText
-          weather.visibility = if (hasWeather) View.VISIBLE else View.GONE
-          weatherDot.visibility = if (hasWeather) View.VISIBLE else View.GONE
-          ui.postDelayed(this, 1_000L)
-        }
-      }
-
   private val rotate =
       object : Runnable {
         override fun run() {
           webNext()
           ui.postDelayed(this, intervalMs())
-        }
-      }
-
-  private val refreshWeather =
-      object : Runnable {
-        override fun run() {
-          fetchWeather()
-          ui.postDelayed(this, weatherRefreshMs)
         }
       }
 
@@ -679,26 +487,6 @@ class PhotoFrameController(
   }
 
   // --- data -------------------------------------------------------------------
-  private fun batteryPct(): Int {
-    val i =
-        context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return -1
-    // Only Portal Go has a battery; the mains-powered Portals (Portal+, Mini,
-    // gen-2, TV) report no battery present but still publish a bogus level=0, so
-    // gate on EXTRA_PRESENT to avoid showing a permanent "0%". -1 hides the field.
-    if (!i.getBooleanExtra(BatteryManager.EXTRA_PRESENT, false)) return -1
-    val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-    val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-    return if (level >= 0 && scale > 0) level * 100 / scale else -1
-  }
-
-  private fun fetchWeather() {
-    io.execute {
-      // Shared resilient fetch: cached location + multi-provider geolocation.
-      val w = Weather.fetch(context)
-      if (w.isNotBlank()) weatherText = w
-    }
-  }
-
   private fun httpGet(spec: String): String {
     val c = URL(spec).openConnection() as HttpURLConnection
     c.connectTimeout = 8000
