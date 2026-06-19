@@ -62,7 +62,7 @@ class FaceRenderer(
   private val buckets = HashMap<GridPosition, LinearLayout>()
 
   // Time-bearing views the tick refreshes; null when the face omits them.
-  private var timeView: TextView? = null
+  private var clockFace: ClockFaceView? = null
   private var dateView: TextView? = null
   private var batteryView: TextView? = null
   private var batteryDivider: View? = null
@@ -126,10 +126,15 @@ class FaceRenderer(
   private fun buildClockCluster(clock: ClockSpec) {
     val col = bucket(clock.position)
 
-    timeView =
-        textView(baseSp = 96f, spec = clock).also {
-          it.text = formatTime(clock, blinkOn)
-          col.addView(it)
+    clockFace =
+        makeClockFace(context, clock, assets).also {
+          it.update(Date(), blinkOn)
+          // Explicit WRAP: a vertical LinearLayout otherwise defaults children to MATCH_PARENT
+          // width, stretching the flip row across the screen.
+          col.addView(
+              it.view,
+              LinearLayout.LayoutParams(
+                  LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
 
     val row = LinearLayout(context)
@@ -258,13 +263,11 @@ class FaceRenderer(
       object : Runnable {
         override fun run() {
           val now = Date()
-          face.clock.let { c ->
-            blinkOn = !blinkOn
-            timeView?.text = formatTime(c, blinkOn)
-            if (c.showDate)
-                dateView?.text =
-                    SimpleDateFormat(c.dateFormat.pattern(), Locale.getDefault()).format(now)
-          }
+          blinkOn = !blinkOn
+          clockFace?.update(now, blinkOn)
+          if (face.clock.showDate)
+              dateView?.text =
+                  SimpleDateFormat(face.clock.dateFormat.pattern(), Locale.getDefault()).format(now)
           val pct = batteryPct()
           val hasBattery = pct >= 0
           batteryView?.text = if (hasBattery) "$pct%" else ""
@@ -289,37 +292,14 @@ class FaceRenderer(
         }
       }
 
-  // --- formatting / styling ---------------------------------------------------
-  /** Build the time string, honouring format / leading-zero / seconds / am-pm / separator. */
-  private fun formatTime(c: ClockSpec, blink: Boolean): String {
-    val hourPat = if (c.is24h) (if (c.leadingZero) "HH" else "H") else (if (c.leadingZero) "hh" else "h")
-    val sep =
-        when (c.separator) {
-          Separator.COLON -> ":"
-          Separator.DOT -> "."
-          Separator.NONE -> ""
-          Separator.BLINK -> if (blink) ":" else " "
-        }
-    val now = Date()
-    val fmt = StringBuilder()
-    fmt.append(SimpleDateFormat(hourPat, Locale.getDefault()).format(now))
-    fmt.append(sep)
-    fmt.append(SimpleDateFormat("mm", Locale.getDefault()).format(now))
-    if (c.showSeconds) fmt.append(sep).append(SimpleDateFormat("ss", Locale.getDefault()).format(now))
-    if (c.showAmPm) fmt.append(" ").append(SimpleDateFormat("a", Locale.getDefault()).format(now))
-    return fmt.toString()
-  }
-
-  /** A styled text view honouring the clock spec's font / weight / colour / shadow / size. */
+  // --- styling ----------------------------------------------------------------
+  /** A styled text view (meta row) honouring the clock spec's font / colour / shadow / size. */
   private fun textView(baseSp: Float, spec: ClockSpec, light: Boolean = true): TextView {
     val t = TextView(context)
     t.textSize = baseSp * spec.sizeScale / 100f
-    t.setTextColor(colorWithOpacity(spec.color, spec.opacity))
-    t.typeface =
-        if (light && spec.font == Face.FONT_SANS_LIGHT)
-            assets.font(Face.FONT_SANS_LIGHT, spec.fontWeight)
-        else assets.font(spec.font, spec.fontWeight)
-    applyShadow(t, spec.shadow, spec.color)
+    t.setTextColor(FaceStyle.colorWithOpacity(spec.color, spec.opacity))
+    t.typeface = FaceStyle.typeface(assets, spec, light)
+    FaceStyle.applyShadow(t, spec.shadow, spec.color)
     return t
   }
 
@@ -333,29 +313,12 @@ class FaceRenderer(
     return t
   }
 
-  private fun applyShadow(t: TextView, shadow: Shadow, colorHex: String) {
-    when (shadow) {
-      Shadow.NONE -> t.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
-      Shadow.SOFT -> t.setShadowLayer(8f, 0f, 2f, 0x99000000.toInt())
-      Shadow.STRONG -> t.setShadowLayer(12f, 0f, 3f, 0xCC000000.toInt())
-      // Halo / neon glow in (roughly) the text colour — the premium look.
-      Shadow.HALO -> t.setShadowLayer(20f, 0f, 0f, 0x66FFFFFF)
-      Shadow.NEON -> t.setShadowLayer(24f, 0f, 0f, colorWithOpacity(colorHex, 0.9f))
-    }
-  }
-
   private fun divider(): View {
     val v = TextView(context)
     v.text = "   •   "
     v.textSize = 22f
     v.setTextColor(0x88FFFFFF.toInt())
     return v
-  }
-
-  private fun colorWithOpacity(hex: String, opacity: Float): Int {
-    val base = runCatching { Color.parseColor(hex) }.getOrDefault(Color.WHITE)
-    val a = (opacity.coerceIn(0f, 1f) * 255).toInt()
-    return (a shl 24) or (base and 0x00FFFFFF)
   }
 
   // --- grid -------------------------------------------------------------------
