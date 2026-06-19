@@ -43,7 +43,7 @@ class MqttService : Service() {
     // A deliberate disable (the user turned it off) → clear the HA entities. A transient
     // system kill while still enabled → keep them; START_STICKY will reconnect.
     val deliberate = !MqttConfig.isEnabled(this)
-    runCatching { publisher?.stop(clearDiscovery = deliberate) }
+    runCatching { publisher?.stop(removeFromHa = deliberate) }
     publisher = null
     super.onDestroy()
   }

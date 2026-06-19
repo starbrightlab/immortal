@@ -71,21 +71,32 @@ class MqttPublisher(private val appContext: Context) {
    * service kill), first remove this device's entities from HA by publishing empty retained
    * configs — otherwise HA would keep showing the Portal forever as "unavailable".
    */
-  fun stop(clearDiscovery: Boolean) {
+  fun stop(removeFromHa: Boolean) {
     running = false
     val c = client // still connected here; the read loop hasn't torn it down yet
-    if (clearDiscovery && c != null) {
-      runCatching {
-        clearDiscovery(c)
-        // Let the empty (retained) configs flush and be processed before we drop the
-        // socket — otherwise HA only sees the disconnect and leaves the entities behind
-        // as "unavailable" instead of removing them. (No "offline" publish: a clean
-        // DISCONNECT suppresses the LWT, so removal isn't preceded by an unavailable flash.)
-        Thread.sleep(400)
-      }
-    }
+    Log.i(TAG, "stop(removeFromHa=$removeFromHa) connected=${c != null}")
     detach()
-    runCatching { c?.disconnect() }
+    if (removeFromHa && c != null) {
+      // stop() runs on the main thread (Service.onDestroy), so the socket writes can't go
+      // here (NetworkOnMainThreadException). Do the removal — empty retained configs so HA
+      // drops the entities rather than leaving them "unavailable" — then a clean DISCONNECT
+      // (suppresses the LWT) on a worker, and block briefly so it actually reaches the broker.
+      val t =
+          Thread {
+                runCatching {
+                      clearDiscovery(c)
+                      Thread.sleep(300) // let the retained clears flush before we disconnect
+                      c.disconnect()
+                      Log.i(TAG, "teardown: cleared ${allEntities.size} entity configs")
+                    }
+                    .onFailure { Log.w(TAG, "teardown clear failed", it) }
+              }
+              .apply {
+                isDaemon = true
+                start()
+              }
+      runCatching { t.join(2500) } // onDestroy can wait a moment; ANR budget is generous
+    }
     runCatching { c?.close() }
     client = null
     worker?.interrupt()

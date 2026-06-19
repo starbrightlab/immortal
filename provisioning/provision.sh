@@ -303,10 +303,15 @@ grant_perms() {
   # apps" toggle is non-functional, so grant the source op directly here; combined with the
   # Gen-1 installer-overlay fix, the confirm dialog is then visible and usable.
   a shell appops set "$PKG" REQUEST_INSTALL_PACKAGES allow >/dev/null 2>&1
-  # Device admin (force-lock only): lets Immortal turn the screen off for its idle
-  # and overnight sleep features via lockNow(). Harmless if it can't be set.
-  a shell dpm set-active-admin "$PKG/.AdminReceiver" >/dev/null 2>&1 \
-    && ok "Screen-off (device admin) enabled" || true
+  # Device admin (force-lock only): lets Immortal turn the screen off for its idle and
+  # overnight sleep features (and the Home Assistant screen control) via lockNow(). Warn
+  # rather than swallow a failure — without it, screen-off silently won't work, which is a
+  # confusing thing to debug after the fact.
+  if a shell dpm set-active-admin "$PKG/.AdminReceiver" 2>&1 | grep -q "Success"; then
+    ok "Screen-off (device admin) enabled"
+  else
+    warn "Couldn't enable screen-off device admin — screensaver sleep and the Home Assistant screen control won't work on this device. Re-run setup; if it keeps failing, check Device health in Immortal settings."
+  fi
   # Lets Immortal read the device's active media sessions (native now-playing) for
   # the screensaver card + header mini-player. `cmd notification allow_listener`
   # writes the secure setting AND rebinds the listener reliably on A9/A10. The app
