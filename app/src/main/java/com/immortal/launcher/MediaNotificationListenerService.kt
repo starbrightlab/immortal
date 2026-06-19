@@ -22,10 +22,32 @@ import android.service.notification.NotificationListenerService
  */
 class MediaNotificationListenerService : NotificationListenerService() {
   override fun onListenerConnected() {
+    instance = this
     MediaSessionReader.onListenerConnected(this)
   }
 
   override fun onListenerDisconnected() {
+    if (instance === this) instance = null
     MediaSessionReader.onListenerDisconnected()
+  }
+
+  companion object {
+    @Volatile private var instance: MediaNotificationListenerService? = null
+
+    /**
+     * Active-notification count per package (for app-switcher badges). Empty when the listener
+     * isn't bound (e.g. un-provisioned device). Ongoing/group-summary notifications are excluded
+     * so a count reflects what the user would actually see.
+     */
+    fun activeCountsByPackage(): Map<String, Int> =
+        instance?.let { svc ->
+          runCatching {
+                svc.activeNotifications
+                    .filter { it.isClearable && (it.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY) == 0 }
+                    .groupingBy { it.packageName }
+                    .eachCount()
+              }
+              .getOrNull()
+        } ?: emptyMap()
   }
 }

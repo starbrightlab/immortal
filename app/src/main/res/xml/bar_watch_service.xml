@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) Meta Platforms, Inc. and affiliates.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<!-- Watches window changes only, to detect the system top bar being revealed (so the
+     quick-button cluster can show in sync). flagRetrieveInteractiveWindows + window content
+     are needed for getWindows(); it inspects window bounds/type, not content. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowsChanged"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="0"
+    android:description="@string/bar_watch_desc" />

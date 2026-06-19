@@ -340,6 +340,8 @@ private fun SettingsMain(
 
       MqttNavRow(onOpen = onOpenMqtt)
 
+      QuickButtonsSection()
+
       Spacer(Modifier.size(26.dp))
       BootAppsNavRow(count = bootCount, onOpen = onOpenBootApps)
 
@@ -694,6 +696,83 @@ private fun MultiRoomScreen(onBack: () -> Unit) {
       )
     }
   }
+}
+
+/**
+ * "Quick buttons" section: a centered overlay button cluster at the top of the screen (v1: an
+ * app switcher). Enable it, and choose whether it shows only while the top bar is revealed
+ * (default) or always.
+ */
+@Composable
+private fun QuickButtonsSection() {
+  val context = LocalContext.current
+  var enabled by remember { mutableStateOf(QuickBarConfig.isEnabled(context)) }
+  var always by remember { mutableStateOf(QuickBarConfig.alwaysShow(context)) }
+
+  Spacer(Modifier.size(26.dp))
+  SectionLabel("Quick buttons")
+  Card {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text("Top-bar app switcher", color = Color.White, fontSize = 17.sp)
+        Text(
+            "A centered button at the top that opens your recent apps to switch between them.",
+            color = Color(0xFF9A9A9A),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+      }
+      Segmented(
+          options = listOf("Off" to "off", "On" to "on"),
+          selected = if (enabled) "on" else "off",
+          onSelect = {
+            val on = it == "on"
+            enabled = on
+            QuickBarConfig.setEnabled(context, on)
+            // Enabling the bar watcher both detects the bar and hosts the cluster overlay; it
+            // runs only while the feature is on, so this is the whole on/off switch.
+            SettingsGuard.setBarWatchEnabled(context, on)
+          },
+      )
+    }
+    if (enabled) {
+      Divider()
+      Row(
+          modifier = Modifier.fillMaxWidth().padding(18.dp),
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text("When to show", color = Color.White, fontSize = 17.sp)
+          Text(
+              "Swipe down from the top to reveal the bar (and the buttons), or keep them always on.",
+              color = Color(0xFF9A9A9A),
+              fontSize = 13.sp,
+              modifier = Modifier.padding(top = 2.dp),
+          )
+        }
+        Segmented(
+            options = listOf("With bar" to "bar", "Always" to "always"),
+            selected = if (always) "always" else "bar",
+            onSelect = {
+              val a = it == "always"
+              always = a
+              QuickBarConfig.setAlwaysShow(context, a)
+              QuickBar.applyConfig()
+            },
+        )
+      }
+    }
+  }
+  Text(
+      "Needs the accessibility-based top-bar watch enabled during setup. The switcher shows your " +
+          "recently used apps; tap one to switch.",
+      color = Color(0xFF7C7C7C),
+      fontSize = 13.sp,
+      modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
+  )
 }
 
 /**

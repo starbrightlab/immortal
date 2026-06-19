@@ -1,0 +1,15 @@
+<!-- Copyright (c) Meta Platforms, Inc. and affiliates.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<!-- App-switcher / recents glyph: three rounded vertical bars (One-UI style). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="3"
+      android:strokeLineCap="round"
+      android:pathData="M5,6 L5,18 M12,6 L12,18 M19,6 L19,18" />
+</vector>

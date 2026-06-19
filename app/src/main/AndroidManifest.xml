@@ -26,6 +26,9 @@
     <!-- Wake the screen on demand (Home Assistant "wake the panel" via the MQTT screen
          switch). A normal permission; ScreenControl.wake uses a wake lock. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- App switcher "close" action: a soft stop of an app's background processes. Normal
+         permission (auto-granted). Not a true force-stop, which needs system privilege. -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <!-- Multi-room now-playing: a media-session foreground service (see
          MultiRoomService). Harmless/unused on the Portal's Android 9/10, where the
          per-type FGS rules don't apply. -->
@@ -255,6 +258,28 @@
         <service
             android:name=".MqttService"
             android:exported="false" />
+
+        <!-- App switcher, opened from the quick-button overlay (internal). -->
+        <activity
+            android:name=".AppSwitcherActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.SampleApp" />
+
+        <!-- Watches window changes to show the quick-button cluster in sync with the system top
+             bar, AND hosts the cluster overlay (as a TYPE_ACCESSIBILITY_OVERLAY, so it renders on
+             the bar). immortal self-enables this only while the Quick buttons feature is on. -->
+        <service
+            android:name=".BarWatchService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+          <intent-filter>
+            <action android:name="android.accessibilityservice.AccessibilityService" />
+          </intent-filter>
+          <meta-data
+              android:name="android.accessibilityservice"
+              android:resource="@xml/bar_watch_service" />
+        </service>
 
         <!-- Multi-room now-playing relay: reads the Snapcast group's track off the
              snapserver and publishes it as a media session so the now-playing card shows
