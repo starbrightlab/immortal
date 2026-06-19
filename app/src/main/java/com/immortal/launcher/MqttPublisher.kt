@@ -11,6 +11,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -53,6 +54,7 @@ class MqttPublisher(private val appContext: Context) {
   private val presenceListener = PresenceHub.Listener { st -> runCatching { publishPresence(st) } }
   private val nowPlayingListener = NowPlayingHub.Listener { st -> runCatching { publishMedia(st) } }
   private var batteryReceiver: BroadcastReceiver? = null
+  private var screenReceiver: BroadcastReceiver? = null
 
   fun start() {
     if (running) return
@@ -64,11 +66,28 @@ class MqttPublisher(private val appContext: Context) {
     }
   }
 
-  fun stop() {
+  /**
+   * Stop publishing. When [clearDiscovery] is true (a deliberate disable, not a transient
+   * service kill), first remove this device's entities from HA by publishing empty retained
+   * configs — otherwise HA would keep showing the Portal forever as "unavailable".
+   */
+  fun stop(clearDiscovery: Boolean) {
     running = false
+    val c = client // still connected here; the read loop hasn't torn it down yet
+    if (clearDiscovery && c != null) {
+      runCatching {
+        clearDiscovery(c)
+        // Let the empty (retained) configs flush and be processed before we drop the
+        // socket — otherwise HA only sees the disconnect and leaves the entities behind
+        // as "unavailable" instead of removing them. (No "offline" publish: a clean
+        // DISCONNECT suppresses the LWT, so removal isn't preceded by an unavailable flash.)
+        Thread.sleep(400)
+      }
+    }
     detach()
-    runCatching { client?.disconnect() }
-    runCatching { client?.close() }
+    runCatching { c?.disconnect() }
+    runCatching { c?.close() }
+    client = null
     worker?.interrupt()
     worker = null
     MqttStatus.text = "Off"
@@ -109,7 +128,14 @@ class MqttPublisher(private val appContext: Context) {
           Thread {
                 while (running && client === c) {
                   sleep(PING_MS)
-                  if (running && client === c) runCatching { c.ping() }.getOrElse { return@Thread }
+                  if (running && client === c) {
+                    runCatching { c.ping() }.getOrElse { return@Thread }
+                    // Heartbeat: refresh live-derived state so HA stays current even if the
+                    // Portal's screen on/off broadcasts are unreliable (they are, for admin
+                    // sleep) — keeps the screen sensor and presence from going stale.
+                    runCatching { publishScreen() }
+                    runCatching { publishPresence(PresenceHub.current) }
+                  }
                 }
               }
               .apply {
@@ -126,7 +152,10 @@ class MqttPublisher(private val appContext: Context) {
             attach() // hub listeners + battery receiver replay current state immediately
             while (running) {
               val pkt = c.readPacket() ?: break
-              if (pkt.type == 0x30) handleCommand(c.parsePublish(pkt).first)
+              if (pkt.type == 0x30) {
+                val (t, p) = c.parsePublish(pkt)
+                handleCommand(t, String(p, Charsets.UTF_8))
+              }
             }
           }
           .onFailure { if (running) Log.w(TAG, "connection ended: ${it.message}") }
@@ -155,6 +184,20 @@ class MqttPublisher(private val appContext: Context) {
     // Registering for a sticky broadcast returns the current battery intent — publish it now.
     val sticky = appContext.registerReceiver(r, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     sticky?.let { runCatching { publishBattery(it) } }
+    // Keep the screen switch state accurate as the display turns on/off (PresenceHub's
+    // screen field can lag; the system broadcast is immediate).
+    val sr =
+        object : BroadcastReceiver() {
+          override fun onReceive(c: Context, i: Intent) = runCatching { publishScreen() }.let {}
+        }
+    screenReceiver = sr
+    appContext.registerReceiver(
+        sr,
+        IntentFilter().apply {
+          addAction(Intent.ACTION_SCREEN_ON)
+          addAction(Intent.ACTION_SCREEN_OFF)
+        })
+    publishScreen()
     publishIp()
   }
 
@@ -163,18 +206,31 @@ class MqttPublisher(private val appContext: Context) {
     runCatching { NowPlayingHub.removeListener(nowPlayingListener) }
     batteryReceiver?.let { r -> runCatching { appContext.unregisterReceiver(r) } }
     batteryReceiver = null
+    screenReceiver?.let { r -> runCatching { appContext.unregisterReceiver(r) } }
+    screenReceiver = null
   }
 
   // --- commands (broker → device) ---------------------------------------------
 
-  private fun handleCommand(topic: String) {
+  private fun handleCommand(topic: String, payload: String) {
     // topic = immortal/<id>/<obj>/set
     val obj = topic.removePrefix("$base/").removeSuffix("/set")
-    Log.i(TAG, "command: $obj")
+    Log.i(TAG, "command: $obj = $payload")
     main.post {
       runCatching {
         when (obj) {
-          "screen_off" -> ScreenControl.sleep(appContext)
+          // Optimistic switch (no state_topic), so HA reflects the command itself — we don't
+          // echo state. The Portal reports the screen as "interactive" for ~10s after
+          // lockNow, so reading it back here would wrongly flip the switch on then off.
+          "screen_power" ->
+              if (payload.trim().equals("ON", ignoreCase = true)) ScreenControl.wake(appContext)
+              else ScreenControl.sleep(appContext)
+          "go_home" ->
+              appContext.startActivity(
+                  Intent(Intent.ACTION_MAIN)
+                      .addCategory(Intent.CATEGORY_HOME)
+                      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          "open" -> openTarget(payload)
           "identify" ->
               Toast.makeText(appContext, "Immortal · ${FleetConfig.name(appContext)}", Toast.LENGTH_LONG)
                   .show()
@@ -185,6 +241,34 @@ class MqttPublisher(private val appContext: Context) {
         }
       }
     }
+  }
+
+  /**
+   * Open whatever Home Assistant asked for via the "Open" entity. Accepts a full URL
+   * (http/https → browser, homeassistant:// → HA), an installed package name (launch it),
+   * or a bare HA dashboard path like "today-home/security" (deep-linked into the HA app).
+   * Reuses [ScreensaverDismiss]'s HA helpers so the behaviour matches the screensaver picker.
+   */
+  private fun openTarget(payload: String) {
+    val t = payload.trim()
+    if (t.isBlank()) return
+    val pm = appContext.packageManager
+    when {
+      t.startsWith("http://") || t.startsWith("https://") || t.startsWith("homeassistant://") ->
+          appContext.startActivity(
+              Intent(Intent.ACTION_VIEW, Uri.parse(t)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      pm.getLaunchIntentForPackage(t) != null ->
+          appContext.startActivity(pm.getLaunchIntentForPackage(t)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      else -> {
+        val pkg = ScreensaverDismiss.installedHaPackage(appContext) ?: return
+        appContext.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(ScreensaverDismiss.haDeepLink(t)))
+                .setPackage(pkg)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      }
+    }
+    // Echo the last target so the text entity shows what it was set to.
+    client?.publish("$base/open/state", t, retain = true)
   }
 
   // --- state (device → broker) ------------------------------------------------
@@ -211,7 +295,24 @@ class MqttPublisher(private val appContext: Context) {
             .toString(),
         retain = true,
     )
-    c.publish("$base/screen/state", st.screen.name.lowercase(), retain = true)
+    publishScreen()
+  }
+
+  /**
+   * Publish the screen-state sensor from the LIVE display state. immortal's PresenceHub
+   * screen field only changes on dream/sleep/interaction events, so it can read "off" while
+   * the panel is actually on — reconcile against PowerManager, using the proxy only to tell
+   * interactive from the screensaver. (The switch is optimistic, so it has no state topic.)
+   */
+  private fun publishScreen() {
+    val c = client ?: return
+    val enum =
+        when {
+          !isScreenOn() -> "off"
+          PresenceHub.current.screen == ScreenState.DREAMING -> "dreaming"
+          else -> "interactive"
+        }
+    c.publish("$base/screen/state", enum, retain = true)
   }
 
   private fun isScreenOn(): Boolean =
@@ -258,8 +359,12 @@ class MqttPublisher(private val appContext: Context) {
   // --- discovery --------------------------------------------------------------
 
   private fun publishDiscovery(c: MqttClient) {
-    sensor(c, "screen", "Screen", icon = "mdi:monitor")
-    button(c, "screen_off", "Screen off", icon = "mdi:monitor-off")
+    // Two-way screen control (wake / off) now that ScreenControl.wake exists, plus a
+    // read-only detail sensor.
+    switchEntity(c, "screen_power", "Screen", icon = "mdi:monitor", optimistic = true)
+    sensor(c, "screen", "Screen state", icon = "mdi:monitor")
+    // Pre-1.41 shipped a one-way "Screen off" button; remove it so it doesn't orphan.
+    publishConfig(c, "button", "screen_off", null)
     binarySensor(c, "presence", "Presence", deviceClass = "occupancy", jsonAttributes = true)
 
     if (hasBattery) {
@@ -274,8 +379,36 @@ class MqttPublisher(private val appContext: Context) {
     button(c, "media_next", "Next track", icon = "mdi:skip-next")
     button(c, "media_previous", "Previous track", icon = "mdi:skip-previous")
 
+    button(c, "go_home", "Home", icon = "mdi:home")
+    textEntity(c, "open", "Open", icon = "mdi:open-in-app")
     button(c, "identify", "Identify", icon = "mdi:bullhorn")
     sensor(c, "ip", "IP address", icon = "mdi:ip-network", diagnostic = true)
+  }
+
+  /** The (component, object) of every entity we publish — used to tear them down on disable. */
+  private val allEntities: List<Pair<String, String>> =
+      listOf(
+          "switch" to "screen_power",
+          "sensor" to "screen",
+          "binary_sensor" to "presence",
+          "sensor" to "battery",
+          "binary_sensor" to "charging",
+          "sensor" to "media_state",
+          "sensor" to "media_title",
+          "sensor" to "media_artist",
+          "button" to "media_play_pause",
+          "button" to "media_next",
+          "button" to "media_previous",
+          "button" to "go_home",
+          "text" to "open",
+          "button" to "identify",
+          "sensor" to "ip",
+          "button" to "screen_off", // legacy (pre-1.41)
+      )
+
+  /** Remove this device's entities from HA by clearing their retained discovery configs. */
+  private fun clearDiscovery(c: MqttClient) {
+    allEntities.forEach { (component, obj) -> publishConfig(c, component, obj, null) }
   }
 
   private fun device(): JSONObject =
@@ -342,8 +475,42 @@ class MqttPublisher(private val appContext: Context) {
     publishConfig(c, "button", obj, cfg)
   }
 
-  private fun publishConfig(c: MqttClient, component: String, obj: String, cfg: JSONObject) {
-    c.publish("homeassistant/$component/immortal_$id/$obj/config", cfg.toString(), retain = true)
+  private fun switchEntity(
+      c: MqttClient,
+      obj: String,
+      name: String,
+      icon: String,
+      optimistic: Boolean = false,
+  ) {
+    val cfg =
+        base(obj, name)
+            .put("command_topic", "$base/$obj/set")
+            .put("availability_topic", "$base/availability")
+            .put("payload_on", "ON")
+            .put("payload_off", "OFF")
+            .put("icon", icon)
+    // Optimistic: no state_topic, so HA tracks the commanded state itself (avoids the
+    // post-lockNow flap where the Portal still reports the screen on for ~10s).
+    if (!optimistic) cfg.put("state_topic", "$base/$obj/state")
+    publishConfig(c, "switch", obj, cfg)
+  }
+
+  private fun textEntity(c: MqttClient, obj: String, name: String, icon: String) {
+    val cfg =
+        base(obj, name)
+            .put("command_topic", "$base/$obj/set")
+            .put("state_topic", "$base/$obj/state")
+            .put("availability_topic", "$base/availability")
+            // It's really an automation target ("tell the panel to show X"), not a control
+            // to mix in with the dashboard — config category keeps it off auto-dashboards.
+            .put("entity_category", "config")
+            .put("icon", icon)
+    publishConfig(c, "text", obj, cfg)
+  }
+
+  /** Publish (or, when [cfg] is null, clear) a retained discovery config. */
+  private fun publishConfig(c: MqttClient, component: String, obj: String, cfg: JSONObject?) {
+    c.publish("homeassistant/$component/immortal_$id/$obj/config", cfg?.toString() ?: "", retain = true)
   }
 
   // --- misc -------------------------------------------------------------------

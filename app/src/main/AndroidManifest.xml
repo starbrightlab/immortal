@@ -23,6 +23,9 @@
     <!-- Fleet Agent: a foreground service so WiFi device management survives a
          reboot on these non-root Portals (where adb-over-WiFi can't). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Wake the screen on demand (Home Assistant "wake the panel" via the MQTT screen
+         switch). A normal permission; ScreenControl.wake uses a wake lock. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Multi-room now-playing: a media-session foreground service (see
          MultiRoomService). Harmless/unused on the Portal's Android 9/10, where the
          per-type FGS rules don't apply. -->

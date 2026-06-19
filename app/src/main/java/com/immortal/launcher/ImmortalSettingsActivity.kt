@@ -86,6 +86,7 @@ private fun ImmortalSettingsScreen() {
   var showBootApps by remember { mutableStateOf(false) }
   var showMultiRoom by remember { mutableStateOf(false) }
   var showMqtt by remember { mutableStateOf(false) }
+  var showHealth by remember { mutableStateOf(false) }
   var bootSelected by remember { mutableStateOf(BootLaunch.packages(context).toSet()) }
 
   if (showBootApps) {
@@ -107,12 +108,17 @@ private fun ImmortalSettingsScreen() {
     MqttScreen(onBack = { showMqtt = false })
     return
   }
+  if (showHealth) {
+    DeviceHealthScreen(onBack = { showHealth = false })
+    return
+  }
 
   SettingsMain(
       bootCount = bootSelected.size,
       onOpenBootApps = { showBootApps = true },
       onOpenMultiRoom = { showMultiRoom = true },
       onOpenMqtt = { showMqtt = true },
+      onOpenHealth = { showHealth = true },
   )
 }
 
@@ -122,6 +128,7 @@ private fun SettingsMain(
     onOpenBootApps: () -> Unit,
     onOpenMultiRoom: () -> Unit,
     onOpenMqtt: () -> Unit,
+    onOpenHealth: () -> Unit,
 ) {
   val context = LocalContext.current
   var settings by remember { mutableStateOf(ImmortalSettings.load(context)) }
@@ -336,7 +343,7 @@ private fun SettingsMain(
       Spacer(Modifier.size(26.dp))
       BootAppsNavRow(count = bootCount, onOpen = onOpenBootApps)
 
-      DeviceAdminRow()
+      DeviceHealthNavRow(onOpen = onOpenHealth)
 
       Text(
           "Changes apply as soon as you go back to the home screen.",
@@ -959,47 +966,195 @@ private fun loadLaunchableApps(context: Context): List<BootAppOption> {
 }
 
 /**
- * Shown only when Immortal's screen-off device admin is active. Deactivating it turns off
- * the idle / overnight screen-off features AND lets Immortal be uninstalled — the shell
- * can't force-remove a non-test admin, so this in-app action is the clean path.
+ * Row on the main settings page into the "Device health" subpage. Subtitle reflects how
+ * many provisioned permissions are missing, so a problem is visible without drilling in.
  */
 @Composable
-private fun DeviceAdminRow() {
+private fun DeviceHealthNavRow(onOpen: () -> Unit) {
   val context = LocalContext.current
-  var active by remember { mutableStateOf(ScreenControl.isAdminActive(context)) }
-  if (!active) return
-
+  val issues = remember { DevicePermissions.issueCount(context) }
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Device admin")
+  SectionLabel("Device")
   Card {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(18.dp),
+        modifier = Modifier.fillMaxWidth().tvFocusableRow { onOpen() }.padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
       Column(modifier = Modifier.weight(1f)) {
-        Text("Screen-off control", color = Color.White, fontSize = 17.sp)
+        Text("Device health", color = Color.White, fontSize = 17.sp)
         Text(
-            "Lets Immortal turn the screen off for idle and overnight sleep. Turning it off " +
-                "also allows Immortal to be uninstalled.",
-            color = Color(0xFF9A9A9A),
+            if (issues == 0) "All set up"
+            else "$issues setting${if (issues == 1) " needs" else "s need"} attention",
+            color = if (issues == 0) Color(0xFF9A9A9A) else Color(0xFFE0A030),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 2.dp),
         )
       }
+      Text("›", color = Color(0xFF7C7C7C), fontSize = 26.sp)
+    }
+  }
+}
+
+/**
+ * The "Device health" subpage: a live status of every special permission provisioning
+ * grants (screen-off device admin, notification access, install, overlay, secure settings),
+ * with — for anything that's missing — what's degraded and how to fix it. A diagnostic to
+ * point a struggling user at. Replaces the old destructive "turn off device admin" button;
+ * the uninstall path it served is kept as a clearly-warned advanced action at the bottom.
+ */
+@Composable
+private fun DeviceHealthScreen(onBack: () -> Unit) {
+  val context = LocalContext.current
+  val checks = remember { DevicePermissions.all(context) }
+  val issues = checks.count { !it.granted }
+  var adminActive by remember { mutableStateOf(ScreenControl.isAdminActive(context)) }
+
+  Column(
+      modifier =
+          Modifier.fillMaxSize()
+              .onPreviewKeyEvent { e ->
+                if (e.key == Key.Back) {
+                  if (e.type == KeyEventType.KeyUp) onBack()
+                  true
+                } else false
+              }
+              .background(Color(0xFF101012))
+              .verticalScroll(rememberScrollState())
+              .padding(horizontal = 28.dp, vertical = 32.dp),
+  ) {
+    Column(modifier = Modifier.widthIn(max = 1100.dp).focusGroup()) {
       Surface(
-          color = Color(0xFF3A3A3C),
-          shape = RoundedCornerShape(10.dp),
-          modifier =
-              Modifier.padding(start = 12.dp).tvFocusable(RoundedCornerShape(10.dp)) {
-                ScreenControl.deactivateAdmin(context)
-                active = ScreenControl.isAdminActive(context)
-              },
+          color = Color(0xFF1C1C1E),
+          shape = RoundedCornerShape(12.dp),
+          modifier = Modifier.tvFocusable(RoundedCornerShape(12.dp)) { onBack() },
       ) {
         Text(
-            "Turn off",
+            "‹  Back",
             color = Color.White,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+        )
+      }
+      Spacer(Modifier.size(18.dp))
+
+      Text("Device health", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+      Text(
+          "The permissions your Portal was set up with, and what each one powers.",
+          color = Color(0xFF9A9A9A),
+          fontSize = 16.sp,
+          modifier = Modifier.padding(top = 6.dp),
+      )
+      Spacer(Modifier.size(22.dp))
+
+      // Summary banner — green when healthy, amber when something needs attention.
+      Surface(
+          color = if (issues == 0) Color(0xFF18301C) else Color(0xFF332813),
+          shape = RoundedCornerShape(14.dp),
+          modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(
+            if (issues == 0) "✓  Everything's set up correctly."
+            else "!  $issues setting${if (issues == 1) " needs" else "s need"} attention — your Portal " +
+                "still works, but some features are limited.",
+            color = if (issues == 0) Color(0xFF7FD18B) else Color(0xFFE0A030),
             fontSize = 15.sp,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.padding(16.dp),
+        )
+      }
+      Spacer(Modifier.size(20.dp))
+
+      Card {
+        checks.forEachIndexed { i, c ->
+          if (i > 0) Divider()
+          HealthRow(c)
+        }
+      }
+
+      if (issues > 0) {
+        Spacer(Modifier.size(22.dp))
+        SectionLabel("How to fix")
+        Text(
+            "Reconnect your Portal to a computer and re-run Immortal setup — it re-grants all of " +
+                "these. (Advanced: re-run provision.sh / provision.ps1 from the provisioning kit.)",
+            color = Color(0xFFB8B8B8),
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            modifier = Modifier.padding(start = 4.dp, end = 4.dp),
+        )
+      }
+
+      // Advanced: deactivating the screen-off admin is the clean path to uninstall Immortal
+      // (the shell can't force-remove a non-test admin). Tucked away and clearly warned — it
+      // turns off screen-off until re-provisioned.
+      if (adminActive) {
+        Spacer(Modifier.size(28.dp))
+        Text(
+            "Allow uninstall",
+            color = Color(0xFF8A8A8A),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+        )
+        Text(
+            "Disabling the screen-off device admin lets Immortal be uninstalled, but it also stops " +
+                "automatic screen-off (screensaver sleep and the Home Assistant control) until you " +
+                "re-run setup. Only do this if you know what you're doing.",
+            color = Color(0xFF7C7C7C),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp),
+        )
+        Text(
+            "Disable screen-off admin",
+            color = Color(0xFFE0908A),
+            fontSize = 15.sp,
+            modifier =
+                Modifier.tvFocusable(RoundedCornerShape(8.dp)) {
+                      ScreenControl.deactivateAdmin(context)
+                      adminActive = ScreenControl.isAdminActive(context)
+                    }
+                    .padding(start = 4.dp, top = 2.dp, bottom = 4.dp),
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun HealthRow(c: DevicePermissions.Check) {
+  Row(
+      modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
+      verticalAlignment = Alignment.Top,
+  ) {
+    Text(
+        if (c.granted) "✓" else "!",
+        color = if (c.granted) Color(0xFF7FD18B) else Color(0xFFE0A030),
+        fontSize = 18.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(end = 14.dp, top = 1.dp),
+    )
+    Column(modifier = Modifier.weight(1f)) {
+      Text(c.title, color = Color.White, fontSize = 17.sp)
+      Text(
+          c.enables,
+          color = Color(0xFF9A9A9A),
+          fontSize = 13.sp,
+          lineHeight = 18.sp,
+          modifier = Modifier.padding(top = 2.dp),
+      )
+      if (!c.granted) {
+        Text(
+            "Without it: ${c.degraded}",
+            color = Color(0xFFE0A030),
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            c.fix,
+            color = Color(0xFF8AB4F8),
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            modifier = Modifier.padding(top = 4.dp),
         )
       }
     }
