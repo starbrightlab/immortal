@@ -303,6 +303,9 @@ grant_perms() {
   # apps" toggle is non-functional, so grant the source op directly here; combined with the
   # Gen-1 installer-overlay fix, the confirm dialog is then visible and usable.
   a shell appops set "$PKG" REQUEST_INSTALL_PACKAGES allow >/dev/null 2>&1
+  # Lets the app switcher (Quick buttons) list recently-used apps via UsageStatsManager —
+  # getRecentTasks can't see other apps since Android 5. Harmless when the feature is off.
+  a shell appops set "$PKG" GET_USAGE_STATS allow >/dev/null 2>&1
   # Device admin (force-lock only): lets Immortal turn the screen off for its idle and
   # overnight sleep features (and the Home Assistant screen control) via lockNow(). Warn
   # rather than swallow a failure — without it, screen-off silently won't work, which is a

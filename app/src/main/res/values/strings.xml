@@ -5,4 +5,5 @@
 <resources>
     <string name="app_name">Immortal</string>
     <string name="install_confirm_desc">Lets Immortal confirm the app-install dialog automatically, so apps deployed over WiFi from the fleet manager install without a tap on this Portal.</string>
+    <string name="bar_watch_desc">Lets Immortal show its quick buttons (like the app switcher) in step with the Portal\'s top bar — it watches for the bar being revealed. It doesn\'t read screen content.</string>
 </resources>

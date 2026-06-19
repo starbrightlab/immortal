@@ -170,4 +170,24 @@ object SettingsGuard {
   fun canWriteSecureSettings(context: Context): Boolean =
       context.checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) ==
           android.content.pm.PackageManager.PERMISSION_GRANTED
+
+  /**
+   * Enable or disable our [BarWatchService] accessibility service by editing the secure setting
+   * ourselves. Unlike notification listeners (OS-protected on A10), `enabled_accessibility_services`
+   * IS writable with WRITE_SECURE_SETTINGS — so the quick-button feature can turn its watcher on
+   * only when the user enables it, instead of provisioning leaving an always-on a11y service.
+   */
+  fun setBarWatchEnabled(context: Context, on: Boolean) {
+    runCatching {
+      val comp = ComponentName(context, BarWatchService::class.java).flattenToString()
+      val cr = context.contentResolver
+      val cur = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+      val parts = cur.split(':').filter { it.isNotBlank() && !it.equals(comp, ignoreCase = true) }
+      val next = (if (on) parts + comp else parts).joinToString(":")
+      Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, next)
+      if (on) Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+      android.util.Log.i("ImmortalQuickBar", "BarWatch a11y ${if (on) "enabled" else "disabled"}")
+    }
+        .onFailure { android.util.Log.w("ImmortalQuickBar", "couldn't toggle BarWatch a11y", it) }
+  }
 }
