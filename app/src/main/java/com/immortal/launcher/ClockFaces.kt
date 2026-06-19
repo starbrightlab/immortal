@@ -124,26 +124,23 @@ class DigitalClockFaceView(
   }
 }
 
-// ─── Flip ────────────────────────────────────────────────────────────────────
+// ─── Flip (Fliqlo) ───────────────────────────────────────────────────────────
 
 /**
- * A split-flap flip clock: two digit cards per group (HH MM, plus SS when enabled), each a
- * dark rounded card with a centre hinge line. When [ClockSpec.animateDigits] is set, a card
- * flips on its horizontal axis as its digit changes. Flip clocks always show two flaps per
- * group, so hours pad to two digits here regardless of `leadingZero`.
+ * A flip clock reproducing the Fliqlo screensaver — the canonical reference. One panel per
+ * group (hour / minute / optional second): a near-black rounded card with a light-grey digit
+ * centred on it. The digit font (Fliqlo.otf) bakes the centre split into each glyph, so the
+ * resting card is correct by construction — no manual half-offset. On a value change the old
+ * top half folds down (rotateX 0→-90, pivot bottom) while the new bottom half unfolds
+ * (90→0, pivot top) over static halves, the authentic split-flap mechanic.
  *
- * (A single-axis card flip — a faithful approximation of a true two-flap split-flap, which we
- * can deepen later. It's the first face the original overlay couldn't draw.)
- */
-/**
- * A split-flap flip clock, ported from mantelframe's `FlipClock.tsx`. One panel per group
- * (hour, minute, optional second), each a rounded card split top/bottom by a centre divider.
- * On a value change the old top half folds down (rotateX 0→-90, pivot bottom) while the new
- * bottom half unfolds (rotateX 90→0, pivot top) over static halves — the authentic split-flap
- * mechanic. Bebas Neue, oversized to fill the panel.
+ * Spec sampled from the Fliqlo bundle: digit #B9B9B9, card #0E0E0E, monospaced advance 0.45·S,
+ * the hour card sized to its digit count (single-digit hours get a narrower card). Sizes are in
+ * device px (DPR 1 on the Portal), scaled by [ClockSpec.sizeScale].
  *
- * Dimensions mirror the reference at sizeScale 100 (panel 280 / font 310, in device px since
- * the Portal browser runs at DPR 1), scaled by [ClockSpec.sizeScale].
+ * NOTE: Fliqlo.otf is proprietary (Yuji Adachi). Bundled here to match the spec during
+ * development; the redistribution licence must be cleared (or the glyphs reproduced in a
+ * cleared font) before this ships. See [[quality-bar-screensaver]].
  */
 class FlipClockFaceView(
     private val context: Context,
@@ -151,30 +148,38 @@ class FlipClockFaceView(
     assets: AssetResolver,
 ) : ClockFaceView {
   private val scale = spec.sizeScale / 100f
-  private val colorInt = FaceStyle.colorWithOpacity(spec.color, spec.opacity)
-  private val typeface = assets.font("Bebas Neue", 400)
 
-  // px (not dp) — the reference's CSS px map to device px on the Portal (DPR 1).
-  private val panelH = 280f * scale
-  private val halfH = panelH / 2f
-  private val digitW = 120f * scale
-  private val padX = 10f * scale
-  private val radius = 24f * scale
-  private val fontSize = 310f * scale
-  private val panelGap = (18f * scale).toInt()
-  private val dividerH = maxOf(1f, 4f * scale)
-  private val offsetPx = fontSize * 0.062f // Bebas ascender nudge so caps centre on the split
-  private val amPmSize = 20f * scale
+  // The Fliqlo digit font (split baked into the glyph). Falls back to a bold face if absent.
+  private val digitFont =
+      runCatching { Typeface.createFromAsset(context.assets, "fonts/Fliqlo.otf") }
+          .getOrDefault(Typeface.DEFAULT_BOLD)
+
+  // Fliqlo is grey; honour an explicit non-default colour from the face.
+  private val digitColor =
+      if (spec.color.equals("#ffffff", true)) 0xFFB9B9B9.toInt()
+      else FaceStyle.colorWithOpacity(spec.color, spec.opacity)
+
+  // Geometry, all px, derived from the font size S (DPR 1 on the Portal).
+  private val s = 300f * scale // digit font size
+  private val cardH = 0.86f * s
+  private val cardHalf = cardH / 2f
+  private val advance = 0.45f * s // monospaced digit advance
+  private val sidePad = 0.11f * s
+  private val corner = 0.06f * s
+  private val gap = (0.10f * s).toInt()
+  private val dividerH = maxOf(2f, 0.012f * s)
+  // Digits sit slightly above the line-box centre (ascent≠descent); nudge down so the baked
+  // split lands on the card's centre divider. Tuned against the Fliqlo thumbnail.
+  private val digitDy = 0.10f * s
+  private val amPmSize = 0.085f * s
 
   private val row =
       LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        clipChildren = false // let the fold animation draw past panel bounds
+        clipChildren = false
       }
 
-  // Fixed two-digit panel width keeps the layout stable (no width jitter on 9→10 / 12→1).
-  private val panelW = digitW * 2 + padX * 2
   private val hourPanel = FlipPanel(showAmPm = spec.showAmPm).also { addPanel(it) }
   private val minPanel = FlipPanel().also { addPanel(it) }
   private val secPanel = if (spec.showSeconds) FlipPanel().also { addPanel(it) } else null
@@ -182,67 +187,64 @@ class FlipClockFaceView(
   override val view: View = row
 
   override fun update(now: Date, blinkOn: Boolean) {
-    val h = ClockMath.hour(spec, now, pad = spec.leadingZero)
-    hourPanel.set(h, amPm12(now))
+    hourPanel.set(ClockMath.hour(spec, now, pad = spec.leadingZero), amPm12(now))
     minPanel.set(ClockMath.minute(now), null)
     secPanel?.set(ClockMath.second(now), null)
   }
 
-  /** AM/PM string for 12h, else null. */
   private fun amPm12(now: Date): String? =
       if (!spec.is24h && spec.showAmPm) ClockMath.amPm(now).uppercase() else null
 
+  private fun cardW(nDigits: Int): Int = (advance * nDigits + 2 * sidePad).toInt()
+
   private fun addPanel(p: FlipPanel) {
-    val lp = LinearLayout.LayoutParams(panelW.toInt(), panelH.toInt())
-    lp.marginStart = if (row.childCount == 0) 0 else panelGap
+    val lp = LinearLayout.LayoutParams(cardW(2), cardH.toInt())
+    lp.marginStart = if (row.childCount == 0) 0 else gap
     row.addView(p, lp)
   }
 
-  /** A single flipping panel rendering a 1–2 char value. */
+  /** A single flipping panel rendering a 1–2 char value on one card. */
   inner class FlipPanel(private val showAmPm: Boolean = false) : FrameLayout(context) {
     private var value: String? = null
-    private val staticTop = half(isTop = true)
-    private val staticBottom = half(isTop = false)
+    private val resting = digitView()
     private val divider =
-        View(context).apply { setBackgroundColor(0xE6000000.toInt()) }
+        View(context).apply { setBackgroundColor(0xFF000000.toInt()) }
     private val amPmLabel: TextView? =
         if (showAmPm)
             TextView(context).apply {
-              textSize = pxToSp(amPmSize)
-              setTextColor(colorInt)
-              alpha = 0.7f
-              typeface = this@FlipClockFaceView.typeface
-              letterSpacing = 0.06f
+              setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, amPmSize)
+              setTextColor(digitColor)
+              typeface = digitFont
+              letterSpacing = 0.04f
             }
         else null
 
     init {
       clipChildren = false
-      addView(staticBottom, halfLp(isTop = false))
-      addView(staticTop, halfLp(isTop = true))
+      background =
+          GradientDrawable().apply {
+            setColor(0xFF0E0E0E.toInt())
+            cornerRadius = corner
+          }
+      clipToOutline = true
+      addView(resting, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
       addView(
           divider,
-          LayoutParams(panelW.toInt(), maxOf(1, dividerH.toInt()), Gravity.TOP).apply {
-            topMargin = (halfH - dividerH / 2f).toInt()
+          LayoutParams(LayoutParams.MATCH_PARENT, maxOf(1, dividerH.toInt()), Gravity.TOP).apply {
+            topMargin = (cardHalf - dividerH / 2f).toInt()
           })
       amPmLabel?.let {
         addView(it, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
       }
-      // Material drop shadow for the whole card.
-      outlineProvider =
-          object : ViewOutlineProvider() {
-            override fun getOutline(v: View, o: Outline) {
-              o.setRoundRect(0, 0, panelW.toInt(), panelH.toInt(), radius)
-            }
-          }
-      elevation = 6f * scale * resources.displayMetrics.density
+      elevation = 4f * scale * resources.displayMetrics.density
     }
 
     fun set(v: String, amPm: String?) {
+      resizeTo(v.length)
       amPmLabel?.let { lbl ->
         lbl.text = amPm ?: ""
         lbl.visibility = if (amPm.isNullOrEmpty()) View.GONE else View.VISIBLE
-        val m = (14f * scale).toInt()
+        val m = (0.05f * s).toInt()
         (lbl.layoutParams as LayoutParams).apply {
           gravity = Gravity.START or (if (amPm == "AM") Gravity.TOP else Gravity.BOTTOM)
           leftMargin = m
@@ -253,28 +255,38 @@ class FlipClockFaceView(
       }
       val prev = value
       value = v
-      staticTop.setText(v)
-      if (prev == null || prev == v || !spec.animateDigits) {
-        staticBottom.setText(v)
-        return
-      }
-      staticBottom.setText(prev) // bottom keeps the old value until the fold lands
+      resting.text = v
+      if (prev == null || prev == v || !spec.animateDigits) return
       playFold(prev, v)
     }
 
-    /** Fold the old top half down, then unfold the new bottom half. */
+    /** Resize the card to fit [n] digits (single-digit hours get a narrower card, like Fliqlo). */
+    private fun resizeTo(n: Int) {
+      val w = cardW(n)
+      (layoutParams as? LinearLayout.LayoutParams)?.let {
+        if (it.width != w) {
+          it.width = w
+          requestLayout()
+        }
+      }
+    }
+
     private fun playFold(from: String, to: String) {
-      val foldTop = half(isTop = true).apply { setText(from) }
-      val unfoldBottom = half(isTop = false).apply { setText(to) }
-      addView(foldTop, halfLp(isTop = true))
-      addView(unfoldBottom, halfLp(isTop = false))
-      val cam = panelH * 3.5f
+      // Static halves under the leaves: top already shows NEW (resting); cover the bottom with
+      // OLD until the new bottom unfolds.
+      val backBottom = halfView(isTop = false).apply { setText(from) }
+      val foldTop = halfView(isTop = true).apply { setText(from) }
+      val unfoldBottom = halfView(isTop = false).apply { setText(to) }
+      addView(backBottom)
+      addView(foldTop)
+      addView(unfoldBottom)
+      val cam = cardH * 3.5f
       foldTop.cameraDistance = cam
       unfoldBottom.cameraDistance = cam
-      foldTop.pivotX = panelW / 2f
-      foldTop.pivotY = halfH // bottom edge of the top half
-      unfoldBottom.pivotX = panelW / 2f
-      unfoldBottom.pivotY = 0f // top edge of the bottom half
+      foldTop.pivotX = width / 2f
+      foldTop.pivotY = cardHalf
+      unfoldBottom.pivotX = width / 2f
+      unfoldBottom.pivotY = 0f
       unfoldBottom.rotationX = 90f
 
       val phase = 300L
@@ -292,54 +304,63 @@ class FlipClockFaceView(
           .setDuration(phase)
           .setInterpolator(android.view.animation.DecelerateInterpolator())
           .withEndAction {
-            staticBottom.setText(to)
             removeView(unfoldBottom)
+            removeView(backBottom)
           }
           .start()
     }
 
-    private fun half(isTop: Boolean) = FlipHalf(isTop)
-
-    private fun halfLp(isTop: Boolean) =
-        LayoutParams(panelW.toInt(), halfH.toInt(), Gravity.TOP).apply {
-          topMargin = if (isTop) 0 else halfH.toInt()
-        }
-  }
-
-  /** The top or bottom half of a panel — a clipped window onto a full-height centred glyph. */
-  inner class FlipHalf(isTop: Boolean) : FrameLayout(context) {
-    private val label =
+    /** A resting full-card digit, centred with the split landing on the card divider. */
+    private fun digitView(): TextView =
         TextView(context).apply {
-          setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, fontSize)
-          setTextColor(colorInt)
-          typeface = this@FlipClockFaceView.typeface
+          setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, s)
+          setTextColor(digitColor)
+          typeface = digitFont
           gravity = Gravity.CENTER
           includeFontPadding = false
           setSingleLine()
-          letterSpacing = -0.02f
-          translationY = if (isTop) offsetPx else -(halfH - offsetPx)
+          translationY = digitDy
         }
+
+    /** A clipped top/bottom half of the card, showing the centred digit, for the fold. */
+    private fun halfView(isTop: Boolean): FlipHalf = FlipHalf(isTop)
+  }
+
+  /** Top or bottom half of a card: a clip window onto a full-card centred digit. */
+  inner class FlipHalf(isTop: Boolean) : FrameLayout(context) {
+    private val label = digitLabel()
 
     init {
       clipChildren = true
       clipToOutline = true
       background =
-          GradientDrawable(
-                  GradientDrawable.Orientation.TOP_BOTTOM,
-                  if (isTop) intArrayOf(0xFA262626.toInt(), 0xFA1E1E1E.toInt())
-                  else intArrayOf(0xFA181818.toInt(), 0xFA121212.toInt()))
-              .apply {
-                cornerRadii =
-                    if (isTop) floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
-                    else floatArrayOf(0f, 0f, 0f, 0f, radius, radius, radius, radius)
-              }
-      addView(label, LayoutParams(panelW.toInt(), panelH.toInt(), Gravity.TOP))
+          GradientDrawable().apply {
+            setColor(0xFF0E0E0E.toInt())
+            cornerRadii =
+                if (isTop) floatArrayOf(corner, corner, corner, corner, 0f, 0f, 0f, 0f)
+                else floatArrayOf(0f, 0f, 0f, 0f, corner, corner, corner, corner)
+          }
+      addView(label, LayoutParams(LayoutParams.MATCH_PARENT, cardH.toInt(), Gravity.TOP))
+      // The half is half-card tall; offset the full-card label so the correct half shows.
+      label.translationY = digitDy + (if (isTop) 0f else -cardHalf)
+      // Position handled by FrameLayout add below.
+      layoutParams =
+          FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, cardHalf.toInt(), Gravity.TOP)
+              .apply { topMargin = if (isTop) 0 else cardHalf.toInt() }
     }
 
-    fun setText(s: String) {
-      label.text = s
+    private fun digitLabel() =
+        TextView(context).apply {
+          setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, s)
+          setTextColor(digitColor)
+          typeface = digitFont
+          gravity = Gravity.CENTER
+          includeFontPadding = false
+          setSingleLine()
+        }
+
+    fun setText(t: String) {
+      label.text = t
     }
   }
-
-  private fun pxToSp(px: Float): Float = px / context.resources.displayMetrics.scaledDensity
 }
