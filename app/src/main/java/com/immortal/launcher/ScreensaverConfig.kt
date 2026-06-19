@@ -77,6 +77,16 @@ object ScreensaverConfig {
       val overnightEnabled: Boolean = false,
       val overnightStartMin: Int = 22 * 60,
       val overnightEndMin: Int = 7 * 60,
+      // What to open when the user taps the frame to dismiss it. null = the Immortal
+      // launcher (the original behaviour). Otherwise a flattened ComponentName of an
+      // installed app — Home Assistant users typically point this at their HA app so a
+      // tap drops them straight back into their dashboard. See [ScreensaverDismiss].
+      val dismissAppComponent: String? = null,
+      // Home Assistant dashboard mode. When non-null, a tap opens the HA companion app
+      // (taking precedence over [dismissAppComponent]); a non-blank value is the
+      // dashboard path to deep-link to (e.g. "today-home/security"), and "" opens the
+      // user's default dashboard. Only offered when an HA app is installed.
+      val dismissHaDashboard: String? = null,
   ) {
     /** True when the idle screen-off timeout is active. */
     val idleSleepOn: Boolean
@@ -119,6 +129,8 @@ object ScreensaverConfig {
         overnightEnabled = p.getBoolean("overnight_enabled", false),
         overnightStartMin = p.getInt("overnight_start_min", 22 * 60),
         overnightEndMin = p.getInt("overnight_end_min", 7 * 60),
+        dismissAppComponent = p.getString("dismiss_app_component", null),
+        dismissHaDashboard = p.getString("dismiss_ha_dashboard", null),
     )
   }
 
@@ -171,4 +183,30 @@ object ScreensaverConfig {
 
   fun setOvernightEndMin(c: Context, min: Int) =
       prefs(c).edit().putInt("overnight_end_min", wrapMinuteOfDay(min)).apply()
+
+  // --- Dismiss target (launcher / app / Home Assistant dashboard) ---------------
+  // The three are mutually exclusive, so each setter clears the others.
+
+  /** Return to the Immortal launcher on dismiss (the default). */
+  fun setDismissLauncher(c: Context) =
+      prefs(c).edit().remove("dismiss_app_component").remove("dismiss_ha_dashboard").apply()
+
+  /** Open [component] (a flattened ComponentName) when the frame is tapped to dismiss. */
+  fun setDismissApp(c: Context, component: String) =
+      prefs(c)
+          .edit()
+          .putString("dismiss_app_component", component)
+          .remove("dismiss_ha_dashboard")
+          .apply()
+
+  /**
+   * Open Home Assistant on dismiss. [path] is the dashboard to deep-link to (e.g.
+   * "today-home/security"); blank opens the user's default dashboard.
+   */
+  fun setDismissHaDashboard(c: Context, path: String) =
+      prefs(c)
+          .edit()
+          .putString("dismiss_ha_dashboard", path.trim())
+          .remove("dismiss_app_component")
+          .apply()
 }

@@ -36,6 +36,10 @@ class PhotoDreamService : DreamService() {
       Log.i(TAG, "onExit (tap) -> finish()")
       // Mark this as a USER exit so DreamPolicy doesn't relaunch the frame.
       DreamPolicy.userExitAt = System.currentTimeMillis()
+      // If the user chose an app to open on dismiss (e.g. their Home Assistant
+      // dashboard), launch it; otherwise this is a no-op and we fall back to the
+      // launcher — same as before, and also the path when that app is uninstalled.
+      ScreensaverDismiss.launchChosenApp(this)
       finish()
     }
     val root = frame.view

@@ -51,9 +51,9 @@
          different keys, so a signature permission defined by Millennium couldn't be held by us.
          Defining it on the sender means only Immortal-signed apps hold it -> only we can trigger. -->
     <permission
-        android:name="com.immortal.launcher.permission.HEY_TRIGGER"
+        android:name="${applicationId}.permission.HEY_TRIGGER"
         android:protectionLevel="signature" />
-    <uses-permission android:name="com.immortal.launcher.permission.HEY_TRIGGER" />
+    <uses-permission android:name="${applicationId}.permission.HEY_TRIGGER" />
 
     <application
         android:name=".ImmortalApp"
@@ -161,6 +161,14 @@
             android:name=".FolderPickerActivity"
             android:exported="false"
             android:label="Choose a folder"
+            android:theme="@style/Theme.SampleApp" />
+
+        <!-- App picker for "open this app when the screensaver is dismissed",
+             reachable from the "When dismissed" row in screensaver settings. -->
+        <activity
+            android:name=".ScreensaverDismissAppActivity"
+            android:exported="false"
+            android:label="Open when dismissed"
             android:theme="@style/Theme.SampleApp" />
 
         <!-- One-field form for pasting a public iCloud / Google Photos shared-album

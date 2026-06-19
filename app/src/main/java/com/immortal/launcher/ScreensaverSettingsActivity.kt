@@ -263,6 +263,32 @@ private fun ScreensaverSettingsScreen() {
         }
       }
 
+      // When dismissed — where a tap on the frame takes you. Default is the launcher;
+      // Home Assistant users typically point this at their dashboard app instead.
+      Spacer(Modifier.size(26.dp))
+      SectionLabel("When dismissed")
+      val dismissLabel =
+          remember(settings.dismissAppComponent, settings.dismissHaDashboard) {
+            ScreensaverDismiss.chosenLabel(context)
+          }
+      Card {
+        NavRow(
+            title = "Open when you tap to exit",
+            value =
+                if (dismissLabel != null) "Opens $dismissLabel"
+                else "Immortal launcher",
+        ) {
+          context.startActivity(Intent(context, ScreensaverDismissAppActivity::class.java))
+        }
+      }
+      Text(
+          "Tap the screensaver to wake your Portal. By default that brings you home to " +
+              "Immortal — or pick an app (like Home Assistant) to drop straight into it.",
+          color = Color(0xFF7C7C7C),
+          fontSize = 13.sp,
+          modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
+      )
+
       // Music — sourced from the device's own media session, so it works with any
       // app (Spotify, podcasts, the Music Assistant player…); shown for everyone.
       Spacer(Modifier.size(26.dp))
@@ -470,6 +496,21 @@ private fun SelectableRow(title: String, subtitle: String, selected: Boolean, on
     }
     // Visual only — the whole row is the focus/click target.
     RadioButton(selected = selected, onClick = null)
+  }
+}
+
+/** A row that opens a sub-page; shows the current [value] and a chevron. */
+@Composable
+private fun NavRow(title: String, value: String, onClick: () -> Unit) {
+  Row(
+      modifier =
+          Modifier.fillMaxWidth().tvFocusableRow { onClick() }
+              .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 16.dp),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+    Text(value, color = Color(0xFF9A9A9A), fontSize = 15.sp)
+    Text("  ›", color = Color(0xFF7C7C7C), fontSize = 20.sp)
   }
 }
 
