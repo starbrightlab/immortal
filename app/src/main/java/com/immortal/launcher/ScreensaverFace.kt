@@ -65,20 +65,23 @@ data class Face(
         )
 
     /**
-     * The overnight bedside clock: a full-bleed flip clock, honouring the user's 12/24-hour
-     * preference. It's full-bleed, so [FaceRenderer] suppresses every other widget and it shows
-     * clean on its own near-black backdrop; the dimming is applied by the host window, not here.
+     * The full-bleed flip clock (Fliqlo split-flap), honouring the user's 12/24-hour preference.
+     * Full-bleed, so [FaceRenderer] suppresses every other widget and it shows clean on its own
+     * near-black backdrop.
      */
-    fun flipNight(context: Context): Face =
+    fun flip(context: Context): Face =
         Face(
-            id = "flip-night",
-            name = "Night clock",
+            id = "flip",
+            name = "Flip clock",
             clock =
                 ClockSpec(
                     mode = ClockMode.FLIP,
                     format = if (ImmortalSettings.use24HourClock(context)) "24h" else "12h",
                 ),
         )
+
+    /** The overnight bedside variant of [flip] — same clock, shown dimmed by the host window. */
+    fun flipNight(context: Context): Face = flip(context).copy(id = "flip-night", name = "Night clock")
 
     /** A sentinel font name the resolver maps to the system light typeface (no bundled TTF). */
     const val FONT_SANS_LIGHT = "sans-serif-light"

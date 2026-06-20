@@ -150,6 +150,12 @@
             android:exported="false"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- Clock-face picker subpage (the FaceCatalog faces). -->
+        <activity
+            android:name=".FacePickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- Connect a self-hosted Immich server as the screensaver source. -->
         <activity
             android:name=".ImmichConnectActivity"

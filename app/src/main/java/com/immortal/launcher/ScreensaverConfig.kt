@@ -88,6 +88,8 @@ object ScreensaverConfig {
       val batterySaver: Boolean = true,
       // Show the current track + album art on the frame while music is playing.
       val showNowPlaying: Boolean = true,
+      // The selected clock face — a [FaceCatalog] entry id. Drives the screensaver overlay.
+      val faceId: String = "immortal-classic",
       // Whether the frame is pinned on (ALWAYS_ON) or follows the Portal's presence policy
       // (PRESENCE — the shared screensaver/music baseline). Defaults to ALWAYS_ON to preserve
       // the original permanent-frame behaviour until PRESENCE is verified on mains hardware.
@@ -174,6 +176,7 @@ object ScreensaverConfig {
         includeVideo = p.getBoolean("include_video", true),
         batterySaver = p.getBoolean("battery_saver", true),
         showNowPlaying = p.getBoolean("show_now_playing", true),
+        faceId = p.getString("face_id", "immortal-classic") ?: "immortal-classic",
         presenceMode =
             runCatching { FrameMode.valueOf(p.getString("presence_mode", FrameMode.ALWAYS_ON.name)!!) }
                 .getOrDefault(FrameMode.ALWAYS_ON),
@@ -269,6 +272,9 @@ object ScreensaverConfig {
 
   fun setShowNowPlaying(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("show_now_playing", on).apply()
+
+  /** Select a clock face by its [FaceCatalog] entry id. */
+  fun setFaceId(c: Context, id: String) = prefs(c).edit().putString("face_id", id).apply()
 
   fun setPresenceMode(c: Context, mode: FrameMode) =
       prefs(c).edit().putString("presence_mode", mode.name).apply()

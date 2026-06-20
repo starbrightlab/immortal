@@ -134,10 +134,9 @@ class PhotoFrameController(
       return
     }
     applyFit()
-    // Build + drive the overlay from the face descriptor (the classic built-in for now;
-    // synced Pro faces will be selected here later). faceOverride lets the debug preview
-    // harness render an arbitrary face.
-    faceRenderer.start(faceOverride ?: Face.immortalClassic(context))
+    // Build + drive the overlay from the user's selected face ([FaceCatalog]); faceOverride lets
+    // the debug preview harness (and the overnight night clock) render a specific face instead.
+    faceRenderer.start(faceOverride ?: FaceCatalog.active(context))
     when {
       settings.usesFolder -> {
         val path = settings.folderPath

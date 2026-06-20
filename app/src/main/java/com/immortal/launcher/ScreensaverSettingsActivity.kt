@@ -140,6 +140,22 @@ private fun ScreensaverSettingsScreen() {
       if (settings.enabled) {
         Spacer(Modifier.size(26.dp))
 
+        SectionLabel("Clock face")
+        Card {
+          NavRow(title = "Clock face", value = FaceCatalog.entryFor(settings.faceId).name) {
+            context.startActivity(Intent(context, FacePickerActivity::class.java))
+          }
+        }
+        Text(
+            "Choose how the time looks — the classic corner clock, a big centred clock, or the " +
+                "full-screen flip clock.",
+            color = Color(0xFF7C7C7C),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
+        )
+
+        Spacer(Modifier.size(26.dp))
+
         SectionLabel("Photos")
         Card {
           NavRow(title = "Photo source", value = currentSourceLabel(settings)) {
