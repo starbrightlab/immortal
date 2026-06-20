@@ -234,6 +234,19 @@ private fun ScreensaverSettingsScreen() {
             context.startActivity(Intent(context, SmbConnectActivity::class.java))
           }
         }
+        Divider()
+        SelectableRow(
+            title = "WebDAV folder",
+            subtitle = davSubtitle(settings),
+            selected = settings.usesDav,
+            onClick = { context.startActivity(Intent(context, DavConnectActivity::class.java)) },
+        )
+        if (settings.usesDav) {
+          Divider()
+          TextButtonRow("Change WebDAV folder…") {
+            context.startActivity(Intent(context, DavConnectActivity::class.java))
+          }
+        }
       }
       Text(
           "Tip: put your photos and videos in a folder on your Portal and pick it here — for " +
@@ -475,6 +488,12 @@ private fun smbSubtitle(s: ScreensaverConfig.Settings): String =
     when {
       !s.usesSmb -> "Show photos from a folder on your NAS over the network."
       else -> "Connected — \\\\${s.smbHost}\\${s.smbShare}"
+    }
+
+private fun davSubtitle(s: ScreensaverConfig.Settings): String =
+    when {
+      !s.usesDav -> "Show photos from a WebDAV share or Nextcloud."
+      else -> "Connected — ${shortUrl(s.davUrl.orEmpty())}"
     }
 
 private fun albumUrlSubtitle(usesUrl: Boolean, url: String?): String =
