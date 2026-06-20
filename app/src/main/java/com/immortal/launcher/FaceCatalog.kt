@@ -20,16 +20,25 @@ import android.content.Context
  */
 object FaceCatalog {
 
-  /** A pickable face: a stable [id] (persisted), a display [name]/[tagline], and its builder. */
+  /**
+   * A pickable face: a stable [id] (persisted), a display [name]/[tagline], its builder, and an
+   * optional set of size variants — the [ClockSpec.sizeScale] for Small/Medium/Large, applied by
+   * [active] from the user's [ScreensaverConfig.faceSizeIndex]. Empty = a fixed-size face (no size
+   * control shown). Tuned per face so even Large doesn't overflow the frame.
+   */
   data class Entry(
       val id: String,
       val name: String,
       val tagline: String,
+      val sizes: List<Int> = emptyList(),
       val build: (Context) -> Face,
   )
 
   /** The id used when nothing is selected (and the load default in [ScreensaverConfig]). */
   const val DEFAULT_ID = "immortal-classic"
+
+  /** Labels for the size variants, indexed by [ScreensaverConfig.faceSizeIndex]. */
+  val SIZE_LABELS = listOf("Small", "Medium", "Large")
 
   val entries: List<Entry> =
       listOf(
@@ -40,14 +49,32 @@ object FaceCatalog {
           ) {
             Face.immortalClassic(it)
           },
-          Entry("flip", "Flip clock", "The retro split-flap clock, full screen") { Face.flip(it) },
-          Entry("big", "Big clock", "A large clock, centred and clean") { bigClock(it) },
-          Entry("bold", "Bold", "A tall condensed clock with the date") { boldClock(it) },
+          Entry(
+              "flip",
+              "Flip clock",
+              "The retro split-flap clock, full screen",
+              sizes = listOf(76, 88, 96),
+          ) {
+            Face.flip(it)
+          },
+          Entry("big", "Big clock", "A large clock, centred and clean", sizes = listOf(280, 380, 460)) {
+            bigClock(it)
+          },
+          Entry("bold", "Bold", "A tall condensed clock with the date", sizes = listOf(320, 430, 500)) {
+            boldClock(it)
+          },
           Entry("minimal", "Minimal", "Just the time, quietly in the corner") { minimalClock(it) },
       )
 
-  /** The face the user has selected (falls back to the first entry if the id is unknown). */
-  fun active(context: Context): Face = entryFor(ScreensaverConfig.load(context).faceId).build(context)
+  /** The face the user has selected, with their size variant applied. */
+  fun active(context: Context): Face {
+    val cfg = ScreensaverConfig.load(context)
+    val entry = entryFor(cfg.faceId)
+    val face = entry.build(context)
+    if (entry.sizes.isEmpty()) return face
+    val scale = entry.sizes[cfg.faceSizeIndex.coerceIn(0, entry.sizes.size - 1)]
+    return face.copy(clock = face.clock.copy(sizeScale = scale))
+  }
 
   fun entryFor(id: String?): Entry = entries.firstOrNull { it.id == id } ?: entries.first()
 

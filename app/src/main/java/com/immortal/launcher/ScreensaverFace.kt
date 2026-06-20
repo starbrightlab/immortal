@@ -80,8 +80,11 @@ data class Face(
                 ),
         )
 
-    /** The overnight bedside variant of [flip] — same clock, shown dimmed by the host window. */
-    fun flipNight(context: Context): Face = flip(context).copy(id = "flip-night", name = "Night clock")
+    /** The overnight bedside variant of [flip] — same clock at a comfortable size, shown dimmed. */
+    fun flipNight(context: Context): Face =
+        flip(context).let {
+          it.copy(id = "flip-night", name = "Night clock", clock = it.clock.copy(sizeScale = 90))
+        }
 
     /** A sentinel font name the resolver maps to the system light typeface (no bundled TTF). */
     const val FONT_SANS_LIGHT = "sans-serif-light"

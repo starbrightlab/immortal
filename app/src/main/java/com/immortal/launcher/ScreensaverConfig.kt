@@ -90,6 +90,9 @@ object ScreensaverConfig {
       val showNowPlaying: Boolean = true,
       // The selected clock face — a [FaceCatalog] entry id. Drives the screensaver overlay.
       val faceId: String = "immortal-classic",
+      // Clock size for faces that offer size variants (0 = Small, 1 = Medium, 2 = Large). Ignored
+      // by faces without variants. See [FaceCatalog].
+      val faceSizeIndex: Int = 1,
       // Whether the frame is pinned on (ALWAYS_ON) or follows the Portal's presence policy
       // (PRESENCE — the shared screensaver/music baseline). Defaults to ALWAYS_ON to preserve
       // the original permanent-frame behaviour until PRESENCE is verified on mains hardware.
@@ -177,6 +180,7 @@ object ScreensaverConfig {
         batterySaver = p.getBoolean("battery_saver", true),
         showNowPlaying = p.getBoolean("show_now_playing", true),
         faceId = p.getString("face_id", "immortal-classic") ?: "immortal-classic",
+        faceSizeIndex = p.getInt("face_size_index", 1),
         presenceMode =
             runCatching { FrameMode.valueOf(p.getString("presence_mode", FrameMode.ALWAYS_ON.name)!!) }
                 .getOrDefault(FrameMode.ALWAYS_ON),
@@ -275,6 +279,9 @@ object ScreensaverConfig {
 
   /** Select a clock face by its [FaceCatalog] entry id. */
   fun setFaceId(c: Context, id: String) = prefs(c).edit().putString("face_id", id).apply()
+
+  /** Set the clock size variant (0 = Small, 1 = Medium, 2 = Large) for faces that offer it. */
+  fun setFaceSizeIndex(c: Context, i: Int) = prefs(c).edit().putInt("face_size_index", i).apply()
 
   fun setPresenceMode(c: Context, mode: FrameMode) =
       prefs(c).edit().putString("presence_mode", mode.name).apply()

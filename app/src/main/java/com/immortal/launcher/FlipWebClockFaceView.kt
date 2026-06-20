@@ -81,10 +81,10 @@ class FlipWebClockFaceView(
   private fun tf(): Int = if (!spec.is24h) 0 else if (spec.leadingZero) 1 else 2
 
   /**
-   * Clock scale as the page's 50–100 percent. Must be passed explicitly: the page clamps an
-   * unset value up from 0 to its 50% minimum, so omitting it leaves the clock at half size. The
-   * clock fills the frame edge-to-edge at 100, so the comfortable default leaves a margin at 90;
-   * an explicit non-default [ClockSpec.sizeScale] still wins.
+   * Clock scale as the page's 50–100 percent (the clock fills the frame edge-to-edge at 100).
+   * Must be passed explicitly: the page clamps an unset value up from 0 to its 50% minimum, so
+   * omitting it would leave the clock at half size. Callers ([FaceCatalog] size variants, the
+   * night clock) pass a tuned value directly.
    */
-  private fun sc(): Int = (if (spec.sizeScale == 100) 90 else spec.sizeScale).coerceIn(50, 100)
+  private fun sc(): Int = spec.sizeScale.coerceIn(50, 100)
 }
