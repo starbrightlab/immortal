@@ -162,6 +162,12 @@
             android:exported="false"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- Render an arbitrary web page (Immich Kiosk, a dashboard) as the screensaver. -->
+        <activity
+            android:name=".WebUrlEntryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- Immortal's own settings (weather unit, home-screen forecast widget, tile
              size), opened from the Immortal tile in the launcher's Settings folder. -->
         <activity

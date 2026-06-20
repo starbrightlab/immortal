@@ -86,6 +86,9 @@ class PhotoFrameController(
   // this instead of an HTTP download, so SMB reuses all the remote advance/tick/fallback logic.
   private var remoteFetch: ((String) -> Bitmap?)? = null
   private var smbSource: SmbSource? = null
+  // Web-page source: a fullscreen WebView that owns the whole frame (the page brings its own
+  // clock/widgets, so the photo layer and Immortal overlay are skipped).
+  private var webView: android.webkit.WebView? = null
 
   // Web-feed history so swipes can go back as well as forward.
   private val history = ArrayList<Bitmap>()
@@ -125,6 +128,11 @@ class PhotoFrameController(
 
   fun start() {
     settings = ScreensaverConfig.load(context)
+    // Web-page source takes over the whole frame — no photo feed, no Immortal overlay.
+    if (faceOverride == null && settings.usesWebUrl) {
+      startWebPage(settings.webUrl!!)
+      return
+    }
     applyFit()
     // Build + drive the overlay from the face descriptor (the classic built-in for now;
     // synced Pro faces will be selected here later). faceOverride lets the debug preview
@@ -258,10 +266,35 @@ class PhotoFrameController(
     }
   }
 
+  /** Render an arbitrary web page fullscreen (Immich Kiosk, a dashboard, …). The page owns the
+   *  whole frame; the host's touch handling still gives tap-to-exit. */
+  @android.annotation.SuppressLint("SetJavaScriptEnabled")
+  private fun startWebPage(url: String) {
+    val wv = android.webkit.WebView(context)
+    wv.setBackgroundColor(Color.BLACK)
+    wv.isVerticalScrollBarEnabled = false
+    wv.isHorizontalScrollBarEnabled = false
+    wv.overScrollMode = View.OVER_SCROLL_NEVER
+    wv.setOnTouchListener { _, _ -> false } // host consumes touch for tap-to-exit
+    wv.settings.apply {
+      javaScriptEnabled = true
+      domStorageEnabled = true
+      mediaPlaybackRequiresUserGesture = false
+      loadWithOverviewMode = true
+      useWideViewPort = true
+    }
+    wv.webViewClient = android.webkit.WebViewClient() // keep navigation inside the WebView
+    (view as FrameLayout).addView(wv, FrameLayout.LayoutParams(MATCH, MATCH))
+    wv.loadUrl(url)
+    webView = wv
+  }
+
   fun stop() {
     ui.removeCallbacksAndMessages(null)
     faceRenderer.stop()
     if (this::videoView.isInitialized) runCatching { videoView.stopPlayback() }
+    webView?.let { runCatching { it.stopLoading(); it.destroy() } }
+    webView = null
     // Close the SMB connection off-thread (network I/O) before the io executor is killed.
     smbSource?.let { s -> Thread { runCatching { s.close() } }.start() }
     smbSource = null

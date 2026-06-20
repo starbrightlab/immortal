@@ -247,6 +247,19 @@ private fun ScreensaverSettingsScreen() {
             context.startActivity(Intent(context, DavConnectActivity::class.java))
           }
         }
+        Divider()
+        SelectableRow(
+            title = "Web page",
+            subtitle = webUrlSubtitle(settings),
+            selected = settings.usesWebUrl,
+            onClick = { context.startActivity(Intent(context, WebUrlEntryActivity::class.java)) },
+        )
+        if (settings.usesWebUrl) {
+          Divider()
+          TextButtonRow("Change web page…") {
+            context.startActivity(Intent(context, WebUrlEntryActivity::class.java))
+          }
+        }
       }
       Text(
           "Tip: put your photos and videos in a folder on your Portal and pick it here — for " +
@@ -494,6 +507,12 @@ private fun davSubtitle(s: ScreensaverConfig.Settings): String =
     when {
       !s.usesDav -> "Show photos from a WebDAV share or Nextcloud."
       else -> "Connected — ${shortUrl(s.davUrl.orEmpty())}"
+    }
+
+private fun webUrlSubtitle(s: ScreensaverConfig.Settings): String =
+    when {
+      !s.usesWebUrl -> "Render any web page (Immich Kiosk, a dashboard) as the screensaver."
+      else -> shortUrl(s.webUrl.orEmpty())
     }
 
 private fun albumUrlSubtitle(usesUrl: Boolean, url: String?): String =

@@ -45,6 +45,7 @@ object ScreensaverConfig {
   const val SOURCE_IMMICH = "immich"
   const val SOURCE_SMB = "smb"
   const val SOURCE_DAV = "dav"
+  const val SOURCE_WEBURL = "weburl"
   const val FIT_FILL = "fill" // crop to fill the screen
   const val FIT_FIT = "fit" // letterbox to show the whole image
   const val DEFAULT_INTERVAL = 30
@@ -73,6 +74,10 @@ object ScreensaverConfig {
       val davUrl: String? = null,
       val davUser: String? = null,
       val davPass: String? = null,
+      // Web page: render an arbitrary URL fullscreen as the screensaver (the page supplies its
+      // own clock/widgets, so Immortal's overlay is skipped). Covers Immich Kiosk, HA dashboards,
+      // etc. A power-user "bring your own frame" option — not the promoted default.
+      val webUrl: String? = null,
       val fit: String = FIT_FILL,
       val intervalSec: Int = DEFAULT_INTERVAL,
       val albumRefreshMin: Int = DEFAULT_ALBUM_REFRESH_MIN,
@@ -124,6 +129,9 @@ object ScreensaverConfig {
     /** True when the user has connected a WebDAV folder for us to read. */
     val usesDav: Boolean
       get() = source == SOURCE_DAV && !davUrl.isNullOrBlank()
+    /** True when the screensaver should render an arbitrary web page. */
+    val usesWebUrl: Boolean
+      get() = source == SOURCE_WEBURL && !webUrl.isNullOrBlank()
   }
 
   /** Keep the slideshow interval sane (5s … 10min). */
@@ -153,6 +161,7 @@ object ScreensaverConfig {
         davUrl = p.getString("dav_url", null),
         davUser = p.getString("dav_user", null),
         davPass = p.getString("dav_pass", null),
+        webUrl = p.getString("web_url", null),
         fit = p.getString("fit", FIT_FILL) ?: FIT_FILL,
         intervalSec = clampInterval(p.getInt("interval_sec", DEFAULT_INTERVAL)),
         albumRefreshMin =
@@ -230,6 +239,10 @@ object ScreensaverConfig {
           .putString("dav_pass", pass)
           .putString("source", SOURCE_DAV)
           .apply()
+
+  /** Render an arbitrary web page as the screensaver (e.g. Immich Kiosk, a dashboard). */
+  fun setWebUrl(c: Context, url: String) =
+      prefs(c).edit().putString("web_url", url.trim()).putString("source", SOURCE_WEBURL).apply()
 
   fun useDefault(c: Context) = prefs(c).edit().putString("source", SOURCE_DEFAULT).apply()
 
