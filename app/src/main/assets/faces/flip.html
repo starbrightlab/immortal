@@ -24,16 +24,17 @@
     align-items: center;
     gap: var(--gap);
   }
+  /* Fliqlo cards are square and identical for hour and minute (the single-digit hour is just
+     centred in the same square card). */
   .card {
     position: relative;
-    width: var(--w2);
+    width: var(--h);
     height: var(--h);
     flex: none;
     /* box-shadow (not filter) — a filter layer fails to composite over a transparent WebView. */
     box-shadow: 0 0.02em 0.06em rgba(0,0,0,0.55);
     border-radius: var(--r);
   }
-  .card.single { width: var(--w1); }
 
   /* Four stacked half-panels: two static (top/bottom), two animated leaves. */
   .half {
@@ -68,13 +69,16 @@
   /* Perspective lives on the card via a wrapper so the fold has depth. */
   .card { perspective: 800px; }
 
+  /* Fliqlo puts a small AM/PM in the top-left (AM) or bottom-left (PM) corner of the square
+     hour card. It uses a system sans (the Fliqlo font is digits-only), not the digit font. */
   .am-pm {
-    position: absolute; left: 0.12em; z-index: 5;
-    font-family: 'Fliqlo', Arial, sans-serif; font-size: var(--ampm);
-    color: var(--color); opacity: 0.85; letter-spacing: 0.04em;
+    position: absolute; left: calc(var(--h) * 0.06); z-index: 5;
+    font-family: Arial, 'Helvetica Neue', sans-serif; font-weight: 700;
+    font-size: var(--ampm); line-height: 1;
+    color: var(--color); opacity: 0.85; letter-spacing: 0.02em;
   }
-  .am-pm.am { top: 0.18em; }
-  .am-pm.pm { bottom: 0.18em; }
+  .am-pm.am { top: calc(var(--h) * 0.10); }
+  .am-pm.pm { bottom: calc(var(--h) * 0.10); }
 
   @keyframes foldDown   { from { transform: rotateX(0deg);  } to { transform: rotateX(-90deg); } }
   @keyframes unfoldUp   { from { transform: rotateX(90deg); } to { transform: rotateX(0deg);   } }
@@ -96,17 +100,14 @@
   function px() {
     // Drive every dimension off card height H, sized to the viewport and scale.
     var vh = window.innerHeight;
+    // Square cards (Fliqlo): card side = H; the glyph cap fills ~76% of it (F = 1.14·H).
     var H = vh * 0.34 * (cfg.scale / 100);
-    var F = H * 1.10;               // font-size: glyph cap fills the card with margin
-    var adv = F * 0.45;             // monospaced advance
-    var pad = H * 0.11;
+    var F = H * 1.0;
     document.documentElement.style.setProperty('--h', H + 'px');
     document.documentElement.style.setProperty('--f', F + 'px');
-    document.documentElement.style.setProperty('--w1', (adv + 2 * pad) + 'px');
-    document.documentElement.style.setProperty('--w2', (2 * adv + 2 * pad) + 'px');
-    document.documentElement.style.setProperty('--r', (H * 0.08) + 'px');
-    document.documentElement.style.setProperty('--gap', (H * 0.07) + 'px');
-    document.documentElement.style.setProperty('--ampm', (F * 0.12) + 'px');
+    document.documentElement.style.setProperty('--r', (H * 0.085) + 'px');
+    document.documentElement.style.setProperty('--gap', (H * 0.08) + 'px');
+    document.documentElement.style.setProperty('--ampm', (H * 0.15) + 'px');
     document.documentElement.style.setProperty('--half', '300ms');
     document.documentElement.style.setProperty('--color', cfg.color);
     // Fliqlo ascent≠descent: the glyph ink centre sits ~0.09·F above the flex-centred line box,
@@ -130,9 +131,9 @@
     s.transform = 'translate(' + tx + ',' + ty + ')';
   }
 
-  function makeCard(single) {
+  function makeCard() {
     var card = document.createElement('div');
-    card.className = 'card' + (single ? ' single' : '');
+    card.className = 'card';
     card.innerHTML =
       '<div class="half top"><span></span></div>' +
       '<div class="half bottom"><span></span></div>';
@@ -141,13 +142,11 @@
       el: card,
       topText: card.querySelector('.top span'),
       botText: card.querySelector('.bottom span'),
-      value: null, single: single, ampm: null
+      value: null, ampm: null
     };
   }
 
   function setCard(p, value, amPm) {
-    var single = value.length === 1;
-    if (p.single !== single) { p.el.classList.toggle('single', single); p.single = single; }
     if (amPm !== undefined) setAmPm(p, amPm);
     if (p.value === null) { p.topText.textContent = value; p.botText.textContent = value; p.value = value; return; }
     if (p.value === value) return;
@@ -196,9 +195,9 @@
     Object.assign(cfg, config || {});
     clock.innerHTML = ''; panels = {};
     px(); place();
-    panels.h = makeCard(true);
-    panels.m = makeCard(false);
-    if (cfg.showSeconds) panels.s = makeCard(false);
+    panels.h = makeCard();
+    panels.m = makeCard();
+    if (cfg.showSeconds) panels.s = makeCard();
     tick();
     setInterval(tick, 1000);
     window.addEventListener('resize', function () { px(); place(); });
