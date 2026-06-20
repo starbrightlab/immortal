@@ -3,16 +3,27 @@ name: Provisioning scripts
 # Catch syntax errors in the provisioning kit before they reach users — bash and
 # (especially) PowerShell, which has historically broken on release without anyone
 # noticing until Windows users hit it.
+#
+# The PowerShell parse runs TWICE on purpose:
+#   - pwsh (PowerShell 7) on Ubuntu catches structural syntax errors quickly.
+#   - Windows PowerShell 5.1 on a Windows runner is what real users actually run
+#     (the .bat invokes the built-in powershell.exe). 5.1 reads a BOM-less file as
+#     the ANSI codepage, so a stray non-ASCII char (e.g. an em dash) mis-decodes
+#     into a phantom quote and breaks parsing — pwsh 7 reads UTF-8 and never sees it.
+#     That false-green is exactly how a broken provision.ps1 shipped before.
+# The ASCII guard makes the most common cause fail fast with a clear message.
 on:
   pull_request:
     paths:
       - "provisioning/provision.sh"
       - "provisioning/provision.ps1"
+      - "provisioning/*.bat"
   push:
     branches: [main]
     paths:
       - "provisioning/provision.sh"
       - "provisioning/provision.ps1"
+      - "provisioning/*.bat"
 
 jobs:
   lint:
@@ -23,7 +34,24 @@ jobs:
       - name: provision.sh — bash syntax
         run: bash -n provisioning/provision.sh
 
-      - name: provision.ps1 — PowerShell parse (pwsh ships on the runner)
+      - name: Windows scripts must be pure ASCII (5.1 mis-decodes non-ASCII)
+        run: |
+          # Windows PowerShell 5.1 reads BOM-less files as ANSI, so any byte > 0x7F
+          # can turn into a phantom quote/brace and break parsing. Keep the
+          # Windows-executed scripts 7-bit clean. provision.sh is exempt — it only
+          # runs on macOS/Linux, where UTF-8 is read natively.
+          fail=0
+          for f in provisioning/provision.ps1 provisioning/*.bat; do
+            [ -e "$f" ] || continue
+            if LC_ALL=C grep -nP "[^\x00-\x7F]" "$f"; then
+              echo "::error file=$f::Non-ASCII byte(s) above — Windows PowerShell 5.1 will mis-decode these. Use ASCII (e.g. '-' instead of '—')."
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] && echo "Windows scripts are pure ASCII"
+          exit $fail
+
+      - name: provision.ps1 — PowerShell 7 parse (quick structural check)
         shell: pwsh
         run: |
           $errs = $null
@@ -33,4 +61,23 @@ jobs:
             $errs | ForEach-Object { Write-Error "line $($_.Extent.StartLineNumber): $($_.Message)" }
             exit 1
           }
-          Write-Host "provision.ps1 parses clean"
+          Write-Host "provision.ps1 parses clean under pwsh 7"
+
+  windows-parse:
+    # The real thing: parse under Windows PowerShell 5.1, exactly what the .bat runs
+    # on a user's machine. `shell: powershell` is 5.1 on the runner; `pwsh` is 7.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: provision.ps1 — Windows PowerShell 5.1 parse
+        shell: powershell
+        run: |
+          $errs = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path provisioning/provision.ps1).Path, [ref]$null, [ref]$errs)
+          if ($errs) {
+            $errs | ForEach-Object { Write-Error "line $($_.Extent.StartLineNumber): $($_.Message)" }
+            exit 1
+          }
+          Write-Host "provision.ps1 parses clean under Windows PowerShell 5.1"
