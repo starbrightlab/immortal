@@ -95,6 +95,7 @@ class FaceRenderer(
     ui.removeCallbacksAndMessages(null)
     npListener?.let { NowPlayingHub.removeListener(it) }
     npListener = null
+    clockFace?.dispose()
     io.shutdownNow()
   }
 
@@ -124,18 +125,24 @@ class FaceRenderer(
    * so a dot never orphans when its field is hidden (e.g. a battery-less Portal).
    */
   private fun buildClockCluster(clock: ClockSpec) {
-    val col = bucket(clock.position)
+    val made = makeClockFace(context, clock, assets)
+    clockFace = made
+    made.update(Date(), blinkOn)
 
-    clockFace =
-        makeClockFace(context, clock, assets).also {
-          it.update(Date(), blinkOn)
-          // Explicit WRAP: a vertical LinearLayout otherwise defaults children to MATCH_PARENT
-          // width, stretching the flip row across the screen.
-          col.addView(
-              it.view,
-              LinearLayout.LayoutParams(
-                  LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-        }
+    // A full-bleed clock (WebView) is its own full-screen layer that positions itself; it sits
+    // below the native widgets and owns no grid bucket. The meta row is skipped for it (the
+    // HTML clock owns the clock area; date/battery/weather handling moves into the face later).
+    if (made.fullBleed) {
+      view.addView(made.view, FrameLayout.LayoutParams(MATCH, MATCH))
+      return
+    }
+
+    val col = bucket(clock.position)
+    // Explicit WRAP: a vertical LinearLayout otherwise defaults children to MATCH_PARENT width.
+    col.addView(
+        made.view,
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
     val row = LinearLayout(context)
     row.gravity = Gravity.CENTER_VERTICAL

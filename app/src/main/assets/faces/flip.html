@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<!--
+  Fliqlo-style flip clock, rendered in a transparent WebView over the photo layer. CSS owns the
+  3D split-flap fold (the right tool for it); the Fliqlo font bakes the centre split into each
+  glyph, so there is exactly ONE split line and no separate divider. Configured from the host via
+  window.startClock({...}). See FlipWebClockFaceView / docs/screensaver-face-descriptor.md.
+-->
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+  @font-face {
+    font-family: 'Fliqlo';
+    src: url('file:///android_asset/fonts/Fliqlo.otf') format('opentype');
+  }
+  html, body {
+    margin: 0; height: 100%; background: transparent; overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+  /* The clock is absolutely positioned per the face's 9-point grid position. */
+  #clock {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+  }
+  .card {
+    position: relative;
+    width: var(--w2);
+    height: var(--h);
+    flex: none;
+    /* box-shadow (not filter) — a filter layer fails to composite over a transparent WebView. */
+    box-shadow: 0 0.02em 0.06em rgba(0,0,0,0.55);
+    border-radius: var(--r);
+  }
+  .card.single { width: var(--w1); }
+
+  /* Four stacked half-panels: two static (top/bottom), two animated leaves. */
+  .half {
+    position: absolute; left: 0; width: 100%; height: 50%;
+    overflow: hidden; background: #0e0e0e;
+  }
+  .top    { top: 0;  border-radius: var(--r) var(--r) 0 0; }
+  .bottom { top: 50%; border-radius: 0 0 var(--r) var(--r); }
+
+  /* Each half holds a full-card-height glyph; the half clips it to its portion. The Fliqlo
+     glyph's baked split sits at the glyph centre, which lands exactly on the clip line. */
+  .half span {
+    position: absolute; left: 0; width: 100%; height: var(--h);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fliqlo', Arial, sans-serif;
+    font-size: var(--f);
+    line-height: 1;
+    color: var(--color);
+    transform: translateY(var(--dy));
+  }
+  .top span    { top: 0; }
+  .bottom span { top: -100%; }
+
+  .leaf {
+    position: absolute; left: 0; width: 100%; height: 50%;
+    overflow: hidden; background: #0e0e0e;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  }
+  .leaf.top    { top: 0;  transform-origin: 50% 100%; }
+  .leaf.bottom { top: 50%; transform-origin: 50% 0%; transform: rotateX(90deg); }
+
+  /* Perspective lives on the card via a wrapper so the fold has depth. */
+  .card { perspective: 800px; }
+
+  .am-pm {
+    position: absolute; left: 0.12em; z-index: 5;
+    font-family: 'Fliqlo', Arial, sans-serif; font-size: var(--ampm);
+    color: var(--color); opacity: 0.85; letter-spacing: 0.04em;
+  }
+  .am-pm.am { top: 0.18em; }
+  .am-pm.pm { bottom: 0.18em; }
+
+  @keyframes foldDown   { from { transform: rotateX(0deg);  } to { transform: rotateX(-90deg); } }
+  @keyframes unfoldUp   { from { transform: rotateX(90deg); } to { transform: rotateX(0deg);   } }
+  .leaf.top.go    { animation: foldDown var(--half) ease-in forwards; }
+  .leaf.bottom.go { animation: unfoldUp var(--half) ease-out forwards; animation-delay: var(--half); }
+</style>
+</head>
+<body>
+<div id="clock"></div>
+<script>
+(function () {
+  var cfg = {
+    format12: true, showSeconds: false, showAmPm: false, leadingZero: false,
+    color: '#b9b9b9', scale: 100, position: 'middle-center'
+  };
+  var clock = document.getElementById('clock');
+  var panels = {}; // 'h','m','s' -> {card, halves...}
+
+  function px() {
+    // Drive every dimension off card height H, sized to the viewport and scale.
+    var vh = window.innerHeight;
+    var H = vh * 0.34 * (cfg.scale / 100);
+    var F = H * 1.10;               // font-size: glyph cap fills the card with margin
+    var adv = F * 0.45;             // monospaced advance
+    var pad = H * 0.11;
+    document.documentElement.style.setProperty('--h', H + 'px');
+    document.documentElement.style.setProperty('--f', F + 'px');
+    document.documentElement.style.setProperty('--w1', (adv + 2 * pad) + 'px');
+    document.documentElement.style.setProperty('--w2', (2 * adv + 2 * pad) + 'px');
+    document.documentElement.style.setProperty('--r', (H * 0.08) + 'px');
+    document.documentElement.style.setProperty('--gap', (H * 0.07) + 'px');
+    document.documentElement.style.setProperty('--ampm', (F * 0.12) + 'px');
+    document.documentElement.style.setProperty('--half', '300ms');
+    document.documentElement.style.setProperty('--color', cfg.color);
+    // Fliqlo ascent≠descent: the glyph ink centre sits ~0.09·F above the flex-centred line box,
+    // so push it down by that to land the baked split on the card centre (the clip line).
+    document.documentElement.style.setProperty('--dy', (F * 0.133) + 'px');
+  }
+
+  function place() {
+    // 9-point grid position with a screen margin.
+    var m = '4%';
+    var p = cfg.position || 'middle-center';
+    var s = clock.style;
+    s.top = s.bottom = s.left = s.right = 'auto';
+    s.transform = '';
+    var vy = p.split('-')[0], vx = p.split('-')[1];
+    if (vy === 'top') s.top = m; else if (vy === 'bottom') s.bottom = m;
+    else { s.top = '50%'; }
+    if (vx === 'left') s.left = m; else if (vx === 'right') s.right = m;
+    else { s.left = '50%'; }
+    var tx = (vx === 'center') ? '-50%' : '0', ty = (vy === 'middle') ? '-50%' : '0';
+    s.transform = 'translate(' + tx + ',' + ty + ')';
+  }
+
+  function makeCard(single) {
+    var card = document.createElement('div');
+    card.className = 'card' + (single ? ' single' : '');
+    card.innerHTML =
+      '<div class="half top"><span></span></div>' +
+      '<div class="half bottom"><span></span></div>';
+    clock.appendChild(card);
+    return {
+      el: card,
+      topText: card.querySelector('.top span'),
+      botText: card.querySelector('.bottom span'),
+      value: null, single: single, ampm: null
+    };
+  }
+
+  function setCard(p, value, amPm) {
+    var single = value.length === 1;
+    if (p.single !== single) { p.el.classList.toggle('single', single); p.single = single; }
+    if (amPm !== undefined) setAmPm(p, amPm);
+    if (p.value === null) { p.topText.textContent = value; p.botText.textContent = value; p.value = value; return; }
+    if (p.value === value) return;
+    var oldV = p.value; p.value = value;
+    p.topText.textContent = value;          // new top revealed as the old top folds away
+    flip(p, oldV, value);
+  }
+
+  function flip(p, oldV, newV) {
+    var ft = document.createElement('div'); ft.className = 'leaf top';
+    ft.innerHTML = '<span style="position:absolute;left:0;width:100%;height:var(--h);display:flex;align-items:center;justify-content:center;font-family:Fliqlo;font-size:var(--f);line-height:1;color:var(--color);top:0;transform:translateY(var(--dy))">' + oldV + '</span>';
+    var fb = document.createElement('div'); fb.className = 'leaf bottom';
+    fb.innerHTML = '<span style="position:absolute;left:0;width:100%;height:var(--h);display:flex;align-items:center;justify-content:center;font-family:Fliqlo;font-size:var(--f);line-height:1;color:var(--color);top:-100%;transform:translateY(var(--dy))">' + newV + '</span>';
+    p.el.appendChild(ft); p.el.appendChild(fb);
+    p.botText.textContent = oldV;            // static bottom keeps old until the new bottom lands
+    requestAnimationFrame(function () { ft.classList.add('go'); fb.classList.add('go'); });
+    setTimeout(function () {
+      p.botText.textContent = newV;
+      if (ft.parentNode) ft.parentNode.removeChild(ft);
+      if (fb.parentNode) fb.parentNode.removeChild(fb);
+    }, 640);
+  }
+
+  function setAmPm(p, amPm) {
+    if (p.ampm) { p.ampm.parentNode.removeChild(p.ampm); p.ampm = null; }
+    if (!amPm) return;
+    var el = document.createElement('div');
+    el.className = 'am-pm ' + amPm.toLowerCase();
+    el.textContent = amPm;
+    p.el.appendChild(el); p.ampm = el;
+  }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  function tick() {
+    var now = new Date();
+    var h = now.getHours(), ap = null;
+    if (cfg.format12) { ap = h >= 12 ? 'PM' : 'AM'; h = h % 12; if (h === 0) h = 12; }
+    var hs = cfg.leadingZero ? pad2(h) : String(h);
+    setCard(panels.h, hs, cfg.showAmPm ? ap : null);
+    setCard(panels.m, pad2(now.getMinutes()));
+    if (panels.s) setCard(panels.s, pad2(now.getSeconds()));
+  }
+
+  window.startClock = function (config) {
+    Object.assign(cfg, config || {});
+    clock.innerHTML = ''; panels = {};
+    px(); place();
+    panels.h = makeCard(true);
+    panels.m = makeCard(false);
+    if (cfg.showSeconds) panels.s = makeCard(false);
+    tick();
+    setInterval(tick, 1000);
+    window.addEventListener('resize', function () { px(); place(); });
+  };
+
+  // Auto-start with defaults if the host doesn't call within a tick (useful for direct testing).
+  setTimeout(function () { if (!panels.h) window.startClock(cfg); }, 50);
+})();
+</script>
+</body>
+</html>
