@@ -1,211 +1,169 @@
 <!DOCTYPE html>
 <!--
-  Fliqlo-style flip clock, rendered in a transparent WebView over the photo layer. CSS owns the
-  3D split-flap fold (the right tool for it); the Fliqlo font bakes the centre split into each
-  glyph, so there is exactly ONE split line and no separate divider. Configured from the host via
-  window.startClock({...}). See FlipWebClockFaceView / docs/screensaver-face-descriptor.md.
+  Caveat on the cascade: .flip.hur.tf0 span::before (the AM/PM badge) sets its
+  OWN font-size to .1em (= 60px). Its left/top/bottom em values are therefore
+  relative to 60px, i.e. (originalPx / 60)em — not /600. Everything else is /600.
+
+  Peripheral chrome that is NOT the clock face (loader, #settings config panel,
+  #debug) is left in px exactly as the original — it is fixed-size UI that
+  should not scale with the clock, and only appears in config/dev mode anyway.
 -->
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<style>
-  @font-face {
-    font-family: 'Fliqlo';
-    src: url('file:///android_asset/fonts/Fliqlo.otf') format('opentype');
-  }
-  html, body {
-    margin: 0; height: 100%; background: transparent; overflow: hidden;
-    -webkit-user-select: none; user-select: none;
-  }
-  /* The clock is absolutely positioned per the face's 9-point grid position. */
-  #clock {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-  }
-  /* Fliqlo cards are square and identical for hour and minute (the single-digit hour is just
-     centred in the same square card). */
-  .card {
-    position: relative;
-    width: var(--h);
-    height: var(--h);
-    flex: none;
-    /* box-shadow (not filter) — a filter layer fails to composite over a transparent WebView. */
-    box-shadow: 0 0.02em 0.06em rgba(0,0,0,0.55);
-    border-radius: var(--r);
-  }
-
-  /* Four stacked half-panels: two static (top/bottom), two animated leaves. */
-  .half {
-    position: absolute; left: 0; width: 100%; height: 50%;
-    overflow: hidden; background: #0e0e0e;
-  }
-  .top    { top: 0;  border-radius: var(--r) var(--r) 0 0; }
-  .bottom { top: 50%; border-radius: 0 0 var(--r) var(--r); }
-
-  /* Each half holds a full-card-height glyph; the half clips it to its portion. The Fliqlo
-     glyph's baked split sits at the glyph centre, which lands exactly on the clip line. */
-  .half span {
-    position: absolute; left: 0; width: 100%; height: var(--h);
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'Fliqlo', Arial, sans-serif;
-    font-size: var(--f);
-    line-height: 1;
-    color: var(--color);
-    transform: translateY(var(--dy));
-  }
-  .top span    { top: 0; }
-  .bottom span { top: -100%; }
-
-  .leaf {
-    position: absolute; left: 0; width: 100%; height: 50%;
-    overflow: hidden; background: #0e0e0e;
-    backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  }
-  .leaf.top    { top: 0;  transform-origin: 50% 100%; }
-  .leaf.bottom { top: 50%; transform-origin: 50% 0%; transform: rotateX(90deg); }
-
-  /* Perspective lives on the card via a wrapper so the fold has depth. */
-  .card { perspective: 800px; }
-
-  /* Fliqlo puts a small AM/PM in the top-left (AM) or bottom-left (PM) corner of the square
-     hour card. It uses a system sans (the Fliqlo font is digits-only), not the digit font. */
-  .am-pm {
-    position: absolute; left: calc(var(--h) * 0.06); z-index: 5;
-    font-family: Arial, 'Helvetica Neue', sans-serif; font-weight: 700;
-    font-size: var(--ampm); line-height: 1;
-    color: var(--color); opacity: 0.85; letter-spacing: 0.02em;
-  }
-  .am-pm.am { top: calc(var(--h) * 0.10); }
-  .am-pm.pm { bottom: calc(var(--h) * 0.10); }
-
-  @keyframes foldDown   { from { transform: rotateX(0deg);  } to { transform: rotateX(-90deg); } }
-  @keyframes unfoldUp   { from { transform: rotateX(90deg); } to { transform: rotateX(0deg);   } }
-  .leaf.top.go    { animation: foldDown var(--half) ease-in forwards; }
-  .leaf.bottom.go { animation: unfoldUp var(--half) ease-out forwards; animation-delay: var(--half); }
-</style>
-</head>
-<body>
-<div id="clock"></div>
+<meta charset="utf-8">
 <script>
+/* Immortal: seed the screensaver config from the URL into localStorage before the clock
+   initialises. tf = 0 (1-12 AM/PM) | 1 (00-23) | 2 (0-23); sc = scale 50-100. */
 (function () {
-  var cfg = {
-    format12: true, showSeconds: false, showAmPm: false, leadingZero: false,
-    color: '#b9b9b9', scale: 100, position: 'middle-center'
-  };
-  var clock = document.getElementById('clock');
-  var panels = {}; // 'h','m','s' -> {card, halves...}
-
-  function px() {
-    // Drive every dimension off card height H, sized to the viewport and scale.
-    var vh = window.innerHeight;
-    // Square cards (Fliqlo): card side = H; the glyph cap fills ~76% of it (F = 1.14·H).
-    var H = vh * 0.34 * (cfg.scale / 100);
-    var F = H * 0.90;   // tuned by visual match to Fliqlo: tall digits, minute pair not cramped
-    document.documentElement.style.setProperty('--h', H + 'px');
-    document.documentElement.style.setProperty('--f', F + 'px');
-    document.documentElement.style.setProperty('--r', (H * 0.085) + 'px');
-    document.documentElement.style.setProperty('--gap', (H * 0.08) + 'px');
-    document.documentElement.style.setProperty('--ampm', (H * 0.12) + 'px');
-    document.documentElement.style.setProperty('--half', '300ms');
-    document.documentElement.style.setProperty('--color', cfg.color);
-    // Fliqlo ascent≠descent: the glyph ink centre sits ~0.09·F above the flex-centred line box,
-    // so push it down by that to land the baked split on the card centre (the clip line).
-    document.documentElement.style.setProperty('--dy', (F * 0.133) + 'px');
-  }
-
-  function place() {
-    // 9-point grid position with a screen margin.
-    var m = '4%';
-    var p = cfg.position || 'middle-center';
-    var s = clock.style;
-    s.top = s.bottom = s.left = s.right = 'auto';
-    s.transform = '';
-    var vy = p.split('-')[0], vx = p.split('-')[1];
-    if (vy === 'top') s.top = m; else if (vy === 'bottom') s.bottom = m;
-    else { s.top = '50%'; }
-    if (vx === 'left') s.left = m; else if (vx === 'right') s.right = m;
-    else { s.left = '50%'; }
-    var tx = (vx === 'center') ? '-50%' : '0', ty = (vy === 'middle') ? '-50%' : '0';
-    s.transform = 'translate(' + tx + ',' + ty + ')';
-  }
-
-  function makeCard() {
-    var card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML =
-      '<div class="half top"><span></span></div>' +
-      '<div class="half bottom"><span></span></div>';
-    clock.appendChild(card);
-    return {
-      el: card,
-      topText: card.querySelector('.top span'),
-      botText: card.querySelector('.bottom span'),
-      value: null, ampm: null
-    };
-  }
-
-  function setCard(p, value, amPm) {
-    if (amPm !== undefined) setAmPm(p, amPm);
-    if (p.value === null) { p.topText.textContent = value; p.botText.textContent = value; p.value = value; return; }
-    if (p.value === value) return;
-    var oldV = p.value; p.value = value;
-    p.topText.textContent = value;          // new top revealed as the old top folds away
-    flip(p, oldV, value);
-  }
-
-  function flip(p, oldV, newV) {
-    var ft = document.createElement('div'); ft.className = 'leaf top';
-    ft.innerHTML = '<span style="position:absolute;left:0;width:100%;height:var(--h);display:flex;align-items:center;justify-content:center;font-family:Fliqlo;font-size:var(--f);line-height:1;color:var(--color);top:0;transform:translateY(var(--dy))">' + oldV + '</span>';
-    var fb = document.createElement('div'); fb.className = 'leaf bottom';
-    fb.innerHTML = '<span style="position:absolute;left:0;width:100%;height:var(--h);display:flex;align-items:center;justify-content:center;font-family:Fliqlo;font-size:var(--f);line-height:1;color:var(--color);top:-100%;transform:translateY(var(--dy))">' + newV + '</span>';
-    p.el.appendChild(ft); p.el.appendChild(fb);
-    p.botText.textContent = oldV;            // static bottom keeps old until the new bottom lands
-    requestAnimationFrame(function () { ft.classList.add('go'); fb.classList.add('go'); });
-    setTimeout(function () {
-      p.botText.textContent = newV;
-      if (ft.parentNode) ft.parentNode.removeChild(ft);
-      if (fb.parentNode) fb.parentNode.removeChild(fb);
-    }, 640);
-  }
-
-  function setAmPm(p, amPm) {
-    if (p.ampm) { p.ampm.parentNode.removeChild(p.ampm); p.ampm = null; }
-    if (!amPm) return;
-    var el = document.createElement('div');
-    el.className = 'am-pm ' + amPm.toLowerCase();
-    el.textContent = amPm;
-    p.el.appendChild(el); p.ampm = el;
-  }
-
-  function pad2(n) { return (n < 10 ? '0' : '') + n; }
-
-  function tick() {
-    var now = new Date();
-    var h = now.getHours(), ap = null;
-    if (cfg.format12) { ap = h >= 12 ? 'PM' : 'AM'; h = h % 12; if (h === 0) h = 12; }
-    var hs = cfg.leadingZero ? pad2(h) : String(h);
-    setCard(panels.h, hs, cfg.showAmPm ? ap : null);
-    setCard(panels.m, pad2(now.getMinutes()));
-    if (panels.s) setCard(panels.s, pad2(now.getSeconds()));
-  }
-
-  window.startClock = function (config) {
-    Object.assign(cfg, config || {});
-    clock.innerHTML = ''; panels = {};
-    px(); place();
-    panels.h = makeCard();
-    panels.m = makeCard();
-    if (cfg.showSeconds) panels.s = makeCard();
-    tick();
-    setInterval(tick, 1000);
-    window.addEventListener('resize', function () { px(); place(); });
-  };
-
-  // Auto-start with defaults if the host doesn't call within a tick (useful for direct testing).
-  setTimeout(function () { if (!panels.h) window.startClock(cfg); }, 50);
+  try {
+    var p = new URLSearchParams(location.search);
+    if (p.has('tf')) localStorage.setItem('tf', p.get('tf'));
+    if (p.has('sc')) localStorage.setItem('sc', p.get('sc'));
+  } catch (e) {}
 })();
 </script>
+<meta content="en" name="content-language">
+<meta content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,shrink-to-fit=no" name="viewport">
+<title>Fliqlo</title>
+<style>
+/* ── Font ──────────────────────────────────────────────────────────────── */
+@font-face{
+  font-family:flip;
+  src:url("Flip-Regular.otf") format("opentype");
+  font-weight:700;
+  font-style:normal;
+}
+
+/* ── Page / body (unchanged from original) ─────────────────────────────── */
+body,html{width:100%;height:100%;background-color:#000}
+html{touch-action:none}
+body{position:relative;margin:0;padding:0;font-family:-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;color:#fff;max-width:100%;max-height:100%;overflow:hidden;-webkit-text-size-adjust:none;text-size-adjust:none;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-align:center;cursor:default}
+body.blur{background-color:#ff0}
+body.dummy{background-color:red}
+*{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none!important}
+a{color:#fff;text-decoration:none}
+
+/* ── Loader + config-panel chrome (unchanged px; not part of the clock) ── */
+#loader{position:fixed;display:block;width:100%;height:100%;top:0;bottom:0;z-index:210;background-color:#000;overflow:hidden;transition:.33s ease-out}
+#loader.remove{opacity:0}
+#debug{z-index:10000;position:fixed;display:inline-block;height:20px;font-size:12px;line-height:20px;top:50%;left:50%;transform:translate(-50%,-50%);margin:0 auto;padding:0 5px;background-color:#0f0;color:#000}
+#settings{transform-origin:bottom center;position:absolute;display:inline-block;box-sizing:border-box;left:50%;bottom:0;transform:translate(-50%,-20px);z-index:104;color:#fff;padding:4px;background-color:rgba(96,96,96,.25);border-radius:8px;font-size:13px;line-height:1;transition:opacity .2s ease-out,visibility .2s ease-out;backdrop-filter:blur(10px)}
+body:not(.hover):not(.pause) #settings{opacity:0;visibility:hidden}
+body.hover #settings{opacity:1;visibility:visible}
+#settings dl{display:flex;justify-content:center;align-items:center;flex-wrap:nowrap;margin:0}
+#settings dt{display:none}
+#settings dd{position:relative;display:block;height:24px;margin:0;overflow:hidden;white-space:nowrap;text-align:left;margin:0 10px 0 0;padding:0}
+#settings dd>label{display:flex;box-sizing:border-box;align-self:center;align-items:center;justify-content:center;align-items:center;height:24px;border-radius:4px;overflow:hidden;transition:background-color .15s}
+.focus #settings label:not(#tf-container){pointer-events:none}
+#settings dd>label:active,#settings dd>label:hover{background-color:rgba(255,255,255,.1)}
+#settings dd:last-child{margin-right:0}
+#tf-container{display:inline-block;position:relative;height:24px;text-align:center;box-sizing:border-box;padding:4px 6px;opacity:.8;overflow:hidden}
+#tf-container::before{content:attr(data-tf);display:inline-block;color:#fff;font-size:11px;line-height:14px;width:16px;height:16px;text-align:center;border-radius:3px;box-sizing:border-box;border:solid 1px #fff;font-family:'Microsoft Sans Serif',Arial,sans-serif;pointer-events:none}
+#tf-container[data-tf="12"]::before{text-indent:-2px;letter-spacing:-1px}
+#settings dd input[type=checkbox]{display:none;outline:0}
+#settings dd input[type=checkbox]+label{display:inline-block;box-sizing:border-box;position:relative;height:24px;text-align:center;overflow:hidden;font-size:0;padding:4px 6px;opacity:.8}
+#settings dd input[type=checkbox]+label::before{content:'';display:inline-block;box-sizing:border-box;border:dashed 1px #fff;border-radius:3px;width:16px;height:16px;overflow:hidden;margin:0;background-color:transparent}
+#settings dd input[type=checkbox]+label::after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;margin:auto;width:18px;height:18px;border-radius:2px;overflow:hidden;background-position:center center;background-size:auto auto;background-color:transparent;background-image:repeating-linear-gradient(45deg,transparent,transparent 12px,#fff 12px,#fff 13px)}
+#settings input[type=checkbox]:checked+label::before{border:solid 1px #fff;background-size:auto auto;background-color:transparent;background-image:repeating-linear-gradient(-45deg,transparent,transparent 3px,#fff 3px,#fff 4px)}
+#settings input[type=checkbox]:checked+label::after{display:none}
+#brightness-container,#scale-container{padding:0 6px 0 26px}
+#scale-container::before{content:'';position:absolute;display:block;box-sizing:border-box;width:6px;height:6px;top:14px;left:6px;margin:0;border:solid 1px #fff;opacity:.8;border-radius:1px}
+#scale-container::after{content:'';position:absolute;display:block;box-sizing:border-box;width:10px;height:10px;top:4px;left:12px;margin:0;border:solid 1px #fff;opacity:.8;border-radius:2px}
+#brightness-container::before{content:'';position:absolute;display:block;width:3px;height:6px;top:8px;left:10px;margin:0;border-radius:50%;border-color:#fff;border-style:solid;border-width:1px 4px 1px 1px;box-shadow:-8px 0 0 -3px #fff,8px 0 0 -3px #fff,0 -8px 0 -3px #fff,0 8px 0 -3px #fff,-6px -6px 0 -3px #fff,-6px 6px 0 -3px #fff,6px -6px 0 -3px #fff,6px 6px 0 -3px #fff;opacity:.8}
+#settings select{position:absolute;top:0;left:0;opacity:0;-webkit-appearance:none;-moz-appearance:none;appearance:none;margin:0;width:100%;height:100%;border:0;font-size:12px;outline:0}
+input[type=range]{-webkit-appearance:none;appearance:none;width:62px;height:2px;box-sizing:content-box;margin:0;padding:0;background-color:rgba(255,255,255,.25);height:2px;border-radius:1px;transform:translate3d(0,0,0);backface-visibility:hidden;outline:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;box-shadow:0 1px 1px rgba(0,0,0,.15);border:0;height:12px;width:12px;border-radius:50%;background:#d7d7d7}
+
+/* ── Stage + scale layer ───────────────────────────────────────────────── */
+#main{position:absolute;display:block;width:100%;height:100%;z-index:0;transition:initial}
+
+/* em anchor: 1em = --clock-size = the 600px digit card. Everything below is px/600. */
+#main-content,.dummy.portrait:not(.innerportrait) #main-content{position:absolute;display:block;top:50%;left:50%;font-size:var(--clock-size,600px);margin-left:-1.125em;margin-top:-0.583333em;width:2.25em;height:1.166667em;text-align:center;white-space:nowrap;font-family:flip,sans-serif;font-weight:700}
+.dummy #main-content,.portrait:not(.dummy) #main-content{margin-left:-0.583333em;margin-top:-1.125em;width:1.166667em;height:2.25em}
+
+#main-content-area,.dummy.portrait:not(.innerportrait) #main-content-area{position:absolute;z-index:0;top:0;right:0;bottom:0;left:0;margin:auto;width:2.083333em;height:1em;border-radius:0.083333em}
+.dummy #main-content-area,.portrait:not(.dummy) #main-content-area{width:1em;height:2.083333em}
+.settings #main-content-area{transition:filter .2s linear}
+
+/* ── Flip animation keyframes (unchanged) ──────────────────────────────── */
+@keyframes fadeIn{0%{-webkit-filter:brightness(10%);filter:brightness(10%)}100%{-webkit-filter:brightness(100%);filter:brightness(100%)}}
+@keyframes fadeInSCR{0%{background-color:rgba(0,0,0,.9)}100%{background-color:rgba(0,0,0,0)}}
+@keyframes fadeOut1{0%,66%{-webkit-filter:brightness(100%);filter:brightness(100%)}100%{-webkit-filter:brightness(50%);filter:brightness(50%)}}
+@keyframes fadeOut1SCR{0%,66%{background-color:rgba(0,0,0,0)}100%{background-color:rgba(0,0,0,.5)}}
+@keyframes fadeOut2{0%{-webkit-filter:brightness(50%);filter:brightness(50%)}100%{-webkit-filter:brightness(10%);filter:brightness(10%)}}
+@keyframes fadeOut2SCR{0%{background-color:rgba(0,0,0,.5)}100%{background-color:rgba(0,0,0,.9)}}
+@keyframes anmTop{0%{transform:rotateX(0);-webkit-filter:brightness(100%);filter:brightness(100%)}100%{transform:rotateX(-90deg);-webkit-filter:brightness(40%);filter:brightness(40%)}}
+@keyframes anmTopSCR{0%{background-color:rgba(0,0,0,0)}100%{background-color:rgba(0,0,0,.6)}}
+@keyframes anmBottom{0%{transform:rotateX(90deg);-webkit-filter:brightness(200%);filter:brightness(200%)}100%{transform:rotateX(0);-webkit-filter:brightness(100%);filter:brightness(100%)}}
+@keyframes anmBottomMS{0%{transform:rotateX(90deg);color:rgba(255,255,255,.9)}100%{transform:rotateX(0);color:rgba(255,255,255,.711)}}
+@keyframes anmBottomSCR{0%{background-color:rgba(255,255,255,.05)}100%{background-color:rgba(255,255,255,0)}}
+
+/* ── Digit groups (hours / minutes) ────────────────────────────────────── */
+.flips{position:absolute;display:block;width:1em;height:1em;border-radius:0.083333em;transform-style:preserve-3d;perspective:6.666667em;box-shadow:0 0 0.033333em rgba(0,0,0,.5);transform:translate3d(0,0,0);backface-visibility:hidden}
+.fade .flips{transition:box-shadow .2s linear}
+.dark .flips{box-shadow:none}
+.flips#hurs{top:0;left:0;z-index:1}
+.dummy.portrait:not(.innerportrait) .flips#mins,.flips#mins{top:0;right:0;z-index:0}
+.dummy .flips#mins,.portrait:not(.dummy) .flips#mins{top:auto;bottom:0}
+
+/* ── Flip halves ───────────────────────────────────────────────────────── */
+.flip{position:absolute;display:block;width:1em;height:0.495em;overflow:hidden;box-sizing:content-box;color:rgba(255,255,255,.711);z-index:0;transform:rotateX(0);-webkit-filter:brightness(100%);filter:brightness(100%);animation-duration:.165s;animation-fill-mode:forwards;transition:unset;background-color:#000}
+.flip.clone{display:none}
+.flip.clone.act{display:block}
+.willchange .flip{will-change:animation}
+.fade .flip{transition:border-color .2s linear,background-color .2s linear}
+.flip.hur{left:0}
+.flip.min{right:0}
+.flip.clone{z-index:1;display:none}
+.flip.top{border-bottom:solid 0.001667em #080808;bottom:0.505em;border-radius:0.083333em 0.083333em 0 0;animation-timing-function:ease-in}
+.dark .flip.top{border-bottom-color:#000}
+.flip.bottom{border-top:solid 0.001667em #151515;top:0.505em;border-radius:0 0 0.083333em 0.083333em;animation-timing-function:ease-out}
+.dark .flip.bottom{border-top-color:#000}
+.flip.top.clone{transform-origin:50% 0.5em}
+.flip.bottom.clone{transform-origin:50% 0}
+.flip.fadein{animation-name:fadeIn}
+.flip.fadeout1{animation-name:fadeOut1}
+.flip.fadeout2{animation-name:fadeOut2}
+.flip.top.transform{display:block;animation-name:anmTop}
+.flip.bottom.transform{display:block;animation-name:anmBottom}
+.stop .flip.bottom.transform,.stop .flip.top.transform{animation:none}
+
+/* card face: outer bevel (::before) + inner panel (::after) */
+.flip::before{content:'';position:absolute;left:0;height:1em;width:1em;border-radius:0.083333em;background-image:linear-gradient(to bottom,#161616,#0c0c0c);z-index:0}
+.flip::after{content:'';position:absolute;left:0;margin:0.001667em;height:0.996667em;width:0.996667em;border-radius:0.081667em;background-image:linear-gradient(to bottom,#111,#0b0b0b);z-index:1}
+.fade .flip::after,.fade .flip::before{transition:opacity .2s linear}
+.dark .flip::after,.dark .flip::before{opacity:0;backface-visibility:hidden;transform:translate3d(0,0,0)}
+
+/* digit glyph: span is a full 1em card, clipped by the .flip half */
+.flip span{position:absolute;display:block;left:0;width:1em;height:1em;overflow:hidden;text-align:center;z-index:2;font-size:1em;line-height:1.263333em}
+.flip.hur.one span{text-indent:-.025em}
+.flip.hur.eleven span,.flip.min.eleven span{text-indent:.08em}
+.flip.hur.eleven.justeleven span,.flip.min.eleven.justeleven span{text-indent:.04em}
+
+/* AM/PM badge: ::before sets its OWN font-size .1em(=60px), so its left/top/bottom em are px/60 */
+.flip.hur.tf0 span::before{content:'AM';display:inline-block;position:absolute;font-size:0.1em;line-height:1;text-align:left;text-indent:0;left:0.633333em;top:1.3em;letter-spacing:0}
+.flip.hur.tf0.pm span::before{content:'PM';top:auto;bottom:1.033333em}
+
+.flip.top span,.flip.top::after,.flip.top::before{top:0}
+.flip.bottom span,.flip.bottom::after,.flip.bottom::before{bottom:0}
+</style>
+<script>
+/* Animation engine — kept verbatim from the original screensaver, with ONE
+   change for standalone use: isChrome now keys off the actual WebView2 host
+   (window.chrome.webview) instead of hostname, so a plain browser falls back
+   to localStorage instead of stalling on a postMessage bridge that isn't there. */
+const appStorage=(()=>{const a=new Map;function n(s,o={}){return new Promise((e,t)=>{var n=crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());a.set(n,{resolve:e,reject:t});n={requestId:n,action:s,...o};null!=window.chrome&&window.chrome.webview.postMessage(JSON.stringify(n))})}return null!=window.chrome&&null!=window.chrome.webview&&window.chrome.webview.addEventListener("message",e=>{e=e.data;if(e&&e.requestId){const t=a.get(e.requestId);t&&(a.delete(e.requestId),e.success?t.resolve(e):t.reject(new Error(e.error||"Unknown error")))}}),{async getItem(e){return(await n("getItem",{key:e})).value??null},async setItem(e,t){return(await n("setItem",{key:e,value:String(t)})).value??null},async removeItem(e){return!!(await n("removeItem",{key:e})).removed},async clear(){await n("clear")},async length(){return(await n("length")).length??0},async key(e){return(await n("key",{index:e})).key??null},async getAll(){return(await n("getAll")).items??{}},async keys(){var e=await this.getAll();return Object.keys(e)},async values(){var e=await this.getAll();return Object.values(e)},async entries(){var e=await this.getAll();return Object.entries(e)}}})();function setLocalStrage(e,t){isChrome?"bg"==e?appStorage.setBool(e,t):appStorage.setInt(e,t):localStorage.setItem(e,t)}function getLocalStrage(e){return isChrome?"bg"==e?appStorage.getBool(e):appStorage.getInt(e):localStorage.getItem(e)}appStorage.setBool=async(e,t)=>{await appStorage.setItem(e,t?"1":"0")},appStorage.getBool=async(e,t=null)=>{e=await appStorage.getItem(e);return null===e?t:"1"===e},appStorage.setInt=async(e,t)=>{await appStorage.setItem(e,String(t))},appStorage.getInt=async(e,t=NaN)=>{e=await appStorage.getItem(e);if(null===e)return t;e=parseInt(e,10);return isNaN(e)?t:e};const isDev=Boolean(0<=window.location.hostname.indexOf("localhost")),isChrome=Boolean(null!=window.chrome&&null!=window.chrome.webview),isConfig=Boolean(isChrome&&"ConfigForm"==window.navigator.userAgent||isDev),isFlipTest=!1;scMax=100,scMin=50,brMax=100,brMin=50;var dsphur,dspmin,tf=0,bg=!0,sc=scMax,osp=1,br=brMax,dsptf=tf,mainTimer=null,hoverTimer=null;function updateSettings(e){var t;e.hasOwnProperty("tf")&&tf!=e.tf&&(t=!Boolean(0<e.tf&&0<tf&&10<=dsphur),setLocalStrage("tf",tf=e.tf),t&&tf!=dsptf&&document.body.classList.contains("hlock")?document.body.dispatchEvent(new CustomEvent("_updateFlips",{detail:{h:!0,m:!1}})):t||(dsptf=tf)),e.hasOwnProperty("sb")&&bg!=e.sb&&(setLocalStrage("bg",bg=e.sb),document.getElementById("main-content-area").classList.toggle("dark",!bg)),e.hasOwnProperty("anm")&&document.getElementById("main-content-area").classList.toggle("fade",e.anm),e.hasOwnProperty("br")&&br!=e.br&&setLocalStrage("br",br=e.br),e.hasOwnProperty("sc")&&sc!=e.sc&&setLocalStrage("sc",sc=e.sc)}async function initView(){var e=await getLocalStrage("tf");isNaN(e)?await setLocalStrage("tf",tf):tf=Number(e),null!=document.getElementById("tf")&&(document.getElementById("tf").value=tf,document.getElementById("tf-container").dispatchEvent(new CustomEvent("_change")));e=await getLocalStrage("bg");null===e?await setLocalStrage("bg",bg):bg=Boolean("true"===String(e).toLowerCase()),null!=document.getElementById("bg")&&bg&&(document.getElementById("bg").checked=!0),document.getElementById("main-content-area").classList.toggle("dark",!bg);e=await getLocalStrage("br");isNaN(e)?await setLocalStrage("br",br):(t=Number(e),(br=Math.max(brMin,Math.min(brMax,t)))!=t&&window.setLocalStrage("br",br)),document.body.dispatchEvent(new CustomEvent("_updateBrightness",{detail:{value:br}}));var t=await getLocalStrage("sc");isNaN(t)?await setLocalStrage("sc",sc):(t=Number(t),(sc=Math.max(scMin,Math.min(scMax,t)))!=t&&window.setLocalStrage("sc",sc)),document.body.dispatchEvent(new CustomEvent("_updateScale",{detail:{value:sc}})),window.focus(),document.body.classList.add("willchange"),document.body.dispatchEvent(new CustomEvent("_updateTime")),mainTimer=setInterval(function(){document.body.dispatchEvent(new CustomEvent("_updateTime"))},250),document.getElementById("loader").classList.add("remove")}function setHoverTimer(){clearTimeout(hoverTimer),hoverTimer=setTimeout(function(){document.body.classList.contains("pause")||document.body.classList.remove("hover")},3e3)}function clearHoverTimer(){clearTimeout(hoverTimer),document.body.classList.contains("pause")||document.body.classList.remove("hover")}function debug(e){if(!document.getElementById("debug")){const t=document.createElement("div");t.setAttribute("id","debug"),document.body.append(t)}document.getElementById("debug").innerHTML=e}document.addEventListener("DOMContentLoaded",function(){if(isDev||(document.oncontextmenu=function(){return!1}),isConfig){document.querySelector("#main").insertAdjacentHTML("beforebegin",'<div id="settings"><dl><dt>Hour Format</dt><dd title="Hour Format"><label id="tf-container"><select id="tf" tabindex="-1"><option value="0"'+(0==tf?" selected":"")+'>&nbsp;1-12 AM/PM&nbsp;</option><option value="1"'+(1==tf?" selected":"")+'>&nbsp;00-23&nbsp;</option><option value="2"'+(2==tf?" selected":"")+'>&nbsp;0-23&nbsp;</option></select></label></dd><dt>Show</dt><dd title="Show Flaps" id="bg-container"><input id="bg" type="checkbox" tabindex="-1"><label for="bg">Show Flaps</label></dd><dt>Scale</dt><dd title="Scale"><label id="scale-container"><input id="scale" type="range" min="'+scMin+'" max="'+scMax+'" value="'+sc+'" step="0.1" tabindex="-1"></label></dd><dt>Brightness</dt><dd title="Brightness"><label id="brightness-container"><input id="brightness" type="range" min="'+brMin+'" max="'+brMax+'" value="'+br+'" step="0.1" tabindex="-1"></label></dd></dl></div>');const e=["mouseenter","mousemove","click"];e.forEach(e=>{document.getElementById("settings").addEventListener(e,e=>{e.stopPropagation(),document.body.classList.add("pause")})}),document.getElementById("settings").addEventListener("mouseleave",e=>{e.stopPropagation(),document.body.classList.remove("pause")}),document.getElementById("tf").addEventListener("change",e=>{updateSettings({tf:e.target.value}),document.getElementById("tf-container").dispatchEvent(new CustomEvent("_change")),e.target.blur()}),document.getElementById("tf").addEventListener("keyup",e=>{27!=e.keyCode&&13!=e.keyCode||e.target.blur()}),document.getElementById("tf-container").dataset.disp=JSON.stringify(["12","00","0"]),document.getElementById("tf-container").addEventListener("_change",function(){this.setAttribute("data-tf",JSON.parse(this.dataset.disp)[tf])}),document.getElementById("bg").addEventListener("change",e=>{updateSettings({sb:e.target.checked,anm:!0})}),document.getElementById("scale").addEventListener("input",e=>{document.body.dispatchEvent(new CustomEvent("_updateScale",{detail:{value:e.target.value}}))}),document.getElementById("scale").addEventListener("change",e=>{updateSettings({sc:e.target.value})}),document.getElementById("brightness").addEventListener("input",e=>{document.body.dispatchEvent(new CustomEvent("_updateBrightness",{detail:{value:e.target.value}}))}),document.getElementById("brightness").addEventListener("change",e=>{updateSettings({br:e.target.value})})}function i(e,t){return Boolean(0==e&&1==t||0==e&&13==t||2==e&&1==t)}function l(e,t){return Boolean(11==t||0==e&&23==t||1==e&&1==t||1<=e&&1!=t&&t%10==1)}function c(e){return Boolean(e%10==1)}function r(e,t){return Boolean(11==t||0==e&&23==t)}function u(e){return Boolean(11==e)}initView(),isConfig&&(document.body.addEventListener("mousemove",e=>{document.body.classList.remove("pause"),document.body.classList.add("hover"),setHoverTimer()}),document.body.addEventListener("mouseleave",e=>{document.body.classList.remove("pause"),clearHoverTimer()}),window.addEventListener("blur",function(){document.activeElement.blur(),document.body.classList.remove("pause"),setHoverTimer()})),document.body.addEventListener("_updateScale",e=>{e=null==e.detail.value||isNaN(e.detail.value)?sc:Math.min(scMax,Math.max(scMin,e.detail.value));const t=document.getElementById("scale");null!=t&&t.value!=e&&(t.value=e),document.getElementById("main").style.transform="scale("+e/100*osp+")"}),document.body.addEventListener("_updateBrightness",e=>{e=null==e.detail.value||isNaN(e.detail.value)?br:Math.min(brMax,Math.max(brMin,e.detail.value));const t=document.getElementById("brightness");null!=t&&t.value!=e&&(t.value=e),document.getElementById("main-content-area").style.filter="brightness("+e+"%)"}),document.getElementById("loader").addEventListener("transitionend",function(){this.remove()},{once:!0}),document.querySelectorAll(".flip").forEach(function(e){const t=e.cloneNode(!0);t.classList.add("clone"),e.closest(".flips").appendChild(t)}),document.querySelectorAll(".flip").forEach(function(e){var t=e.classList.contains("hur")?"hur":"min",n=e.classList.contains("top")?"top":"bottom",s=e.classList.contains("clone")?"clone":"org";e.dataset.hm=t,e.setAttribute("id",t+"-"+n+"-"+s);s=document.createElement("span");e.append(s)}),window.addEventListener("_resize",e=>{var t=document.body.clientWidth,n=document.body.clientHeight,s=Boolean(t<n),o=Math.max(t,n),a=Math.min(t,n),t=document.getElementById("main-content").clientWidth,n=document.getElementById("main-content").clientHeight,n=Math.min(a/Math.min(t,n),o/Math.max(t,n));document.body.classList.toggle("portrait",s),osp!=n&&(osp=n,document.body.dispatchEvent(new CustomEvent("_updateScale",{detail:{value:sc}})))}),window.addEventListener("resize",function(){window.dispatchEvent(new CustomEvent("_resize"))}),window.dispatchEvent(new CustomEvent("_resize")),document.body.addEventListener("_updateTime",e=>{var t,n,s=new Date,o=s.getHours(),a=isFlipTest?s.getSeconds():s.getMinutes(),d=s.getSeconds(),a=a<10?"0"+a:a;null==dsphur||null==dspmin?(document.getElementById("main-content-area").classList.add("stop"),document.querySelectorAll(".flip").forEach(e=>e.classList.remove("transform","fadein","fadeout1","fadeout2")),document.querySelectorAll(".flip.hur").forEach(e=>{e.classList.toggle("tf0",0==tf),e.classList.toggle("pm",0==tf&&12<=o),e.classList.toggle("one",i(tf,o)),e.classList.toggle("eleven",l(tf,o)),e.classList.toggle("justeleven",r(tf,o)),e.querySelector("span").textContent=0==tf&&(0==o||13<=o)?Math.abs(o-12):1==tf&&o<10?"0"+o:o}),document.querySelectorAll(".flip.min").forEach(e=>{e.classList.toggle("eleven",c(a)),e.classList.toggle("justeleven",u(a)),e.querySelector("span").textContent=a}),dsphur=o,dspmin=a,dsptf=tf,document.body.classList.remove("hlock","mlock")):o!=dsphur||a!=dspmin||tf!=dsptf?(59==d&&document.body.classList.contains("willchange")&&document.body.classList.add("willchange"),(t=Boolean(a!=dspmin&&!document.body.classList.contains("mlock")))&&(dspmin=a),(n=Boolean(o!=dsphur&&!document.body.classList.contains("hlock")))&&(dsphur=o),s=Boolean(tf!=dsptf&&!document.body.classList.contains("hlock")),(t||n||s)&&document.body.dispatchEvent(new CustomEvent("_updateFlips",{detail:{h:Boolean(n||s),m:t}}))):document.body.classList.contains("hlock")||document.body.classList.contains("mlock")||!document.body.classList.contains("willchange")||59==d||document.body.classList.remove("willchange")}),document.body.addEventListener("_updateFlips",e=>{if(document.getElementById("main-content-area").classList.remove("stop"),e.detail.h){dsptf=tf,document.getElementById("hur-top-clone").classList.add("act","transform");const t=document.getElementById("hur-top-org");t.classList.toggle("tf0",0==dsptf),t.classList.toggle("pm",0==dsptf&&12<=dsphur),t.classList.toggle("one",i(dsptf,dsphur)),t.classList.toggle("eleven",l(dsptf,dsphur)),t.classList.toggle("justeleven",r(dsptf,dsphur)),t.querySelector("span").textContent=0==dsptf&&(0==dsphur||13<=dsphur)?Math.abs(dsphur-12):1==dsptf&&dsphur<10?"0"+dsphur:dsphur,document.getElementById("hur-top-org").classList.add("fadein");const n=document.getElementById("hur-bottom-clone");n.classList.toggle("tf0",0==dsptf),n.classList.toggle("pm",0==dsptf&&12<=dsphur),n.classList.toggle("one",i(dsptf,dsphur)),n.classList.toggle("eleven",l(dsptf,dsphur)),n.classList.toggle("justeleven",r(dsptf,dsphur)),n.querySelector("span").textContent=0==dsptf&&(0==dsphur||13<=dsphur)?Math.abs(dsphur-12):1==dsptf&&dsphur<10?"0"+dsphur:dsphur,document.getElementById("hur-bottom-org").classList.add("fadeout1")}if(e.detail.m){document.getElementById("min-top-clone").classList.add("act","transform");const s=document.getElementById("min-top-org");s.classList.toggle("eleven",c(dspmin)),s.classList.toggle("justeleven",u(dspmin)),s.querySelector("span").textContent=dspmin,document.getElementById("min-top-org").classList.add("fadein");const o=document.getElementById("min-bottom-clone");o.classList.toggle("eleven",c(dspmin)),o.classList.toggle("justeleven",u(dspmin)),o.querySelector("span").textContent=dspmin,document.getElementById("min-bottom-org").classList.add("fadeout1")}}),document.querySelectorAll("#hur-top-clone,#min-top-clone").forEach(e=>e.addEventListener("animationstart",function(){var e=this.dataset.hm;"hur"==e?document.body.classList.add("hlock"):"min"==e&&document.body.classList.add("mlock")})),document.querySelectorAll("#hur-top-clone,#min-top-clone").forEach(e=>e.addEventListener("animationend",function(){var e=this.dataset.hm;this.classList.remove("act","transform"),this.querySelector("span").textContent="hur"==e?0==dsptf&&(0==dsphur||13<=dsphur)?Math.abs(dsphur-12):1==dsptf&&dsphur<10?"0"+dsphur:dsphur:dspmin,document.getElementById(e+"-bottom-clone").classList.add("act","transform"),"hur"==e?(this.classList.toggle("tf0",0==dsptf),this.classList.toggle("pm",0==dsptf&&12<=dsphur),this.classList.toggle("one",i(dsptf,dsphur)),this.classList.toggle("eleven",l(dsptf,dsphur)),this.classList.toggle("justeleven",r(dsptf,dsphur))):"min"==e&&(this.classList.toggle("eleven",c(dspmin)),this.classList.toggle("justeleven",u(dspmin)))})),document.querySelectorAll("#hur-top-org,#min-top-org").forEach(e=>e.addEventListener("animationend",function(){this.classList.add("fadein")})),document.querySelectorAll("#hur-bottom-clone,#min-bottom-clone").forEach(e=>e.addEventListener("animationend",function(){var e=this.dataset.hm;this.classList.remove("act","transform");const t=document.getElementById(e+"-bottom-org");t.classList.toggle("tf0","hur"==e&&0==dsptf),t.classList.toggle("pm","hur"==e&&0==dsptf&&12<=dsphur),t.classList.toggle("one","hur"==e&&i(dsptf,dsphur)),t.classList.toggle("eleven","hur"==e&&l(dsptf,dsphur)||"min"==e&&c(dspmin)),t.classList.toggle("justeleven","hur"==e&&r(dsptf,dsphur)||"min"==e&&u(dspmin)),t.querySelector("span").textContent="hur"==e?0==dsptf&&(0==dsphur||13<=dsphur)?Math.abs(dsphur-12):1==dsptf&&dsphur<10?"0"+dsphur:dsphur:dspmin,"hur"==e?document.body.classList.remove("hlock"):"min"==e&&document.body.classList.remove("mlock"),"min"==e&&document.body.classList.contains("willchange")&&document.body.classList.remove("willchange")})),document.querySelectorAll("#hur-bottom-org,#min-bottom-org").forEach(e=>e.addEventListener("animationend",function(){this.classList.contains("fadeout1")?(this.classList.remove("fadeout1"),this.classList.add("fadeout2")):this.classList.remove("fadeout2")}))})
+</script>
+</head>
+<body>
+<div id="loader"></div>
+<div id="main">
+  <div id="main-content">
+    <div id="main-content-area">
+      <div class="flips" id="hurs"><div class="flip hur top"></div><div class="flip bottom hur"></div></div>
+      <div class="flips" id="mins"><div class="flip min top"></div><div class="flip bottom min"></div></div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

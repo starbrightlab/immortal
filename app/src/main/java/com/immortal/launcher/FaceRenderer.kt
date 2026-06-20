@@ -104,6 +104,11 @@ class FaceRenderer(
     view.removeAllViews()
     buckets.clear()
 
+    // A full-bleed clock (e.g. the Fliqlo flip clock) owns the whole frame on its own black
+    // background, so skip the scrim and every Immortal widget — none should overlay it.
+    buildClockCluster(face.clock)
+    if (clockFace?.fullBleed == true) return
+
     // Legibility scrim under the bottom cluster, matching the original frame.
     val scrim = View(context)
     scrim.background =
@@ -111,9 +116,8 @@ class FaceRenderer(
             GradientDrawable.Orientation.BOTTOM_TOP,
             intArrayOf(0xCC000000.toInt(), 0x00000000),
         )
-    view.addView(scrim, FrameLayout.LayoutParams(MATCH, dp(320), Gravity.BOTTOM))
+    view.addView(scrim, 0, FrameLayout.LayoutParams(MATCH, dp(320), Gravity.BOTTOM))
 
-    buildClockCluster(face.clock)
     buildStandaloneWidgets(face)
     if (face.nowPlaying.enabled) buildNowPlaying(face.nowPlaying)
   }

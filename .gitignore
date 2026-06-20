@@ -38,5 +38,3 @@ system_services.apk
 *.apk
 docs/
 
-# Proprietary Fliqlo font — kept local for dev; licence must be cleared before shipping (see ClockFaces.kt)
-app/src/main/assets/fonts/Fliqlo.otf
