@@ -8,9 +8,14 @@
 package com.immortal.launcher
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.Inet4Address
@@ -170,6 +175,25 @@ class LanSetupServer(
             .getOrNull()
   }
 }
+
+/** A black-on-white QR code [Bitmap] for [text] (square, [sizePx] px), or null on failure. */
+fun lanSetupQr(text: String, sizePx: Int): Bitmap? =
+    runCatching {
+          val matrix =
+              QRCodeWriter().encode(
+                  text, BarcodeFormat.QR_CODE, sizePx, sizePx, mapOf(EncodeHintType.MARGIN to 1))
+          val w = matrix.width
+          val h = matrix.height
+          val pixels = IntArray(w * h)
+          for (y in 0 until h) {
+            val row = y * w
+            for (x in 0 until w) pixels[row + x] = if (matrix[x, y]) Color.BLACK else Color.WHITE
+          }
+          Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also {
+            it.setPixels(pixels, 0, w, 0, 0, w, h)
+          }
+        }
+        .getOrNull()
 
 // ── Served pages ─────────────────────────────────────────────────────────────
 
