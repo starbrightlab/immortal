@@ -88,6 +88,9 @@ object ScreensaverConfig {
       val batterySaver: Boolean = true,
       // Show the current track + album art on the frame while music is playing.
       val showNowPlaying: Boolean = true,
+      // Whether to draw a clock face at all. Off = photos only (the now-playing card still follows
+      // its own [showNowPlaying] switch). On by default.
+      val facesEnabled: Boolean = true,
       // The selected clock face — a [FaceCatalog] entry id. Drives the screensaver overlay.
       val faceId: String = "immortal-classic",
       // Clock size for faces that offer size variants (0 = Small, 1 = Medium, 2 = Large). Ignored
@@ -179,6 +182,7 @@ object ScreensaverConfig {
         includeVideo = p.getBoolean("include_video", true),
         batterySaver = p.getBoolean("battery_saver", true),
         showNowPlaying = p.getBoolean("show_now_playing", true),
+        facesEnabled = p.getBoolean("faces_enabled", true),
         faceId = p.getString("face_id", "immortal-classic") ?: "immortal-classic",
         faceSizeIndex = p.getInt("face_size_index", 1),
         presenceMode =
@@ -276,6 +280,10 @@ object ScreensaverConfig {
 
   fun setShowNowPlaying(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("show_now_playing", on).apply()
+
+  /** Turn the clock face on/off (off = photos only). */
+  fun setFacesEnabled(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("faces_enabled", on).apply()
 
   /** Select a clock face by its [FaceCatalog] entry id. */
   fun setFaceId(c: Context, id: String) = prefs(c).edit().putString("face_id", id).apply()

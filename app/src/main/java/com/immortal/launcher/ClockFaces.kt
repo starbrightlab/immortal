@@ -43,9 +43,16 @@ interface ClockFaceView {
 /** Pick the renderer for a clock spec. ANALOG / WORD fall back to digital until built. */
 fun makeClockFace(context: Context, spec: ClockSpec, assets: AssetResolver): ClockFaceView =
     when (spec.mode) {
+      ClockMode.NONE -> NoClockFaceView(context)
       ClockMode.FLIP -> FlipWebClockFaceView(context, spec)
       else -> DigitalClockFaceView(context, spec, assets)
     }
+
+/** A clock that draws nothing — used when the user turns clock faces off (photos only). */
+class NoClockFaceView(context: Context) : ClockFaceView {
+  override val view: View = View(context).apply { visibility = View.GONE }
+  override fun update(now: Date, blinkOn: Boolean) {}
+}
 
 // ─── Shared styling ──────────────────────────────────────────────────────────
 

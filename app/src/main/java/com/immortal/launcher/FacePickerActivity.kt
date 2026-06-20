@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -71,6 +72,7 @@ class FacePickerActivity : ComponentActivity() {
 @Composable
 private fun FacePickerScreen() {
   val context = LocalContext.current
+  var facesOn by remember { mutableStateOf(ScreensaverConfig.load(context).facesEnabled) }
   var faceId by remember { mutableStateOf(ScreensaverConfig.load(context).faceId) }
   var sizeIndex by remember { mutableStateOf(ScreensaverConfig.load(context).faceSizeIndex) }
   val activity = context as? Activity
@@ -98,31 +100,48 @@ private fun FacePickerScreen() {
       )
       Spacer(Modifier.size(26.dp))
 
-      Card {
-        FaceCatalog.entries.forEachIndexed { i, entry ->
-          if (i > 0) Divider()
-          SelectableRow(
-              title = entry.name,
-              subtitle = entry.tagline,
-              selected = faceId == entry.id,
-              onClick = {
-                ScreensaverConfig.setFaceId(context, entry.id)
-                faceId = entry.id
-              },
-          )
-        }
-      }
+      // Master switch — off shows photos only (no clock). On by default.
+      Card { ToggleRow("Show a clock face", facesOn) { v ->
+        ScreensaverConfig.setFacesEnabled(context, v)
+        facesOn = v
+      } }
 
-      // Size control — only for faces that offer variants (flip / big / bold).
-      val selected = FaceCatalog.entryFor(faceId)
-      if (selected.sizes.isNotEmpty()) {
-        Spacer(Modifier.size(18.dp))
+      if (facesOn) {
+        Spacer(Modifier.size(22.dp))
         Card {
-          SizeStepper(sizeIndex.coerceIn(0, selected.sizes.lastIndex)) { v ->
-            ScreensaverConfig.setFaceSizeIndex(context, v)
-            sizeIndex = v
+          FaceCatalog.entries.forEachIndexed { i, entry ->
+            if (i > 0) Divider()
+            SelectableRow(
+                title = entry.name,
+                subtitle = entry.tagline,
+                selected = faceId == entry.id,
+                onClick = {
+                  ScreensaverConfig.setFaceId(context, entry.id)
+                  faceId = entry.id
+                },
+            )
           }
         }
+
+        // Size control — only for faces that offer variants (flip / big / bold).
+        val selected = FaceCatalog.entryFor(faceId)
+        if (selected.sizes.isNotEmpty()) {
+          Spacer(Modifier.size(18.dp))
+          Card {
+            SizeStepper(sizeIndex.coerceIn(0, selected.sizes.lastIndex)) { v ->
+              ScreensaverConfig.setFaceSizeIndex(context, v)
+              sizeIndex = v
+            }
+          }
+        }
+      } else {
+        Text(
+            "Photos only — no clock or widgets on the screensaver. The now-playing card still " +
+                "follows its own switch in screensaver settings.",
+            color = Color(0xFF9A9A9A),
+            fontSize = 14.sp,
+            modifier = Modifier.padding(top = 14.dp, start = 4.dp, end = 4.dp),
+        )
       }
 
       Spacer(Modifier.size(22.dp))
@@ -157,6 +176,19 @@ private fun Card(content: @Composable () -> Unit) {
 @Composable
 private fun Divider() {
   Spacer(Modifier.fillMaxWidth().height(1.dp).background(Color(0x14FFFFFF)))
+}
+
+@Composable
+private fun ToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+  Row(
+      modifier =
+          Modifier.fillMaxWidth().tvFocusableRow { onChange(!checked) }
+              .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+    Switch(checked = checked, onCheckedChange = null)
+  }
 }
 
 @Composable

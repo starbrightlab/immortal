@@ -66,9 +66,14 @@ object FaceCatalog {
           Entry("minimal", "Minimal", "Just the time, quietly in the corner") { minimalClock(it) },
       )
 
+  /** A face that draws no clock (faces turned off) — photos only; now-playing still follows its switch. */
+  private fun noClock(): Face =
+      Face(id = "none", clock = ClockSpec(mode = ClockMode.NONE), battery = BatterySpec(enabled = false))
+
   /** The face the user has selected, with their size variant applied. */
   fun active(context: Context): Face {
     val cfg = ScreensaverConfig.load(context)
+    if (!cfg.facesEnabled) return noClock()
     val entry = entryFor(cfg.faceId)
     val face = entry.build(context)
     if (entry.sizes.isEmpty()) return face

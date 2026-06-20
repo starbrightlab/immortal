@@ -112,13 +112,15 @@ enum class ClockMode {
   DIGITAL,
   FLIP,
   ANALOG,
-  WORD;
+  WORD,
+  NONE; // no clock drawn (faces turned off — photos only)
   companion object {
     fun fromWire(s: String?): ClockMode =
         when (s) {
           "flip" -> FLIP
           "analog" -> ANALOG
           "word" -> WORD
+          "none" -> NONE
           else -> DIGITAL
         }
   }
