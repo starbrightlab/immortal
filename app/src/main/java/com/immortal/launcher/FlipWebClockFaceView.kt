@@ -33,8 +33,8 @@ class FlipWebClockFaceView(
   @SuppressLint("SetJavaScriptEnabled")
   private val web =
       WebView(context).apply {
-        // Matches the page's slate-grey backdrop so there's no black flash before it paints.
-        setBackgroundColor(0xFF2B2C30.toInt())
+        // Matches the page's slate backdrop so there's no black flash before it paints.
+        setBackgroundColor(0xFF1B1C20.toInt())
         isVerticalScrollBarEnabled = false
         isHorizontalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
@@ -82,7 +82,9 @@ class FlipWebClockFaceView(
 
   /**
    * Clock scale as the page's 50–100 percent. Must be passed explicitly: the page clamps an
-   * unset value up from 0 to its 50% minimum, so omitting it leaves the clock at half size.
+   * unset value up from 0 to its 50% minimum, so omitting it leaves the clock at half size. The
+   * clock fills the frame edge-to-edge at 100, so the comfortable default leaves a margin at 90;
+   * an explicit non-default [ClockSpec.sizeScale] still wins.
    */
-  private fun sc(): Int = spec.sizeScale.coerceIn(50, 100)
+  private fun sc(): Int = (if (spec.sizeScale == 100) 90 else spec.sizeScale).coerceIn(50, 100)
 }
