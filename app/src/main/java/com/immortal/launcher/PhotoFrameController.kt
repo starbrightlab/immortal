@@ -204,6 +204,28 @@ class PhotoFrameController(
           }
         }
       }
+      settings.usesDav -> {
+        val url = settings.davUrl
+        if (url.isNullOrBlank()) {
+          startWeb()
+          return
+        }
+        io.execute {
+          val urls = DavSource.listImageUrls(url, settings.davUser, settings.davPass).orEmpty()
+          ui.post {
+            if (urls.isNotEmpty()) {
+              remoteUrls = if (settings.shuffle) urls.shuffled() else urls
+              remoteHeaders = DavSource.authHeaders(settings.davUser, settings.davPass)
+              remoteMode = true
+              remoteIndex = -1
+              remoteFailStreak = 0
+              advanceRemote(+1)
+            } else {
+              startWeb()
+            }
+          }
+        }
+      }
       settings.usesSmb -> {
         val src =
             SmbSource(

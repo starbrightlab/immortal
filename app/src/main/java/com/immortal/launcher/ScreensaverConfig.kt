@@ -44,6 +44,7 @@ object ScreensaverConfig {
   const val SOURCE_URL = "url"
   const val SOURCE_IMMICH = "immich"
   const val SOURCE_SMB = "smb"
+  const val SOURCE_DAV = "dav"
   const val FIT_FILL = "fill" // crop to fill the screen
   const val FIT_FIT = "fit" // letterbox to show the whole image
   const val DEFAULT_INTERVAL = 30
@@ -68,6 +69,10 @@ object ScreensaverConfig {
       val smbPath: String? = null,
       val smbUser: String? = null,
       val smbPass: String? = null,
+      // WebDAV: the full folder URL, with optional Basic-auth credentials.
+      val davUrl: String? = null,
+      val davUser: String? = null,
+      val davPass: String? = null,
       val fit: String = FIT_FILL,
       val intervalSec: Int = DEFAULT_INTERVAL,
       val albumRefreshMin: Int = DEFAULT_ALBUM_REFRESH_MIN,
@@ -116,6 +121,9 @@ object ScreensaverConfig {
     /** True when the user has connected an SMB network share for us to read. */
     val usesSmb: Boolean
       get() = source == SOURCE_SMB && !smbHost.isNullOrBlank() && !smbShare.isNullOrBlank()
+    /** True when the user has connected a WebDAV folder for us to read. */
+    val usesDav: Boolean
+      get() = source == SOURCE_DAV && !davUrl.isNullOrBlank()
   }
 
   /** Keep the slideshow interval sane (5s … 10min). */
@@ -142,6 +150,9 @@ object ScreensaverConfig {
         smbPath = p.getString("smb_path", null),
         smbUser = p.getString("smb_user", null),
         smbPass = p.getString("smb_pass", null),
+        davUrl = p.getString("dav_url", null),
+        davUser = p.getString("dav_user", null),
+        davPass = p.getString("dav_pass", null),
         fit = p.getString("fit", FIT_FILL) ?: FIT_FILL,
         intervalSec = clampInterval(p.getInt("interval_sec", DEFAULT_INTERVAL)),
         albumRefreshMin =
@@ -208,6 +219,16 @@ object ScreensaverConfig {
           .putString("smb_user", user.trim())
           .putString("smb_pass", pass)
           .putString("source", SOURCE_SMB)
+          .apply()
+
+  /** Connect a WebDAV folder and make it the active source (credentials optional). */
+  fun setDav(c: Context, url: String, user: String, pass: String) =
+      prefs(c)
+          .edit()
+          .putString("dav_url", url.trim())
+          .putString("dav_user", user.trim())
+          .putString("dav_pass", pass)
+          .putString("source", SOURCE_DAV)
           .apply()
 
   fun useDefault(c: Context) = prefs(c).edit().putString("source", SOURCE_DEFAULT).apply()
