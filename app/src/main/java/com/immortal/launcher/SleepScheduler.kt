@@ -15,14 +15,28 @@ import android.util.Log
 import java.util.Calendar
 
 /**
- * Schedules the two presence-free screen-off features via AlarmManager + lockNow():
- *  - Idle timeout: turn the screen off after the screensaver has run for N minutes
- *    with no interaction. The alarm is armed when the screensaver starts and
- *    cancelled when the user returns to Immortal, so it measures one continuous
- *    idle session.
- *  - Overnight window: keep the screen off between two times each night.
+ * Immortal's screen-off model, in one place. The Portal has several ways the screen can go
+ * dark; this is the map so they stop fighting each other. Two distinct concerns:
  *
- * Both are off by default (see [ScreensaverConfig]).
+ *  1. **Whether the photo frame *holds* the screen on** — [DreamPolicy.holdScreenOn], keyed on
+ *     [FrameMode] (presence vs always-on) and, on the Portal Go, the battery saver. This decides
+ *     if the frame pins the display or hands control back to the Portal's own presence policy.
+ *     It does not actively turn the screen off; it just stops keeping it on.
+ *
+ *  2. **Actively turning the screen off** — the two presence-free features below, both via
+ *     AlarmManager + [ScreenControl.sleep] (device-admin `lockNow`). A manual Home-Assistant
+ *     command ([MqttPublisher]) is the third caller of [ScreenControl.sleep]; it shares the same
+ *     primitive but isn't scheduled here.
+ *
+ * The two scheduled features (both off by default — see [ScreensaverConfig]):
+ *  - **Idle timeout**: turn the screen off after the screensaver has run N minutes with no
+ *    interaction. Armed when the screensaver starts, cancelled when the user returns to Immortal,
+ *    so it measures one continuous idle session.
+ *  - **Overnight window**: prefer the screen dark between two times each night. The window-start
+ *    alarm turns the screen off and suppresses the auto screensaver for the window. Crucially it
+ *    is **not** a re-lock loop: a deliberate wake hands the user the device, and it only returns
+ *    to dark via an idle timeout (see [HomeActivity]'s overnight session). It must never trap the
+ *    user — it's their device.
  */
 object SleepScheduler {
   private const val TAG = "ImmortalSleep"
