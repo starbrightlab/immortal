@@ -117,14 +117,27 @@ function Wait-Device {
 }
 
 # ----- actions ---------------------------------------------------------------
+function Resolve-ReleaseApkUrl {
+  # Explicit pin wins; otherwise ask GitHub for the latest release's .apk asset on
+  # RELEASE_REPO, so versioned asset names (immortal-<version>.apk) keep working.
+  if ($cfg["RELEASE_APK_URL"]) { return $cfg["RELEASE_APK_URL"] }
+  if (-not $cfg["RELEASE_REPO"]) { return $null }
+  try {
+    $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$($cfg["RELEASE_REPO"])/releases/latest" `
+      -Headers @{ "User-Agent" = "immortal-provisioner"; "Accept" = "application/vnd.github+json" }
+    return ($rel.assets | Where-Object { $_.name -like "*.apk" } | Select-Object -First 1).browser_download_url
+  } catch { return $null }
+}
 function Install-Client {
   $apk = Get-ChildItem -Path $cfg["APK_GLOB"] -ErrorAction SilentlyContinue | Select-Object -First 1
-  if (-not $apk -and $cfg["RELEASE_APK_URL"]) {
+  if (-not $apk) {
+    $url = Resolve-ReleaseApkUrl
+    if (-not $url) { Die "No local APK in apks\ and couldn't resolve a release APK. Drop a signed APK in apks\, or set RELEASE_APK_URL / RELEASE_REPO in config.env." }
     Step "No local APK - downloading the latest Immortal release"
     $dir = Split-Path -Parent $cfg["APK_GLOB"]
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     $dest = Join-Path $dir "immortal.apk"
-    Invoke-WebRequest -Uri $cfg["RELEASE_APK_URL"] -OutFile $dest
+    Invoke-WebRequest -Uri $url -OutFile $dest
     $apk = Get-Item $dest
     Ok "Downloaded $($apk.Name)"
   }
@@ -242,16 +255,16 @@ function Grant-Perms {
   # apps" toggle is non-functional, so grant the source op directly here; with the Gen-1
   # installer-overlay fix the confirm dialog is then visible and usable.
   A shell appops set $cfg["PKG"] REQUEST_INSTALL_PACKAGES allow | Out-Null
-  # Lets the app switcher (Quick buttons) list recently-used apps via UsageStatsManager —
+  # Lets the app switcher (Quick buttons) list recently-used apps via UsageStatsManager -
   # getRecentTasks can't see other apps since Android 5. Harmless when the feature is off.
   A shell appops set $cfg["PKG"] GET_USAGE_STATS allow | Out-Null
   # Device admin (force-lock only): lets Immortal turn the screen off for its idle and
   # overnight sleep features (and the Home Assistant screen control) via lockNow(). Warn
-  # rather than swallow a failure — without it, screen-off silently won't work.
+  # rather than swallow a failure - without it, screen-off silently won't work.
   if ((A shell dpm set-active-admin "$($cfg["PKG"])/.AdminReceiver") -match "Success") {
     Ok "Screen-off (device admin) enabled"
   } else {
-    Warn "Couldn't enable screen-off device admin — screensaver sleep and the Home Assistant screen control won't work on this device. Re-run setup; if it keeps failing, check Device health in Immortal settings."
+    Warn "Couldn't enable screen-off device admin - screensaver sleep and the Home Assistant screen control won't work on this device. Re-run setup; if it keeps failing, check Device health in Immortal settings."
   }
   # Lets Immortal read the device's active media sessions (native now-playing) for
   # the screensaver card + header mini-player. Also self-enabled on app launch.

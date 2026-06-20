@@ -156,14 +156,30 @@ EOF
 }
 
 # ----- individual actions ----------------------------------------------------
+# Resolve a download URL for the signed release APK. An explicit RELEASE_APK_URL
+# wins (pin a specific build); otherwise ask GitHub for the latest release on
+# RELEASE_REPO and pick its first .apk asset — so versioned asset names
+# (immortal-<version>.apk) keep working without editing this kit every release.
+resolve_release_apk_url() {
+  if [ -n "${RELEASE_APK_URL:-}" ]; then printf '%s\n' "$RELEASE_APK_URL"; return 0; fi
+  [ -n "${RELEASE_REPO:-}" ] || return 1
+  curl -fsSL -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${RELEASE_REPO}/releases/latest" 2>/dev/null \
+    | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*\.apk"' \
+    | head -1 \
+    | sed 's/.*"\(https[^"]*\)".*/\1/'
+}
+
 install_client() {
   local apk
   apk="$(ls $APK_GLOB 2>/dev/null | head -1)"
-  if [ -z "$apk" ] && [ -n "${RELEASE_APK_URL:-}" ]; then
+  if [ -z "$apk" ]; then
+    local url; url="$(resolve_release_apk_url)"
+    [ -n "$url" ] || die "No local APK in apks/ and couldn't resolve a release APK. Drop a signed APK in apks/, or set RELEASE_APK_URL / RELEASE_REPO in config.env."
     step "No local APK — downloading the latest Immortal release"
     mkdir -p "$(dirname "$APK_GLOB")"
     apk="$(dirname "$APK_GLOB")/immortal.apk"
-    curl -fL "$RELEASE_APK_URL" -o "$apk" || die "Could not download the release APK. Check your connection."
+    curl -fL "$url" -o "$apk" || die "Could not download the release APK. Check your connection."
     ok "Downloaded $(basename "$apk")"
   fi
   [ -n "$apk" ] || die "No client APK found matching '$APK_GLOB'. Drop your signed APK in apks/."

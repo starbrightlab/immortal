@@ -1,6 +1,6 @@
 {
-  "versionCode": 41,
-  "versionName": "1.40",
+  "versionCode": 43,
+  "versionName": "1.42",
   "apkUrl": "https://github.com/starbrightlab/immortal/releases/latest/download/immortal.apk",
-  "notes": "Immortal 1.40 — Multi-room audio: group your Portals as synced speakers (Snapcast + Music Assistant) and see what's playing, with transport controls, on every Portal — including AirPlay cast to the group. Plus a now-playing mini-player in the home header, a 'Start on boot' app manager, and a big provisioning cleanup: apps now install through the system installer (no daemon, and no re-provisioning after a reboot), you choose whether to keep OS updates, and you can show/hide the status bar from Settings."
+  "notes": "Immortal 1.42 — Top-bar app switcher, Home Assistant integration, and multi-room setup polish."
 }

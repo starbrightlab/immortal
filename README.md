@@ -150,7 +150,11 @@ Hosted from this repo:
 
 - [`version.json`](version.json) — the self-update manifest. Bump `versionCode`/`versionName`,
   build a signed release, and attach it as `immortal.apk` to a GitHub Release; devices update on
-  their next check.
+  their next check. The asset **must** be named `immortal.apk` — the manifest's `apkUrl` (and the
+  store catalog) point at the stable `releases/latest/download/immortal.apk`, which 404s and breaks
+  self-update for every device if a release attaches only a versioned name. Use
+  [`scripts/publish-release.sh`](scripts/publish-release.sh) `<tag> <signed.apk>` to upload the
+  asset under both the stable and versioned names and verify the URL resolves.
 - [`catalog.json`](catalog.json) — the app-store catalog. Edit and commit; clients pick it up on
   next open (a bundled copy ships as the offline fallback).
 

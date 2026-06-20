@@ -90,7 +90,7 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
           value = url,
           onValueChange = { url = it },
           placeholder = {
-            Text("https://www.icloud.com/sharedalbum/#…", color = Color(0xFF777777))
+            Text("https://photos.icloud.com/shared/album/…", color = Color(0xFF777777))
           },
           singleLine = true,
           modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
@@ -157,8 +157,9 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
           modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
       )
       Text(
-          "• iPhone Photos → an album you own → Share → Copy Link. The album must " +
-              "be a Shared Album with \"Public Website\" turned on.\n" +
+          "• iPhone Photos → a Shared Album you own → people/share button → " +
+              "Share Link → Copy Link (works with the current " +
+              "photos.icloud.com/shared/album/… links).\n" +
               "• Google Photos → album → Share → \"Get link\" (anyone with the link can view).",
           color = Color(0xFF8A8A8A),
           fontSize = 13.sp,
