@@ -156,6 +156,12 @@
             android:exported="false"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- "Set up from your phone": on-device LAN web form for source credentials. -->
+        <activity
+            android:name=".LanSetupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- Connect a self-hosted Immich server as the screensaver source. -->
         <activity
             android:name=".ImmichConnectActivity"
