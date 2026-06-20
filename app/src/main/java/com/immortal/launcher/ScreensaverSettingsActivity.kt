@@ -221,6 +221,19 @@ private fun ScreensaverSettingsScreen() {
             context.startActivity(Intent(context, ImmichConnectActivity::class.java))
           }
         }
+        Divider()
+        SelectableRow(
+            title = "Network share (NAS)",
+            subtitle = smbSubtitle(settings),
+            selected = settings.usesSmb,
+            onClick = { context.startActivity(Intent(context, SmbConnectActivity::class.java)) },
+        )
+        if (settings.usesSmb) {
+          Divider()
+          TextButtonRow("Change network share…") {
+            context.startActivity(Intent(context, SmbConnectActivity::class.java))
+          }
+        }
       }
       Text(
           "Tip: put your photos and videos in a folder on your Portal and pick it here — for " +
@@ -456,6 +469,12 @@ private fun immichSubtitle(s: ScreensaverConfig.Settings): String =
       !s.usesImmich -> "Pull photos from your self-hosted Immich server."
       !s.immichAlbumName.isNullOrBlank() -> "Connected — album “${s.immichAlbumName}”"
       else -> "Connected — whole library"
+    }
+
+private fun smbSubtitle(s: ScreensaverConfig.Settings): String =
+    when {
+      !s.usesSmb -> "Show photos from a folder on your NAS over the network."
+      else -> "Connected — \\\\${s.smbHost}\\${s.smbShare}"
     }
 
 private fun albumUrlSubtitle(usesUrl: Boolean, url: String?): String =
