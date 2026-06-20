@@ -33,7 +33,8 @@ class FlipWebClockFaceView(
   @SuppressLint("SetJavaScriptEnabled")
   private val web =
       WebView(context).apply {
-        setBackgroundColor(Color.BLACK)
+        // Matches the page's slate-grey backdrop so there's no black flash before it paints.
+        setBackgroundColor(0xFF2B2C30.toInt())
         isVerticalScrollBarEnabled = false
         isHorizontalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
@@ -44,6 +45,10 @@ class FlipWebClockFaceView(
           domStorageEnabled = true // the page persists its config via localStorage
           allowFileAccess = true
           allowFileAccessFromFileURLs = true
+          // Honour the page's `width=device-width` viewport so the clock's auto-fit measures the
+          // real screen and fills it, instead of the WebView's default ~980px layout width.
+          useWideViewPort = true
+          loadWithOverviewMode = true
         }
         webViewClient =
             object : WebViewClient() {
@@ -56,7 +61,7 @@ class FlipWebClockFaceView(
                     "FlipWeb", "error ${error.errorCode} ${error.description} @ ${request.url}")
               }
             }
-        loadUrl("file:///android_asset/faces/flip.html?tf=${tf()}")
+        loadUrl("file:///android_asset/faces/flip.html?tf=${tf()}&sc=${sc()}")
       }
 
   override val view: View = web
@@ -74,4 +79,10 @@ class FlipWebClockFaceView(
 
   /** Fliqlo time-format code: 0 = 1-12 with AM/PM, 1 = 00-23, 2 = 0-23. */
   private fun tf(): Int = if (!spec.is24h) 0 else if (spec.leadingZero) 1 else 2
+
+  /**
+   * Clock scale as the page's 50–100 percent. Must be passed explicitly: the page clamps an
+   * unset value up from 0 to its 50% minimum, so omitting it leaves the clock at half size.
+   */
+  private fun sc(): Int = spec.sizeScale.coerceIn(50, 100)
 }
