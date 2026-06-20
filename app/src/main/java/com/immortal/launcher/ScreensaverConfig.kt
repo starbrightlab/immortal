@@ -100,6 +100,10 @@ object ScreensaverConfig {
       val overnightEnabled: Boolean = false,
       val overnightStartMin: Int = 22 * 60,
       val overnightEndMin: Int = 7 * 60,
+      // What the overnight window shows. false = go dark (screen off). true = a dimmed flip
+      // clock as a bedside clock, kept on through the window. Only meaningful when
+      // [overnightEnabled].
+      val overnightNightClock: Boolean = false,
       // What to open when the user taps the frame to dismiss it. null = the Immortal
       // launcher (the original behaviour). Otherwise a flattened ComponentName of an
       // installed app — Home Assistant users typically point this at their HA app so a
@@ -177,6 +181,7 @@ object ScreensaverConfig {
         overnightEnabled = p.getBoolean("overnight_enabled", false),
         overnightStartMin = p.getInt("overnight_start_min", 22 * 60),
         overnightEndMin = p.getInt("overnight_end_min", 7 * 60),
+        overnightNightClock = p.getBoolean("overnight_night_clock", false),
         dismissAppComponent = p.getString("dismiss_app_component", null),
         dismissHaDashboard = p.getString("dismiss_ha_dashboard", null),
     )
@@ -281,6 +286,10 @@ object ScreensaverConfig {
 
   fun setOvernightEndMin(c: Context, min: Int) =
       prefs(c).edit().putInt("overnight_end_min", wrapMinuteOfDay(min)).apply()
+
+  /** Choose the overnight display: false = screen off, true = a dimmed flip night clock. */
+  fun setOvernightNightClock(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("overnight_night_clock", on).apply()
 
   // --- Dismiss target (launcher / app / Home Assistant dashboard) ---------------
   // The three are mutually exclusive, so each setter clears the others.

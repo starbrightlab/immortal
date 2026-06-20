@@ -12,6 +12,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -35,6 +37,22 @@ class PhotoFramePreviewActivity : ComponentActivity() {
   private lateinit var frame: PhotoFrameController
   private var powerReceiver: BroadcastReceiver? = null
 
+  // Overnight "night clock" mode: this activity is the dimmed bedside flip clock for the window.
+  private var nightClock = false
+  private val nightWatch = Handler(Looper.getMainLooper())
+  // While showing the night clock, bow out the moment the window ends (within a minute), restoring
+  // normal brightness and handing back to the launcher.
+  private val nightWatchTick =
+      object : Runnable {
+        override fun run() {
+          if (!SleepScheduler.isOvernightNow(this@PhotoFramePreviewActivity)) {
+            finish()
+            return
+          }
+          nightWatch.postDelayed(this, 60_000L)
+        }
+      }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     // Immersive fullscreen.
@@ -43,47 +61,65 @@ class PhotoFramePreviewActivity : ComponentActivity() {
       hide(WindowInsetsCompat.Type.systemBars())
       systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
-    // Inside the overnight window the screen should stay off — don't show photos.
-    if (SleepScheduler.isOvernightNow(this)) {
+    // Overnight behaviour: dark mode → don't show photos, just blank. Night-clock mode → fall
+    // through and render the dimmed flip clock instead.
+    nightClock = SleepScheduler.isOvernightNow(this) && ScreensaverConfig.load(this).overnightNightClock
+    if (SleepScheduler.isOvernightNow(this) && !nightClock) {
       ScreenControl.sleep(this)
       finish()
       return
     }
-    applyKeepScreenOn()
+
     frame = PhotoFrameController(this)
     frame.onExit = { finish() }
-    // Debug preview harness: render an arbitrary face (mantelframe WidgetConfig shape) instead
-    // of the classic one, for fast on-device iteration. The face JSON is passed base64-encoded
-    // ("face_b64") to survive adb's shell quoting; plain "face_json" is also accepted. Only the
-    // debug build exports this activity (src/debug/AndroidManifest.xml), so it's a no-op in
-    // release where the extra can't be supplied.
-    val faceJson =
-        intent?.getStringExtra("face_b64")?.let {
-          runCatching { String(android.util.Base64.decode(it, android.util.Base64.DEFAULT)) }
-              .getOrNull()
-        } ?: intent?.getStringExtra("face_json")
-    faceJson?.let { json ->
-      runCatching { frame.faceOverride = Face.fromJson("preview", org.json.JSONObject(json)) }
-          .onFailure { android.util.Log.w("FacePreview", "face parse failed", it) }
+
+    if (nightClock) {
+      // Bedside clock: force the screen on for the window and dim it to a soft glow. Brightness is
+      // window-scoped, so it restores automatically when this activity finishes (tap, or window end).
+      frame.faceOverride = Face.flipNight(this)
+      window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+      window.attributes = window.attributes.apply { screenBrightness = NIGHT_BRIGHTNESS }
+    } else {
+      applyKeepScreenOn()
+      // Debug preview harness: render an arbitrary face (mantelframe WidgetConfig shape) instead
+      // of the classic one, for fast on-device iteration. The face JSON is passed base64-encoded
+      // ("face_b64") to survive adb's shell quoting; plain "face_json" is also accepted. Only the
+      // debug build exports this activity (src/debug/AndroidManifest.xml), so it's a no-op in
+      // release where the extra can't be supplied.
+      val faceJson =
+          intent?.getStringExtra("face_b64")?.let {
+            runCatching { String(android.util.Base64.decode(it, android.util.Base64.DEFAULT)) }
+                .getOrNull()
+          } ?: intent?.getStringExtra("face_json")
+      faceJson?.let { json ->
+        runCatching { frame.faceOverride = Face.fromJson("preview", org.json.JSONObject(json)) }
+            .onFailure { android.util.Log.w("FacePreview", "face parse failed", it) }
+      }
     }
+
     setContentView(frame.view)
     frame.start()
-    // A screensaver session is running: start (or keep) the idle screen-off countdown.
-    SleepScheduler.armIdle(this)
 
-    if (DreamPolicy.hasBattery(this)) {
-      powerReceiver =
-          object : BroadcastReceiver() {
-            override fun onReceive(c: Context, intent: Intent) {
-              applyKeepScreenOn()
+    if (nightClock) {
+      // The clock stays up all window (no idle screen-off); just watch for the window to end.
+      nightWatch.post(nightWatchTick)
+    } else {
+      // A screensaver session is running: start (or keep) the idle screen-off countdown.
+      SleepScheduler.onScreensaverStarted(this)
+      if (DreamPolicy.hasBattery(this)) {
+        powerReceiver =
+            object : BroadcastReceiver() {
+              override fun onReceive(c: Context, intent: Intent) {
+                applyKeepScreenOn()
+              }
             }
-          }
-      registerReceiver(
-          powerReceiver,
-          IntentFilter().apply {
-            addAction(Intent.ACTION_POWER_CONNECTED)
-            addAction(Intent.ACTION_POWER_DISCONNECTED)
-          })
+        registerReceiver(
+            powerReceiver,
+            IntentFilter().apply {
+              addAction(Intent.ACTION_POWER_CONNECTED)
+              addAction(Intent.ACTION_POWER_DISCONNECTED)
+            })
+      }
     }
   }
 
@@ -109,7 +145,13 @@ class PhotoFramePreviewActivity : ComponentActivity() {
 
   override fun onDestroy() {
     powerReceiver?.let { runCatching { unregisterReceiver(it) } }
+    nightWatch.removeCallbacks(nightWatchTick)
     if (this::frame.isInitialized) frame.stop()
     super.onDestroy()
+  }
+
+  private companion object {
+    // A soft glow for the overnight bedside clock — dim but still legible in a dark room.
+    const val NIGHT_BRIGHTNESS = 0.08f
   }
 }

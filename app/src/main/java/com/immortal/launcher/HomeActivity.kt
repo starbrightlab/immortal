@@ -14,8 +14,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -137,19 +135,6 @@ private data class AppEntry(
  * touch targets, landscape.
  */
 class HomeActivity : ComponentActivity() {
-  // Overnight idle-off. Inside the overnight window the Portal should prefer to be dark, but
-  // it's the user's device: a wake hands over a full, generous session that every touch renews,
-  // and the screen only returns to dark via this idle timeout — never an aggressive re-lock loop
-  // (the old 60s timeout read as "locked out till morning"). The authoritative window-start lock
-  // is the ACTION_OVERNIGHT_START alarm; this just turns the screen off again once the user is
-  // genuinely idle, exactly like a daytime idle timeout.
-  private val resleepHandler = Handler(Looper.getMainLooper())
-  private val resleep = Runnable {
-    // Re-check at fire time: the window may have ended while the screen was on.
-    if (SleepScheduler.isOvernightNow(this)) ScreenControl.sleep(this)
-  }
-  private var overnightWindow = false
-
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enterImmersive()
@@ -213,40 +198,22 @@ class HomeActivity : ComponentActivity() {
     // allow the photo frame to resume its normal screensaver behaviour.
     DreamPolicy.inStockHandoff = false
     SettingsGuard.reaffirmScreensaver(this)
-    // Back on the launcher: the idle screen-off session is over.
-    SleepScheduler.cancelIdle(this)
-    // Inside the overnight window, give the user the device: a wake arms a generous idle
-    // session (renewed on every touch in dispatchTouchEvent), not an instant or 60s re-lock.
-    // The screen returns to dark only after the user is actually idle for this long.
-    overnightWindow = SleepScheduler.isOvernightNow(this)
-    if (overnightWindow) armResleep(overnightSessionMs())
+    // The user is back on the launcher: end the idle session and, inside the overnight window,
+    // arm the touch-renewed "you have the device" session. SleepScheduler owns that policy.
+    SleepScheduler.onReturnedToLauncher(this)
   }
 
   override fun onPause() {
     super.onPause()
-    // Don't carry a pending re-sleep into another activity or a real sleep.
-    overnightWindow = false
-    resleepHandler.removeCallbacks(resleep)
+    // Don't carry a pending overnight re-sleep into another activity or a real sleep.
+    SleepScheduler.onLeftLauncher()
   }
 
-  // dispatchTouchEvent is the top of the input chain, so it sees every touch before
-  // Compose consumes it. Outside the overnight window this is a no-op.
+  // dispatchTouchEvent is the top of the input chain, so it sees every touch before Compose
+  // consumes it. Renews the overnight session; a no-op outside the window.
   override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-    if (overnightWindow) armResleep(overnightSessionMs())
+    SleepScheduler.onInteraction(this)
     return super.dispatchTouchEvent(ev)
-  }
-
-  // How long a deliberate overnight wake keeps the screen on (renewed on each touch). Matches
-  // the user's daytime idle timeout when they've set one, else a generous default — so a 3am
-  // pickup behaves like any idle device instead of yanking the user back to black.
-  private fun overnightSessionMs(): Long {
-    val cfg = ScreensaverConfig.load(this)
-    return if (cfg.idleSleepOn) cfg.idleSleepMin * 60_000L else OVERNIGHT_SESSION_DEFAULT_MS
-  }
-
-  private fun armResleep(delayMs: Long) {
-    resleepHandler.removeCallbacks(resleep)
-    resleepHandler.postDelayed(resleep, delayMs)
   }
 
   private fun enterImmersive() {
@@ -715,11 +682,6 @@ private fun LauncherScreen(
 private const val APP_KEY = "app:"
 private const val FOLDER_KEY = "folder:"
 
-// Overnight re-sleep timings. A wake with no interaction is treated as stray and
-// sleeps again after the short grace; once the user actually touches the screen we
-// switch to a normal screen-timeout so they can use the device, resetting it on
-// each interaction.
-private const val OVERNIGHT_SESSION_DEFAULT_MS = 5L * 60_000 // 5 min; generous so a night wake isn't trapped
 private const val UPDATE_CHECK_INTERVAL_MS = 6L * 60 * 60 * 1000 // 6 hours
 
 // --- tile sizing ----------------------------------------------------------------

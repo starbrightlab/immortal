@@ -11,6 +11,8 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import java.util.Calendar
 
@@ -32,14 +34,36 @@ import java.util.Calendar
  *  - **Idle timeout**: turn the screen off after the screensaver has run N minutes with no
  *    interaction. Armed when the screensaver starts, cancelled when the user returns to Immortal,
  *    so it measures one continuous idle session.
- *  - **Overnight window**: prefer the screen dark between two times each night. The window-start
- *    alarm turns the screen off and suppresses the auto screensaver for the window. Crucially it
- *    is **not** a re-lock loop: a deliberate wake hands the user the device, and it only returns
- *    to dark via an idle timeout (see [HomeActivity]'s overnight session). It must never trap the
- *    user — it's their device.
+ *  - **Overnight window**: between two times each night the window either goes dark (screen off)
+ *    or shows a dimmed flip **night clock** ([ScreensaverConfig.overnightNightClock]). The
+ *    window-start alarm enters that rest state and suppresses the auto screensaver for the window.
+ *    Crucially it is **not** a re-lock loop: a deliberate wake hands the user the device for a
+ *    full, touch-renewed session, and it only returns to the rest state once they're genuinely
+ *    idle. It must never trap the user — it's their device.
+ *
+ * This object is the single owner of all of the above. Activities and the alarm receiver don't
+ * implement policy; they just report events ([onScreensaverStarted], [onReturnedToLauncher],
+ * [onInteraction], [onLeftLauncher], [onWindowStart], [onWindowEnd], [onIdleElapsed]) and this
+ * decides what the screen does. The night-session timer that used to live in [HomeActivity] is
+ * owned here too.
  */
 object SleepScheduler {
   private const val TAG = "ImmortalSleep"
+
+  // How long a deliberate overnight wake keeps the screen on (renewed on each touch). Matches the
+  // user's daytime idle timeout when set, else a generous default — so a 3am pickup behaves like
+  // any idle device instead of snapping back to the rest state.
+  private const val OVERNIGHT_SESSION_DEFAULT_MS = 5L * 60_000
+
+  // The renewable overnight "you have the device" session, owned here (was HomeActivity's Handler).
+  // Lazy so loading this object (e.g. for the pure inWindow tests) doesn't touch the main Looper.
+  private val main by lazy { Handler(Looper.getMainLooper()) }
+  @Volatile private var nightSessionActive = false
+  @Volatile private var nightSessionCtx: Context? = null
+  private val nightSessionElapsed = Runnable {
+    nightSessionActive = false
+    nightSessionCtx?.let { if (isOvernightNow(it)) enterOvernightRest(it) }
+  }
 
   const val ACTION_IDLE = "com.immortal.launcher.SLEEP_IDLE"
   const val ACTION_OVERNIGHT_START = "com.immortal.launcher.OVERNIGHT_START"
@@ -72,10 +96,10 @@ object SleepScheduler {
     pi(c, action, rc, create = false)?.let { alarms(c).cancel(it); it.cancel() }
   }
 
-  // ----- idle timeout --------------------------------------------------------
+  // ----- events from the app -------------------------------------------------
 
-  /** Arm the idle alarm when a screensaver session begins (no-op if one is pending). */
-  fun armIdle(context: Context) {
+  /** A screensaver session began: start the daytime idle screen-off countdown if enabled. */
+  fun onScreensaverStarted(context: Context) {
     val cfg = ScreensaverConfig.load(context)
     if (!cfg.enabled || !cfg.idleSleepOn) return
     if (pi(context, ACTION_IDLE, RC_IDLE, create = false) != null) return // already counting
@@ -84,8 +108,48 @@ object SleepScheduler {
     Log.i(TAG, "idle sleep armed for ${cfg.idleSleepMin} min")
   }
 
-  /** Cancel the idle alarm — the user is interacting again. */
-  fun cancelIdle(context: Context) = cancel(context, ACTION_IDLE, RC_IDLE)
+  /**
+   * The user is back on Immortal's launcher. The idle screen-off session is over; and inside the
+   * overnight window, give them the device — arm a full, touch-renewed session after which the
+   * screen returns to its overnight rest state (dark or the night clock). Never an instant re-lock.
+   */
+  fun onReturnedToLauncher(context: Context) {
+    cancelIdle(context)
+    main.removeCallbacks(nightSessionElapsed)
+    if (isOvernightNow(context)) {
+      nightSessionCtx = context.applicationContext
+      nightSessionActive = true
+      main.postDelayed(nightSessionElapsed, overnightSessionMs(context))
+    } else {
+      nightSessionActive = false
+    }
+  }
+
+  /** A touch on the launcher: renew the overnight session so interaction keeps the screen up. */
+  fun onInteraction(context: Context) {
+    if (!nightSessionActive) return
+    main.removeCallbacks(nightSessionElapsed)
+    main.postDelayed(nightSessionElapsed, overnightSessionMs(context))
+  }
+
+  /** The launcher is no longer foreground: drop any pending overnight re-sleep. */
+  fun onLeftLauncher() {
+    nightSessionActive = false
+    main.removeCallbacks(nightSessionElapsed)
+  }
+
+  /** The daytime idle alarm fired: turn the system Dream off so it can't re-light, then blank. */
+  fun onIdleElapsed(context: Context) {
+    SettingsGuard.setSystemScreensaverEnabled(context, false)
+    ScreenControl.sleep(context)
+  }
+
+  private fun cancelIdle(context: Context) = cancel(context, ACTION_IDLE, RC_IDLE)
+
+  private fun overnightSessionMs(context: Context): Long {
+    val cfg = ScreensaverConfig.load(context)
+    return if (cfg.idleSleepOn) cfg.idleSleepMin * 60_000L else OVERNIGHT_SESSION_DEFAULT_MS
+  }
 
   // ----- overnight window ----------------------------------------------------
 
@@ -117,10 +181,46 @@ object SleepScheduler {
   /** Apply the right state immediately (on boot, app start, or a settings change). */
   fun applyOvernightNow(context: Context) {
     scheduleOvernight(context)
-    if (isOvernightNow(context)) {
-      SettingsGuard.reaffirmScreensaver(context) // forces screensaver off inside the window
+    if (isOvernightNow(context)) enterOvernightRest(context)
+  }
+
+  /** The window-start alarm fired: enter the rest state and arm tomorrow's alarms. */
+  fun onWindowStart(context: Context) {
+    Log.i(TAG, "overnight start")
+    enterOvernightRest(context)
+    scheduleOvernight(context)
+  }
+
+  /** The window-end alarm fired: restore the screensaver per the user's setting, re-arm tomorrow. */
+  fun onWindowEnd(context: Context) {
+    Log.i(TAG, "overnight end → restore screensaver")
+    SettingsGuard.reaffirmScreensaver(context)
+    scheduleOvernight(context)
+  }
+
+  /**
+   * Put the screen into the overnight rest state: a dimmed flip night clock, or dark. Either way
+   * we force the system Dream off for the window first (so the stock dream can't re-light over us).
+   */
+  private fun enterOvernightRest(context: Context) {
+    SettingsGuard.reaffirmScreensaver(context) // inside the window this forces the system Dream off
+    if (ScreensaverConfig.load(context).overnightNightClock) {
+      cancelIdle(context) // the bedside clock stays up; no stray daytime idle alarm may blank it
+      ScreenControl.wake(context) // the window may start while the screen is already off
+      launchNightClock(context)
+    } else {
       ScreenControl.sleep(context)
     }
+  }
+
+  /** Show [PhotoFramePreviewActivity], which renders the dimmed night clock while in the window. */
+  private fun launchNightClock(context: Context) {
+    runCatching {
+          context.startActivity(
+              Intent(context, PhotoFramePreviewActivity::class.java)
+                  .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        }
+        .onFailure { Log.w(TAG, "night clock launch failed", it) }
   }
 
   private fun nowMinuteOfDay(): Int {

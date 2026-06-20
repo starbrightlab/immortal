@@ -330,9 +330,18 @@ private fun ScreensaverSettingsScreen() {
               settings = settings.copy(overnightEndMin = ScreensaverConfig.wrapMinuteOfDay(v))
               SleepScheduler.applyOvernightNow(context)
             }
+            Divider()
+            ToggleRow("Show a night clock instead of going dark", settings.overnightNightClock) {
+              ScreensaverConfig.setOvernightNightClock(context, it)
+              settings = settings.copy(overnightNightClock = it)
+              SleepScheduler.applyOvernightNow(context)
+            }
           }
           Text(
-              "Keeps the screen off between these times every night.",
+              if (settings.overnightEnabled && settings.overnightNightClock)
+                  "Shows a dimmed flip clock between these times every night — a bedside clock. " +
+                      "Tap it any time to use the device."
+              else "Keeps the screen off between these times every night.",
               fontSize = 13.sp,
               color = Color(0xFF9A9A9A),
               modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 14.dp),

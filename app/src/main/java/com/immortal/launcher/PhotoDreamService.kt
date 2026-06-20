@@ -59,7 +59,7 @@ class PhotoDreamService : DreamService() {
     super.onDreamingStarted()
     Log.i(TAG, "onDreamingStarted")
     // A screensaver session is running: start (or keep) the idle screen-off countdown.
-    SleepScheduler.armIdle(this)
+    SleepScheduler.onScreensaverStarted(this)
   }
 
   override fun onDreamingStopped() {
