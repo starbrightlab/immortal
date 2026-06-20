@@ -144,6 +144,12 @@
             android:label="Screensaver"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- Photo-source picker subpage (standard + advanced sources). -->
+        <activity
+            android:name=".ScreensaverSourcesActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- Connect a self-hosted Immich server as the screensaver source. -->
         <activity
             android:name=".ImmichConnectActivity"
