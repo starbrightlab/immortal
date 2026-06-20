@@ -42,6 +42,7 @@ object ScreensaverConfig {
   const val SOURCE_DEFAULT = "default"
   const val SOURCE_FOLDER = "folder"
   const val SOURCE_URL = "url"
+  const val SOURCE_IMMICH = "immich"
   const val FIT_FILL = "fill" // crop to fill the screen
   const val FIT_FIT = "fit" // letterbox to show the whole image
   const val DEFAULT_INTERVAL = 30
@@ -55,6 +56,11 @@ object ScreensaverConfig {
       val source: String = SOURCE_DEFAULT,
       val folderPath: String? = null,
       val albumUrl: String? = null,
+      // Immich (self-hosted) connection. albumId/Name null = the whole library.
+      val immichUrl: String? = null,
+      val immichKey: String? = null,
+      val immichAlbumId: String? = null,
+      val immichAlbumName: String? = null,
       val fit: String = FIT_FILL,
       val intervalSec: Int = DEFAULT_INTERVAL,
       val albumRefreshMin: Int = DEFAULT_ALBUM_REFRESH_MIN,
@@ -97,6 +103,9 @@ object ScreensaverConfig {
     /** True when the user has pasted a public album share link for us to fetch. */
     val usesUrl: Boolean
       get() = source == SOURCE_URL && !albumUrl.isNullOrBlank()
+    /** True when the user has connected an Immich server for us to pull from. */
+    val usesImmich: Boolean
+      get() = source == SOURCE_IMMICH && !immichUrl.isNullOrBlank() && !immichKey.isNullOrBlank()
   }
 
   /** Keep the slideshow interval sane (5s … 10min). */
@@ -114,6 +123,10 @@ object ScreensaverConfig {
         source = p.getString("source", SOURCE_DEFAULT) ?: SOURCE_DEFAULT,
         folderPath = p.getString("folder_path", null),
         albumUrl = p.getString("album_url", null),
+        immichUrl = p.getString("immich_url", null),
+        immichKey = p.getString("immich_key", null),
+        immichAlbumId = p.getString("immich_album_id", null),
+        immichAlbumName = p.getString("immich_album_name", null),
         fit = p.getString("fit", FIT_FILL) ?: FIT_FILL,
         intervalSec = clampInterval(p.getInt("interval_sec", DEFAULT_INTERVAL)),
         albumRefreshMin =
@@ -145,6 +158,30 @@ object ScreensaverConfig {
 
   fun setAlbumUrl(c: Context, url: String) =
       prefs(c).edit().putString("album_url", url.trim()).putString("source", SOURCE_URL).apply()
+
+  /** Connect an Immich server and make it the active source (whole library by default). */
+  fun setImmich(c: Context, url: String, key: String) =
+      prefs(c)
+          .edit()
+          .putString("immich_url", ImmichSource.normalizeBase(url))
+          .putString("immich_key", key.trim())
+          .putString("source", SOURCE_IMMICH)
+          .apply()
+
+  /** Pick which Immich album to show; null/blank id = the whole library. */
+  fun setImmichAlbum(c: Context, albumId: String?, albumName: String?) =
+      prefs(c)
+          .edit()
+          .apply {
+            if (albumId.isNullOrBlank()) {
+              remove("immich_album_id")
+              remove("immich_album_name")
+            } else {
+              putString("immich_album_id", albumId)
+              putString("immich_album_name", albumName)
+            }
+          }
+          .apply()
 
   fun useDefault(c: Context) = prefs(c).edit().putString("source", SOURCE_DEFAULT).apply()
 

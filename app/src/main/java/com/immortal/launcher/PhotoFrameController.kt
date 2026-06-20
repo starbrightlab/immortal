@@ -74,11 +74,14 @@ class PhotoFrameController(
   // callback can tell it's been superseded and bow out.
   private var gen = 0
 
-  // Remote-album playback state (iCloud / Google Photos shared albums).
+  // Remote playback state (iCloud / Google Photos shared albums, or an Immich server).
   private var remoteMode = false
   private var remoteUrls: List<String> = emptyList()
   private var remoteIndex = -1
   private var remoteFailStreak = 0
+  // Auth headers sent with each remote image download — empty for public shares, the
+  // x-api-key for Immich. Applied in [advanceRemote]/[downloadBitmap].
+  private var remoteHeaders: Map<String, String> = emptyMap()
 
   // Web-feed history so swipes can go back as well as forward.
   private val history = ArrayList<Bitmap>()
@@ -160,6 +163,7 @@ class PhotoFrameController(
           ui.post {
             if (urls.isNotEmpty()) {
               remoteUrls = if (settings.shuffle) urls.shuffled() else urls
+              remoteHeaders = emptyMap()
               remoteMode = true
               remoteIndex = -1
               remoteFailStreak = 0
@@ -167,6 +171,30 @@ class PhotoFrameController(
               scheduleRemoteRefresh()
             } else {
               // Album unshared / unreachable → never leave the frame blank.
+              startWeb()
+            }
+          }
+        }
+      }
+      settings.usesImmich -> {
+        val base = settings.immichUrl
+        val key = settings.immichKey
+        if (base.isNullOrBlank() || key.isNullOrBlank()) {
+          startWeb()
+          return
+        }
+        io.execute {
+          val urls = ImmichSource.listImageUrls(base, key, settings.immichAlbumId).orEmpty()
+          ui.post {
+            if (urls.isNotEmpty()) {
+              remoteUrls = if (settings.shuffle) urls.shuffled() else urls
+              remoteHeaders = ImmichSource.authHeaders(key)
+              remoteMode = true
+              remoteIndex = -1
+              remoteFailStreak = 0
+              advanceRemote(+1)
+            } else {
+              // Server unreachable / album empty → never leave the frame blank.
               startWeb()
             }
           }
@@ -404,7 +432,7 @@ class PhotoFrameController(
     val g = gen
     stopVideo()
     io.execute {
-      val bmp = runCatching { downloadBitmap(url) }.getOrNull()
+      val bmp = runCatching { downloadBitmap(url, remoteHeaders) }.getOrNull()
       ui.post {
         if (g != gen) return@post // superseded by a newer advance
         if (!remoteMode) return@post // raced with startWeb() flipping us off
@@ -425,6 +453,7 @@ class PhotoFrameController(
   private fun startWeb() {
     localMode = false
     remoteMode = false
+    remoteHeaders = emptyMap()
     ui.removeCallbacks(remoteTick)
     ui.removeCallbacks(remoteRefresh)
     stopVideo()
@@ -499,12 +528,13 @@ class PhotoFrameController(
     return c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
   }
 
-  private fun downloadBitmap(spec: String): Bitmap? {
+  private fun downloadBitmap(spec: String, headers: Map<String, String> = emptyMap()): Bitmap? {
     val c = URL(spec).openConnection() as HttpURLConnection
     c.connectTimeout = 8000
     c.readTimeout = 12000
     c.instanceFollowRedirects = true
     c.setRequestProperty("User-Agent", "PortalPhotoFrame/1.0")
+    headers.forEach { (k, v) -> c.setRequestProperty(k, v) }
     return c.inputStream.use { BitmapFactory.decodeStream(it) }
   }
 

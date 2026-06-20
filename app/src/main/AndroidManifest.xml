@@ -71,7 +71,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="false"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.SampleApp">
 
         <!-- Immortal launcher. Eligible as the system home (HOME filter) for the
