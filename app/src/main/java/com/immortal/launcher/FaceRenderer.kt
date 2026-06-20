@@ -55,7 +55,12 @@ class FaceRenderer(
 
   /** The overlay container, added above the photo layer by the host. */
   val view: FrameLayout by lazy {
-    FrameLayout(context).apply { layoutParams = FrameLayout.LayoutParams(MATCH, MATCH) }
+    FrameLayout(context).apply {
+      layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+      // Let text shadows overflow their tight boxes instead of being clipped into hard rectangles.
+      clipChildren = false
+      clipToPadding = false
+    }
   }
 
   // Position buckets (a vertical stack per used grid cell), created on demand.
@@ -157,6 +162,7 @@ class FaceRenderer(
 
     val row = LinearLayout(context)
     row.gravity = Gravity.CENTER_VERTICAL
+    row.clipChildren = false // let each field's shadow overflow rather than clip to a box
 
     if (clock.showDate) {
       dateView =
@@ -350,6 +356,8 @@ class FaceRenderer(
         val col = LinearLayout(context)
         col.orientation = LinearLayout.VERTICAL
         col.gravity = horizontalGravity(pos)
+        col.clipChildren = false // shadows on the clock / meta text may overflow this column
+        col.clipToPadding = false
         val lp = FrameLayout.LayoutParams(WRAP, WRAP, gravityFor(pos))
         lp.setMargins(dp(40), dp(40), dp(40), dp(40))
         view.addView(col, lp)

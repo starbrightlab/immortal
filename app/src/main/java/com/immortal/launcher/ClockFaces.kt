@@ -71,22 +71,10 @@ object FaceStyle {
       Shadow.HALO -> t.setShadowLayer(20f, 0f, 0f, 0x66FFFFFF)
       Shadow.NEON -> t.setShadowLayer(24f, 0f, 0f, colorWithOpacity(colorHex, 0.9f))
     }
-    // A TextView clips its drawing to its bounds, so the blurred shadow gets trimmed at the tight
-    // WRAP_CONTENT text box — a strong/neon glow then reads as a hard rectangle. Pad the view so
-    // the blur (radius + offset) has room to render fully on every side.
-    val pad = shadowPadding(shadow)
-    t.setPadding(pad, pad, pad, pad)
+    // NB: a blurred shadow overflows the tight text box and is clipped by the parent unless the
+    // parent sets clipChildren=false (FaceRenderer does). We deliberately don't pad the view to
+    // make room — that would widen the meta-row gaps and the clock→meta spacing.
   }
-
-  /** Padding (px) so a [shadow]'s blur radius + offset isn't clipped by the text box. */
-  fun shadowPadding(shadow: Shadow): Int =
-      when (shadow) {
-        Shadow.NONE -> 0
-        Shadow.SOFT -> 10
-        Shadow.STRONG -> 16
-        Shadow.HALO -> 24
-        Shadow.NEON -> 30
-      }
 }
 
 /** Time-component formatting shared across clock modes. */
