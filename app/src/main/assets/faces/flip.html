@@ -102,12 +102,12 @@
     var vh = window.innerHeight;
     // Square cards (Fliqlo): card side = H; the glyph cap fills ~76% of it (F = 1.14·H).
     var H = vh * 0.34 * (cfg.scale / 100);
-    var F = H * 1.0;
+    var F = H * 0.90;   // tuned by visual match to Fliqlo: tall digits, minute pair not cramped
     document.documentElement.style.setProperty('--h', H + 'px');
     document.documentElement.style.setProperty('--f', F + 'px');
     document.documentElement.style.setProperty('--r', (H * 0.085) + 'px');
     document.documentElement.style.setProperty('--gap', (H * 0.08) + 'px');
-    document.documentElement.style.setProperty('--ampm', (H * 0.15) + 'px');
+    document.documentElement.style.setProperty('--ampm', (H * 0.12) + 'px');
     document.documentElement.style.setProperty('--half', '300ms');
     document.documentElement.style.setProperty('--color', cfg.color);
     // Fliqlo ascent≠descent: the glyph ink centre sits ~0.09·F above the flex-centred line box,
