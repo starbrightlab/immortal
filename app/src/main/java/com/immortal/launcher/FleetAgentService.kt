@@ -24,7 +24,7 @@ import android.util.Log
  *
  * Why this is the reboot-proof channel: adb-over-WiFi can't auto-survive a reboot
  * on these non-root Android 9/10 Portals (the TCP port is a root-only system
- * property — see docs/portal-debug-findings.md), but an app foreground service
+ * property), but an app foreground service
  * comes straight back. [ensureRunning] is called from [ImmortalApp.onCreate] and
  * [BootReceiver], the same hooks that re-assert ADB and the screensaver, so the
  * agent is reachable again after a power-cycle with no USB and no root.

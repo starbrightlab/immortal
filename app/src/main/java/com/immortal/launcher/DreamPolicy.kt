@@ -84,7 +84,7 @@ object DreamPolicy {
    *    when someone returns. This is the shared screensaver/music baseline.
    *  - [FrameMode.ALWAYS_ON] holds on mains / while charging / with the saver off → a permanent
    *    frame, at the cost of masking the presence proxy (presence then reads UNKNOWN; the music
-   *    defers to Home Assistant — see [PresenceHub] and snapcast-multiroom.md → *Presence*).
+   *    defers to Home Assistant — see [PresenceHub] and docs/design/multi-room-audio.md → *Presence*).
    *
    * Note on what we CAN'T do: we can't read Meta's presence signal directly — it's front-camera
    * CV behind a platform-signature permission (proven by the SuperFrame APK teardown). But the

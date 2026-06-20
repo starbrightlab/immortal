@@ -38,7 +38,7 @@ services. Touch models and the remote-driven **Portal TV** are both supported.
   and play/pause/skip controls — on the home header and screensaver of **every** Portal in the group,
   not just the one driving playback. AirPlay cast into a group works too. There's also a compact
   now-playing mini-player whenever anything is playing on the device itself.
-  ([Design notes](snapcast-multiroom.md).)
+  ([Design notes](docs/design/multi-room-audio.md).)
 - **Smart-home integration** (`MqttService`) — Immortal can publish the Portal's state and accept
   commands over **MQTT**, so the device shows up in **Home Assistant** as something you can see and
   control (including turning its screen on and off).

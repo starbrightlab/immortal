@@ -13,16 +13,22 @@ import android.provider.Settings
 import java.io.File
 
 /**
- * Client for the optional shell-privileged install daemon set up by the
- * provisioning kit (`installd.sh`, started via ADB as the shell user).
+ * Client for an **optional** shell-privileged install daemon — a watched queue
+ * that installs/updates APKs silently, with no system installer dialog.
  *
- * When the daemon is running, Immortal can install/update apps **silently** by
- * dropping the APK into a watched queue — no system installer dialog at all.
- * This is what makes the App Store and self-update work on the Gen-1 Portal+,
- * whose built-in installer UI is broken, and it's a one-tap upgrade on every
- * other model too. When the daemon isn't running (e.g. after a reboot, since
- * non-root helpers don't survive one), callers fall back to the normal
- * PackageInstaller flow.
+ * History: the provisioning kit used to start this daemon over ADB to work
+ * around the Gen-1 Portal+'s broken installer dialog. That daemon was retired
+ * in 1.40 — the kit no longer sets one up. The normal install path is now the
+ * system [android.content.pm.PackageInstaller]; on the Gen-1 Portal+, whose
+ * built-in dialog renders white-on-white, the kit makes that dialog usable
+ * again with a reboot-persistent overlay fix (see [installerDialogFixed]).
+ *
+ * This client is retained as a still-supported fast path: callers check
+ * [isAvailable] first and use the silent queue if a daemon happens to be
+ * running (e.g. one started by hand), otherwise they fall through to
+ * PackageInstaller. With stock provisioning [isAvailable] is simply false. It
+ * also backs the store's "installs paused" state via [installPaused] — true
+ * only on a Gen-1 with neither a daemon nor the overlay fix.
  *
  * The daemon renames `<name>.apk` → `<name>.apk.done` / `.failed` to report
  * results; we write APKs atomically (`.part` → rename) so it never sees a
@@ -45,11 +51,12 @@ object InstallDaemon {
   }
 
   /**
-   * Whether this device's built-in installer dialog is broken and it therefore
-   * RELIES on the daemon to install anything. True on the Gen-1 Portal/Portal+
-   * (Android 9 / API 28); the Android-10 models (Go, Mini, gen-2) have a working
-   * system installer and don't need the daemon. Used to tell the two apart so a
-   * paused daemon on a Gen-1 reads as "re-run setup", not a bug.
+   * Whether this device's built-in installer dialog is broken out of the box, so
+   * it can't use the stock PackageInstaller dialog unaided. True on the Gen-1
+   * Portal/Portal+ (Android 9 / API 28); the Android-10 models (Go, Mini, gen-2)
+   * have a working system installer. On a Gen-1 an install needs either the
+   * overlay fix (makes the stock dialog usable) or a running daemon — used to tell
+   * a genuinely-paused Gen-1 ("re-run setup") apart from a healthy newer model.
    */
   /** Pure SDK check (extracted for testing): API < 29 == broken-installer Gen-1. */
   internal fun isLegacy(sdkInt: Int): Boolean = sdkInt < 29

@@ -14,6 +14,9 @@
 .cxx
 local.properties
 
+# MkDocs build output (the docs site is built and deployed by CI, not committed).
+/site
+
 # Release signing — NEVER commit these. Back them up securely; the same key must
 # sign every Immortal release for in-place self-update to work.
 keystore.properties
@@ -32,9 +35,9 @@ provisioning/fleet/
 _planning/
 
 # Reverse-engineering research — never publish (repo is public). Decompilation
-# working dir, APKs pulled off the device, and internal findings docs.
+# working dir and APKs pulled off the device. Keep internal findings in
+# apk_work/ or _planning/ — NOT in docs/, which is now the published wiki source.
 apk_work/
 system_services.apk
 *.apk
-docs/
 

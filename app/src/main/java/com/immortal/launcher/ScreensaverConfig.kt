@@ -17,7 +17,7 @@ import android.content.Context
  *    music must defer to Home Assistant / a manual override.
  *  - [PRESENCE]   — don't pin: let the Portal's presence policy sleep the screen when the room
  *    empties and re-dream when someone returns. This is the shared baseline the screensaver and
- *    the music both follow (see snapcast-multiroom.md → *Presence*). Confirmed on the Portal Go
+ *    the music both follow (see docs/design/multi-room-audio.md → *Presence*). Confirmed on the Portal Go
  *    on battery; verify empty-room sleep on a mains Portal before making it the global default.
  */
 enum class FrameMode {

@@ -74,7 +74,7 @@
           "fdroidId": "de.badaix.snapcast",
           "minSdk": 21,
           "description": "Synchronized multi-room audio — play music in perfect sync across Portals.",
-          "longDescription": "The official Snapcast client and player. Point it at a Snapcast (or Music Assistant) server on your network and the Portal becomes a synchronized speaker — every room plays the same audio in sync, Sonos-style. Bundles the native player, needs no Google services, and runs on every Portal. Note: this is the stock app for testing the multi-room setup; an Immortal-native always-on companion is on the roadmap (see snapcast-multiroom.md).",
+          "longDescription": "The official Snapcast client and player. Point it at a Snapcast (or Music Assistant) server on your network and the Portal becomes a synchronized speaker — every room plays the same audio in sync, Sonos-style. Bundles the native player, needs no Google services, and runs on every Portal. Note: this is the stock app for testing the multi-room setup; an Immortal-native always-on companion is on the roadmap.",
           "iconUrl": "https://f-droid.org/repo/de.badaix.snapcast/en-US/icon.png",
           "author": "badaix",
           "homepage": "https://github.com/badaix/snapcast"

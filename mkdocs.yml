@@ -1,0 +1,80 @@
+site_name: Immortal
+site_description: >-
+  A custom home screen, screensaver, and app store that keeps discontinued
+  Meta Portal devices alive.
+# The docs are served from GitHub Pages today. When we're ready to point
+# savemyportal.com at them, set the custom domain in the repo's Pages settings
+# (or add docs/CNAME) and update site_url to match.
+site_url: https://starbrightlab.github.io/immortal/
+repo_url: https://github.com/starbrightlab/immortal
+repo_name: starbrightlab/immortal
+edit_uri: edit/main/docs/
+copyright: >-
+  Immortal is an independent community project — not affiliated with, endorsed
+  by, or sponsored by Meta.
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.action.edit
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install on a Portal: install.md
+      - First-gen Portals (Android 9): first-gen-portals.md
+      - Provisioning kit: provisioning.md
+  - Features:
+      - Launcher: features/launcher.md
+      - Screensaver & photo frame: features/screensaver.md
+      - App Store: features/app-store.md
+      - Multi-room audio & now-playing: features/multi-room-audio.md
+      - Smart home (Home Assistant / MQTT): features/smart-home.md
+      - Fleet management: features/fleet.md
+      - Portal TV: features/portal-tv.md
+  - Hardware limitations: limitations.md
+  - For developers:
+      - Releasing: releasing.md
+      - Submitting an app: submitting-apps.md
+  - Design notes:
+      - Multi-room audio: design/multi-room-audio.md

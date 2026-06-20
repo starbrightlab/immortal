@@ -20,7 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * photo-frame screensaver (in-process) and the Snapcast music companion (cross-process).
  *
  * Why this exists: the Portal won't let an unprivileged app read Meta's presence signal
- * (it's front-camera CV behind a platform-signature permission — see snapcast-multiroom.md),
+ * (it's front-camera CV behind a platform-signature permission — see docs/design/multi-room-audio.md),
  * but the system's own dream/sleep lifecycle is DERIVED from that signal, and we DO receive
  * it. So the dream coming up means "someone's around"; the device sleeping at a screen
  * timeout means "the room emptied." [PresenceHub] turns those events into a single
