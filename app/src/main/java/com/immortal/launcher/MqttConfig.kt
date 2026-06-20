@@ -22,6 +22,7 @@ import java.security.SecureRandom
 object MqttConfig {
   private const val PREFS = "mqtt_publisher"
   const val DEFAULT_PORT = 1883
+  const val DEFAULT_TLS_PORT = 8883
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -45,6 +46,21 @@ object MqttConfig {
   fun password(c: Context): String = prefs(c).getString("password", "").orEmpty()
 
   fun setPassword(c: Context, v: String) = prefs(c).edit().putString("password", v).apply()
+
+  /** Wrap the broker connection in TLS (e.g. Mosquitto behind a reverse proxy on 8883). */
+  fun useTls(c: Context): Boolean = prefs(c).getBoolean("use_tls", false)
+
+  fun setUseTls(c: Context, on: Boolean) = prefs(c).edit().putBoolean("use_tls", on).apply()
+
+  /**
+   * Verify the broker's certificate (chain + hostname) when [useTls] is on. Default true —
+   * turn off only for self-signed certs you can't add to the device trust store. Ignored
+   * when TLS is off.
+   */
+  fun validateCert(c: Context): Boolean = prefs(c).getBoolean("validate_cert", true)
+
+  fun setValidateCert(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("validate_cert", on).apply()
 
   /** True once a broker host is set — the publisher stays idle until then. */
   fun isConfigured(c: Context): Boolean = host(c).isNotBlank()

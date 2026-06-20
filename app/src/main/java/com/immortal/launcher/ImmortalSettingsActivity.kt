@@ -816,6 +816,8 @@ private fun MqttScreen(onBack: () -> Unit) {
   var port by remember { mutableStateOf(MqttConfig.port(context).toString()) }
   var user by remember { mutableStateOf(MqttConfig.username(context)) }
   var pass by remember { mutableStateOf(MqttConfig.password(context)) }
+  var useTls by remember { mutableStateOf(MqttConfig.useTls(context)) }
+  var validateCert by remember { mutableStateOf(MqttConfig.validateCert(context)) }
   // MqttStatus is a plain holder updated off the main thread, so poll it for live
   // "Connecting… → Connected" feedback (Compose won't recompose on its writes).
   var status by remember { mutableStateOf(MqttStatus.text) }
@@ -838,6 +840,8 @@ private fun MqttScreen(onBack: () -> Unit) {
     MqttConfig.setPort(context, port.toIntOrNull() ?: MqttConfig.DEFAULT_PORT)
     MqttConfig.setUsername(context, user)
     MqttConfig.setPassword(context, pass)
+    MqttConfig.setUseTls(context, useTls)
+    MqttConfig.setValidateCert(context, validateCert)
     MqttService.sync(context)
   }
 
@@ -962,7 +966,7 @@ private fun MqttScreen(onBack: () -> Unit) {
               keyboardOptions =
                   KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
               keyboardActions = KeyboardActions(onNext = { userFocus.requestFocus() }),
-              label = { Text("Port (default 1883)") },
+              label = { Text("Port (default 1883, or 8883 for TLS)") },
               modifier =
                   Modifier.fillMaxWidth()
                       .padding(start = 18.dp, end = 18.dp, top = 4.dp)
@@ -1002,6 +1006,59 @@ private fun MqttScreen(onBack: () -> Unit) {
                       .padding(start = 18.dp, end = 18.dp, top = 8.dp)
                       .focusRequester(passFocus),
           )
+          Row(
+              modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text("Use TLS / SSL", color = Color.White, fontSize = 15.sp)
+              Text(
+                  "Encrypt the connection (e.g. a broker behind a reverse proxy on port 8883).",
+                  color = Color(0xFF9A9A9A),
+                  fontSize = 13.sp,
+                  modifier = Modifier.padding(top = 2.dp),
+              )
+            }
+            Segmented(
+                options = listOf("Off" to "off", "On" to "on"),
+                selected = if (useTls) "on" else "off",
+                onSelect = {
+                  val on = it == "on"
+                  useTls = on
+                  // Hop to the matching default port if the field is still on the other default.
+                  if (on && port == MqttConfig.DEFAULT_PORT.toString())
+                      port = MqttConfig.DEFAULT_TLS_PORT.toString()
+                  else if (!on && port == MqttConfig.DEFAULT_TLS_PORT.toString())
+                      port = MqttConfig.DEFAULT_PORT.toString()
+                  apply()
+                },
+            )
+          }
+          if (useTls) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text("Validate certificate", color = Color.White, fontSize = 15.sp)
+                Text(
+                    "Verify the broker's certificate and hostname. Turn off only for a " +
+                        "self-signed broker on a trusted network.",
+                    color = Color(0xFF9A9A9A),
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+              }
+              Segmented(
+                  options = listOf("Off" to "off", "On" to "on"),
+                  selected = if (validateCert) "on" else "off",
+                  onSelect = {
+                    validateCert = it == "on"
+                    apply()
+                  },
+              )
+            }
+          }
           // Live connection status — gives Apply visible feedback (Connecting… → Connected).
           Text(
               status.ifBlank { "Starting…" },
@@ -1012,9 +1069,9 @@ private fun MqttScreen(onBack: () -> Unit) {
         }
       }
       Text(
-          "Connects to a broker on your LAN (plain MQTT). Your Portal shows up in Home " +
-              "Assistant automatically as a device with presence, screen, battery, now-playing " +
-              "and a few controls — no configuration.yaml editing.",
+          "Connects to a broker on your LAN over plain MQTT or TLS. Your Portal shows up in " +
+              "Home Assistant automatically as a device with presence, screen, battery, " +
+              "now-playing and a few controls — no configuration.yaml editing.",
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),

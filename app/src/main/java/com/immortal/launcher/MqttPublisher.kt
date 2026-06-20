@@ -122,6 +122,10 @@ class MqttPublisher(private val appContext: Context) {
               username = MqttConfig.username(appContext),
               password = MqttConfig.password(appContext),
               will = MqttClient.Will("$base/availability", "offline", retain = true),
+              tls =
+                  if (MqttConfig.useTls(appContext))
+                      MqttClient.Tls(validateCert = MqttConfig.validateCert(appContext))
+                  else null,
           )
       MqttStatus.text = "Connecting to $host…"
       val ok = runCatching { c.connect(KEEPALIVE_SEC) }.getOrDefault(false)

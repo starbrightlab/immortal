@@ -14,6 +14,11 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocket
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * A minimal MQTT 3.1.1 client over a raw socket — no Gradle dependency, matching the
@@ -33,7 +38,14 @@ class MqttClient(
     private val username: String,
     private val password: String,
     private val will: Will?,
+    private val tls: Tls? = null,
 ) {
+  /**
+   * TLS options. [validateCert] off uses a trust-all manager and skips hostname checks — only
+   * for self-signed brokers on a trusted LAN, never the public internet.
+   */
+  data class Tls(val validateCert: Boolean)
+
   /** A retained last-will, published by the broker if we drop without a clean DISCONNECT. */
   data class Will(val topic: String, val payload: String, val retain: Boolean)
 
@@ -48,9 +60,11 @@ class MqttClient(
 
   /** Open the socket and complete the MQTT handshake. Returns true on CONNACK accepted. */
   fun connect(keepAliveSec: Int, connectTimeoutMs: Int = 8000): Boolean {
-    val s = Socket()
-    s.connect(InetSocketAddress(host, port), connectTimeoutMs)
-    s.tcpNoDelay = true
+    // Plain TCP first; the TLS handshake can only run once the socket is connected.
+    val raw = Socket()
+    raw.connect(InetSocketAddress(host, port), connectTimeoutMs)
+    raw.tcpNoDelay = true
+    val s = if (tls != null) wrapTls(raw) else raw
     socket = s
     out = BufferedOutputStream(s.getOutputStream())
     inp = BufferedInputStream(s.getInputStream())
@@ -58,6 +72,37 @@ class MqttClient(
     val ack = readPacket() ?: return false
     // CONNACK (0x20): byte[1] is the return code; 0 = accepted.
     return ack.type == 0x20 && ack.body.size >= 2 && ack.body[1].toInt() == 0
+  }
+
+  /**
+   * Wrap a connected socket in TLS over [host]. With [Tls.validateCert] on we set the HTTPS
+   * endpoint-identification algorithm so the JSSE checks the hostname too (an SSLSocket alone
+   * verifies the chain but not the name); off, we trust everything for self-signed LAN setups.
+   */
+  private fun wrapTls(raw: Socket): SSLSocket {
+    val opts = tls!!
+    val ctx = SSLContext.getInstance("TLS")
+    if (opts.validateCert) {
+      ctx.init(null, null, null) // platform default trust managers
+    } else {
+      ctx.init(null, arrayOf<TrustManager>(TrustAll), java.security.SecureRandom())
+    }
+    val ssl = ctx.socketFactory.createSocket(raw, host, port, true) as SSLSocket
+    ssl.useClientMode = true
+    if (opts.validateCert) {
+      ssl.sslParameters = ssl.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
+    }
+    ssl.startHandshake()
+    return ssl
+  }
+
+  /** Accepts any certificate. Used only when the user opts out of validation for a self-signed broker. */
+  private object TrustAll : X509TrustManager {
+    override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+
+    override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+
+    override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
   }
 
   /** QoS-0 publish. [retain] tells the broker to keep it as the topic's last value. */
