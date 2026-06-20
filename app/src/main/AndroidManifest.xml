@@ -144,6 +144,12 @@
             android:label="Screensaver"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- Connect a self-hosted Immich server as the screensaver source. -->
+        <activity
+            android:name=".ImmichConnectActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- Immortal's own settings (weather unit, home-screen forecast widget, tile
              size), opened from the Immortal tile in the launcher's Settings folder. -->
         <activity

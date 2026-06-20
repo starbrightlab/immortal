@@ -208,6 +208,19 @@ private fun ScreensaverSettingsScreen() {
             context.startActivity(Intent(context, AlbumUrlEntryActivity::class.java))
           }
         }
+        Divider()
+        SelectableRow(
+            title = "Immich server",
+            subtitle = immichSubtitle(settings),
+            selected = settings.usesImmich,
+            onClick = { context.startActivity(Intent(context, ImmichConnectActivity::class.java)) },
+        )
+        if (settings.usesImmich) {
+          Divider()
+          TextButtonRow("Change Immich server or album…") {
+            context.startActivity(Intent(context, ImmichConnectActivity::class.java))
+          }
+        }
       }
       Text(
           "Tip: put your photos and videos in a folder on your Portal and pick it here — for " +
@@ -436,6 +449,13 @@ private fun folderSubtitle(usesFolder: Boolean, name: String?, count: Int?): Str
       count < 0 -> "${name ?: "Selected folder"} — can't read it; showing built-in photos"
       count == 0 -> "${name ?: "Selected folder"} — no photos or videos found"
       else -> "${name ?: "Selected folder"} — $count item${if (count == 1) "" else "s"}"
+    }
+
+private fun immichSubtitle(s: ScreensaverConfig.Settings): String =
+    when {
+      !s.usesImmich -> "Pull photos from your self-hosted Immich server."
+      !s.immichAlbumName.isNullOrBlank() -> "Connected — album “${s.immichAlbumName}”"
+      else -> "Connected — whole library"
     }
 
 private fun albumUrlSubtitle(usesUrl: Boolean, url: String?): String =
