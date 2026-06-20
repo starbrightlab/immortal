@@ -243,7 +243,10 @@ object RemoteAlbum {
 
     // 1. Resolve the share: zone + anonymous token + the partition host to query.
     val resolveUrl = "$CK_HOST/database/1/$CK_CONTAINER/production/public/records/resolve?$CK_PARAMS"
-    val resolveBody = postJson(resolveUrl, "{\"shortGUIDs\":[{\"value\":\"$token\"}]}") ?: return null
+    // Build the body with JSONObject so a pasted token (or any field) is escaped, not interpolated.
+    val resolvePayload =
+        JSONObject().put("shortGUIDs", JSONArray().put(JSONObject().put("value", token)))
+    val resolveBody = postJson(resolveUrl, resolvePayload.toString()) ?: return null
     val resolved = JSONObject(resolveBody).optJSONArray("results")?.optJSONObject(0) ?: return null
     val zone = resolved.optJSONObject("zoneID") ?: return null
     val zoneName = zone.optString("zoneName", "").ifBlank { return null }
@@ -265,8 +268,11 @@ object RemoteAlbum {
 
     // 2. Page the shared zone's assets. downloadURLs come inline — unlike the legacy
     //    API there's no separate webasseturls round-trip.
-    val zoneJson =
-        "{\"zoneName\":\"$zoneName\",\"ownerRecordName\":\"$ownerRecordName\",\"zoneType\":\"$zoneType\"}"
+    val zoneId =
+        JSONObject()
+            .put("zoneName", zoneName)
+            .put("ownerRecordName", ownerRecordName)
+            .put("zoneType", zoneType)
     val queryUrl =
         "$partition/database/1/$CK_CONTAINER/production/shared/records/query?$CK_PARAMS" +
             "&publicAccessAuthToken=${URLEncoder.encode(authToken, "UTF-8")}"
@@ -275,12 +281,26 @@ object RemoteAlbum {
     var marker: String? = null
     var pages = 0
     do {
-      val markerJson = marker?.let { ",\"continuationMarker\":\"$it\"" } ?: ""
-      val body =
-          "{\"query\":{\"recordType\":\"$CK_RECORD_TYPE\",\"filterBy\":[{\"fieldName\":\"direction\"," +
-              "\"comparator\":\"EQUALS\",\"fieldValue\":{\"value\":\"DESCENDING\",\"type\":\"STRING\"}}]}," +
-              "\"zoneID\":$zoneJson,\"resultsLimit\":$CK_PAGE_SIZE$markerJson}"
-      val resp = postJson(queryUrl, body) ?: break
+      val m = marker // local for a stable smart-cast
+      val query =
+          JSONObject()
+              .put("recordType", CK_RECORD_TYPE)
+              .put(
+                  "filterBy",
+                  JSONArray().put(
+                      JSONObject()
+                          .put("fieldName", "direction")
+                          .put("comparator", "EQUALS")
+                          .put(
+                              "fieldValue",
+                              JSONObject().put("value", "DESCENDING").put("type", "STRING"))))
+      val payload =
+          JSONObject()
+              .put("query", query)
+              .put("zoneID", zoneId)
+              .put("resultsLimit", CK_PAGE_SIZE)
+              .apply { if (m != null) put("continuationMarker", m) }
+      val resp = postJson(queryUrl, payload.toString()) ?: break
       val obj = JSONObject(resp)
       val records: JSONArray = obj.optJSONArray("records") ?: break
       for (i in 0 until records.length()) {
