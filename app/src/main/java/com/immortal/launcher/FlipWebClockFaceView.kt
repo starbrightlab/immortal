@@ -34,7 +34,7 @@ class FlipWebClockFaceView(
   private val web =
       WebView(context).apply {
         // Matches the page's slate backdrop so there's no black flash before it paints.
-        setBackgroundColor(0xFF141518.toInt())
+        setBackgroundColor(0xFF0F1012.toInt())
         isVerticalScrollBarEnabled = false
         isHorizontalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER

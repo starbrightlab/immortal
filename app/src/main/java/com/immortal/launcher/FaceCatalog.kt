@@ -54,13 +54,11 @@ object FaceCatalog {
   private fun format(context: Context): String =
       if (ImmortalSettings.use24HourClock(context)) "24h" else "12h"
 
-  private fun nowPlaying(context: Context): NowPlayingSpec =
-      NowPlayingSpec(
-          enabled = ScreensaverConfig.load(context).showNowPlaying,
-          position = GridPosition.BOTTOM_RIGHT,
-      )
+  // The now-playing card is no longer a per-face widget — it's a global switch
+  // (ScreensaverConfig.showNowPlaying) the renderer honours on every face, at BOTTOM_RIGHT. Faces
+  // below only need to set the clock + which corner widgets (date/battery/weather) they want.
 
-  /** A large, centred light clock — nothing else but the now-playing card. */
+  /** A large, centred light clock — just the time (plus the global now-playing card). */
   private fun bigClock(context: Context): Face =
       Face(
           id = "big",
@@ -73,11 +71,10 @@ object FaceCatalog {
                   color = "#ffffff",
                   format = format(context),
                   separator = Separator.COLON,
-                  sizeScale = 150,
+                  sizeScale = 380,
                   position = GridPosition.MIDDLE_CENTER,
                   shadow = Shadow.SOFT,
               ),
-          nowPlaying = nowPlaying(context),
           battery = BatterySpec(enabled = false),
       )
 
@@ -94,17 +91,16 @@ object FaceCatalog {
                   color = "#ffffff",
                   format = format(context),
                   separator = Separator.COLON,
-                  sizeScale = 180,
+                  sizeScale = 440,
                   position = GridPosition.MIDDLE_CENTER,
                   shadow = Shadow.STRONG,
                   showDate = true,
                   dateFormat = DateFormat.LONG,
               ),
-          nowPlaying = nowPlaying(context),
           battery = BatterySpec(enabled = false),
       )
 
-  /** Quiet small time in the corner — no date, weather, battery or now-playing. */
+  /** Quiet small time in the corner — no date, weather or battery (now-playing stays global). */
   private fun minimalClock(context: Context): Face =
       Face(
           id = "minimal",
@@ -121,7 +117,6 @@ object FaceCatalog {
                   position = GridPosition.BOTTOM_LEFT,
                   shadow = Shadow.SOFT,
               ),
-          nowPlaying = NowPlayingSpec(enabled = false),
           battery = BatterySpec(enabled = false),
       )
 }

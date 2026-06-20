@@ -85,7 +85,9 @@ class FaceRenderer(
     buildOverlay()
     tick.run()
     refreshWeather.run()
-    if (face.nowPlaying.enabled) {
+    // Now-playing is independent of the face (see buildOverlay): subscribe whenever the user has
+    // the setting on, so music shows on every face — even the full-bleed flip clock.
+    if (ScreensaverConfig.load(context).showNowPlaying) {
       npListener = NowPlayingHub.Listener { state -> ui.post { updateNowPlaying(state) } }
       NowPlayingHub.addListener(npListener!!)
     }
@@ -104,22 +106,27 @@ class FaceRenderer(
     view.removeAllViews()
     buckets.clear()
 
-    // A full-bleed clock (e.g. the Fliqlo flip clock) owns the whole frame on its own black
-    // background, so skip the scrim and every Immortal widget — none should overlay it.
     buildClockCluster(face.clock)
-    if (clockFace?.fullBleed == true) return
+    val fullBleed = clockFace?.fullBleed == true
 
-    // Legibility scrim under the bottom cluster, matching the original frame.
-    val scrim = View(context)
-    scrim.background =
-        GradientDrawable(
-            GradientDrawable.Orientation.BOTTOM_TOP,
-            intArrayOf(0xCC000000.toInt(), 0x00000000),
-        )
-    view.addView(scrim, 0, FrameLayout.LayoutParams(MATCH, dp(320), Gravity.BOTTOM))
+    // A full-bleed clock (e.g. the Fliqlo flip clock) owns the whole frame on its own near-black
+    // background, so skip the scrim and the date/battery/weather widgets — none should overlay it.
+    if (!fullBleed) {
+      // Legibility scrim under the bottom cluster, matching the original frame.
+      val scrim = View(context)
+      scrim.background =
+          GradientDrawable(
+              GradientDrawable.Orientation.BOTTOM_TOP,
+              intArrayOf(0xCC000000.toInt(), 0x00000000),
+          )
+      view.addView(scrim, 0, FrameLayout.LayoutParams(MATCH, dp(320), Gravity.BOTTOM))
+      buildStandaloneWidgets(face)
+    }
 
-    buildStandaloneWidgets(face)
-    if (face.nowPlaying.enabled) buildNowPlaying(face.nowPlaying)
+    // Now-playing is independent of the face: it shows on EVERY face — including the full-bleed
+    // flip clock — whenever the user has the now-playing setting on (it's high-value enough to be
+    // its own switch, not tied to face selection). The card self-hides until music is playing.
+    if (ScreensaverConfig.load(context).showNowPlaying) buildNowPlaying(face.nowPlaying)
   }
 
   /**
@@ -165,7 +172,11 @@ class FaceRenderer(
       weatherView =
           textView(baseSp = 22f, spec = clock, light = false).also { row.addView(it) }
     }
-    if (row.childCount > 0) col.addView(row)
+    // Explicit WRAP width: a horizontal row added to a vertical LinearLayout otherwise defaults to
+    // MATCH_PARENT and gets constrained to the (often narrower) clock's width above it, clipping
+    // the date/battery/weather on the right. WRAP lets the row size to its own content.
+    if (row.childCount > 0)
+        col.addView(row, LinearLayout.LayoutParams(WRAP, LinearLayout.LayoutParams.WRAP_CONTENT))
   }
 
   /** Weather / battery that aren't co-located with the clock get their own line in their bucket. */
@@ -279,9 +290,9 @@ class FaceRenderer(
           if (face.clock.showDate)
               dateView?.text =
                   SimpleDateFormat(face.clock.dateFormat.pattern(), Locale.getDefault()).format(now)
-          val pct = batteryPct()
+          val (pct, charging) = batteryInfo()
           val hasBattery = pct >= 0
-          batteryView?.text = if (hasBattery) "$pct%" else ""
+          batteryView?.text = if (hasBattery) (if (charging) "$pct% ⚡" else "$pct%") else ""
           batteryView?.visibility = if (hasBattery) View.VISIBLE else View.GONE
           batteryDivider?.visibility = if (hasBattery) View.VISIBLE else View.GONE
           val hasWeather = weatherText.isNotBlank()
@@ -370,13 +381,20 @@ class FaceRenderer(
       }
 
   // --- data -------------------------------------------------------------------
-  private fun batteryPct(): Int {
+  /** Battery percent (-1 = no battery / mains-only Portal) and whether it's charging. */
+  private fun batteryInfo(): Pair<Int, Boolean> {
     val i =
-        context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return -1
-    if (!i.getBooleanExtra(BatteryManager.EXTRA_PRESENT, false)) return -1
+        context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            ?: return -1 to false
+    if (!i.getBooleanExtra(BatteryManager.EXTRA_PRESENT, false)) return -1 to false
     val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
     val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-    return if (level >= 0 && scale > 0) level * 100 / scale else -1
+    val status = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+    val charging =
+        status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == BatteryManager.BATTERY_STATUS_FULL
+    val pct = if (level >= 0 && scale > 0) level * 100 / scale else -1
+    return pct to charging
   }
 
   private fun downloadBitmap(spec: String): Bitmap? {
