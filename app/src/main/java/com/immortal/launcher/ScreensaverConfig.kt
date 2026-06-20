@@ -43,6 +43,7 @@ object ScreensaverConfig {
   const val SOURCE_FOLDER = "folder"
   const val SOURCE_URL = "url"
   const val SOURCE_IMMICH = "immich"
+  const val SOURCE_SMB = "smb"
   const val FIT_FILL = "fill" // crop to fill the screen
   const val FIT_FIT = "fit" // letterbox to show the whole image
   const val DEFAULT_INTERVAL = 30
@@ -61,6 +62,12 @@ object ScreensaverConfig {
       val immichKey: String? = null,
       val immichAlbumId: String? = null,
       val immichAlbumName: String? = null,
+      // SMB / network-share (NAS) connection. smbPath is the folder within the share.
+      val smbHost: String? = null,
+      val smbShare: String? = null,
+      val smbPath: String? = null,
+      val smbUser: String? = null,
+      val smbPass: String? = null,
       val fit: String = FIT_FILL,
       val intervalSec: Int = DEFAULT_INTERVAL,
       val albumRefreshMin: Int = DEFAULT_ALBUM_REFRESH_MIN,
@@ -106,6 +113,9 @@ object ScreensaverConfig {
     /** True when the user has connected an Immich server for us to pull from. */
     val usesImmich: Boolean
       get() = source == SOURCE_IMMICH && !immichUrl.isNullOrBlank() && !immichKey.isNullOrBlank()
+    /** True when the user has connected an SMB network share for us to read. */
+    val usesSmb: Boolean
+      get() = source == SOURCE_SMB && !smbHost.isNullOrBlank() && !smbShare.isNullOrBlank()
   }
 
   /** Keep the slideshow interval sane (5s … 10min). */
@@ -127,6 +137,11 @@ object ScreensaverConfig {
         immichKey = p.getString("immich_key", null),
         immichAlbumId = p.getString("immich_album_id", null),
         immichAlbumName = p.getString("immich_album_name", null),
+        smbHost = p.getString("smb_host", null),
+        smbShare = p.getString("smb_share", null),
+        smbPath = p.getString("smb_path", null),
+        smbUser = p.getString("smb_user", null),
+        smbPass = p.getString("smb_pass", null),
         fit = p.getString("fit", FIT_FILL) ?: FIT_FILL,
         intervalSec = clampInterval(p.getInt("interval_sec", DEFAULT_INTERVAL)),
         albumRefreshMin =
@@ -181,6 +196,18 @@ object ScreensaverConfig {
               putString("immich_album_name", albumName)
             }
           }
+          .apply()
+
+  /** Connect an SMB network share and make it the active source. */
+  fun setSmb(c: Context, host: String, share: String, path: String, user: String, pass: String) =
+      prefs(c)
+          .edit()
+          .putString("smb_host", host.trim())
+          .putString("smb_share", share.trim())
+          .putString("smb_path", path.trim())
+          .putString("smb_user", user.trim())
+          .putString("smb_pass", pass)
+          .putString("source", SOURCE_SMB)
           .apply()
 
   fun useDefault(c: Context) = prefs(c).edit().putString("source", SOURCE_DEFAULT).apply()

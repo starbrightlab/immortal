@@ -82,6 +82,10 @@ class PhotoFrameController(
   // Auth headers sent with each remote image download — empty for public shares, the
   // x-api-key for Immich. Applied in [advanceRemote]/[downloadBitmap].
   private var remoteHeaders: Map<String, String> = emptyMap()
+  // Optional custom fetcher for the remote path: when set (SMB), each "url" is fetched through
+  // this instead of an HTTP download, so SMB reuses all the remote advance/tick/fallback logic.
+  private var remoteFetch: ((String) -> Bitmap?)? = null
+  private var smbSource: SmbSource? = null
 
   // Web-feed history so swipes can go back as well as forward.
   private val history = ArrayList<Bitmap>()
@@ -200,6 +204,34 @@ class PhotoFrameController(
           }
         }
       }
+      settings.usesSmb -> {
+        val src =
+            SmbSource(
+                host = settings.smbHost.orEmpty(),
+                shareName = settings.smbShare.orEmpty(),
+                basePath = settings.smbPath.orEmpty(),
+                user = settings.smbUser.orEmpty(),
+                password = settings.smbPass.orEmpty(),
+            )
+        io.execute {
+          val paths = if (src.connect()) src.listImages() else emptyList()
+          ui.post {
+            if (paths.isNotEmpty()) {
+              smbSource = src
+              remoteUrls = if (settings.shuffle) paths.shuffled() else paths
+              remoteFetch = { p -> src.openStream(p)?.use { BitmapFactory.decodeStream(it) } }
+              remoteMode = true
+              remoteIndex = -1
+              remoteFailStreak = 0
+              advanceRemote(+1)
+            } else {
+              // Share unreachable / no images → never leave the frame blank.
+              src.close()
+              startWeb()
+            }
+          }
+        }
+      }
       else -> startWeb()
     }
   }
@@ -208,6 +240,9 @@ class PhotoFrameController(
     ui.removeCallbacksAndMessages(null)
     faceRenderer.stop()
     if (this::videoView.isInitialized) runCatching { videoView.stopPlayback() }
+    // Close the SMB connection off-thread (network I/O) before the io executor is killed.
+    smbSource?.let { s -> Thread { runCatching { s.close() } }.start() }
+    smbSource = null
     io.shutdownNow()
   }
 
@@ -432,7 +467,9 @@ class PhotoFrameController(
     val g = gen
     stopVideo()
     io.execute {
-      val bmp = runCatching { downloadBitmap(url, remoteHeaders) }.getOrNull()
+      val fetch = remoteFetch
+      val bmp =
+          runCatching { fetch?.invoke(url) ?: downloadBitmap(url, remoteHeaders) }.getOrNull()
       ui.post {
         if (g != gen) return@post // superseded by a newer advance
         if (!remoteMode) return@post // raced with startWeb() flipping us off
@@ -454,6 +491,9 @@ class PhotoFrameController(
     localMode = false
     remoteMode = false
     remoteHeaders = emptyMap()
+    remoteFetch = null
+    smbSource?.let { s -> io.execute { runCatching { s.close() } } }
+    smbSource = null
     ui.removeCallbacks(remoteTick)
     ui.removeCallbacks(remoteRefresh)
     stopVideo()
