@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.43 (2026-06-20)
+
+Screensaver gets clock faces and a lot more places to pull photos from.
+
+- **Clock faces with a picker.** Choose a screensaver clock face — flip clock, big, bold, or minimal — with size options, from a new face picker.
+- **Self-hosted photo sources.** Point the photo frame at your own library: an [Immich](https://immich.app/) server, a network share (SMB), a WebDAV server, or any web page. Each can be set up from your phone by scanning a QR code, so you don't have to type URLs and credentials on the Portal.
+- **Dimmed overnight night clock.** During the overnight window the screensaver can show a dimmed clock instead of going fully dark.
+- **New iCloud shared-album links.** Support for Apple's newer iCloud (CloudKit) shared-album link format, so recently-created shared albums work as a photo source again.
+- **Release safety.** Fixed the release-APK download path and added a guard that blocks publishing an unsigned release (which would break self-update for every device).
+- **Windows fix.** `provision.ps1` no longer crashes to a parse error on Windows PowerShell 5.1.
+
+## 1.42 (2026-06-19)
+
+Home Assistant, and a quicker way to switch apps.
+
+- **Home Assistant integration.** Immortal can talk to [Home Assistant](https://www.home-assistant.io/) over MQTT: it publishes the Portal's state and accepts commands, so the device shows up as something you can see and control from Home Assistant — including turning its screen on and off.
+- **Top-bar app switcher.** A new header control lists your recently-used apps so you can hop between them without going back to the home grid.
+- **Multi-room polish.** The multi-room audio settings gained an in-app setup guide and a keyboard sized to fit the fields, and dropped a Snapcast stream-status gate that could blank the AirPlay now-playing card.
+
 ## 1.40 (2026-06-18)
 
 The biggest release yet: multi-room audio, now-playing on every Portal, and a thorough provisioning overhaul.

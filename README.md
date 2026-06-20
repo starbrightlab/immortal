@@ -18,8 +18,11 @@ services. Touch models and the remote-driven **Portal TV** are both supported.
   another — name them, rename them, and drag apps back out, just like a phone. A green **Calls**
   tile bridges to the stock dialer/contacts for WhatsApp and Messenger calling.
 - **Screensaver** (`PhotoDreamService` / `PhotoFrameController`) — a photo frame with stock-style
-  clock/battery/date/weather widgets. Point it at a folder of **your own photos and videos**, or
-  use the keyless built-in feed (Lorem Picsum, Unsplash-ready); weather is keyless Open-Meteo + IP
+  clock/battery/date/weather widgets and a choice of **clock faces** (flip clock, big, bold, minimal)
+  with size options. Point it at a folder of **your own photos and videos**, an **iCloud shared
+  album**, a self-hosted **Immich** library, a **network share (SMB)** or **WebDAV** server, or any
+  **web page** — most of which you can set up from your phone by scanning a QR code — or use the
+  keyless built-in feed (Lorem Picsum, Unsplash-ready). Weather is keyless Open-Meteo + IP
   geolocation. It cooperates with the Portal's presence sensor so it runs as a **permanent frame**
   while someone's around (and on mains power), and on the battery-powered **Portal Go** an optional
   "sleep when nobody's around" setting saves power. Swipe to change photos, tap to exit.
@@ -29,6 +32,20 @@ services. Touch models and the remote-driven **Portal TV** are both supported.
   for installed apps. F-Droid entries resolve the current APK at install time so the catalog never
   goes stale; your own apps use a direct `apkUrl`. **The store is open to community submissions** —
   every catalog PR is CI-validated. Built a Portal app? [Get it listed](SUBMISSIONS.md).
+- **Multi-room audio & now-playing** (`MultiRoomService` / `NowPlayingHub`) — group your Portals as
+  synced whole-home speakers with [Snapcast](https://github.com/badaix/snapcast) and
+  [Music Assistant](https://music-assistant.io/), and see what's playing — title, artist, cover art,
+  and play/pause/skip controls — on the home header and screensaver of **every** Portal in the group,
+  not just the one driving playback. AirPlay cast into a group works too. There's also a compact
+  now-playing mini-player whenever anything is playing on the device itself.
+  ([Design notes](snapcast-multiroom.md).)
+- **Smart-home integration** (`MqttService`) — Immortal can publish the Portal's state and accept
+  commands over **MQTT**, so the device shows up in **Home Assistant** as something you can see and
+  control (including turning its screen on and off).
+- **Fleet management** (`FleetAgentService`) — an optional always-on WiFi service for managing a
+  Portal over the network — deploy and update apps, push config, browse files, read logs — without
+  reaching for a USB cable each time. It survives reboots (unlike adb-over-WiFi on these non-root
+  devices) and is opt-in per device (`provision.sh --fleet`).
 - **Help tour** (`HelpActivity`) — a friendly, non-technical walkthrough on a Help tile (and once
   on first launch), so anyone can pick up a revived Portal.
 - **Portal TV support** — full remote/D-pad navigation across the whole UI, a Calls tile that
@@ -74,75 +91,63 @@ Immortal runs on the original Portal+ too — launcher, screensaver, and app sto
 one quirk worth knowing up front, because it's a quirk of that hardware's older software, not a
 fault in Immortal:
 
-**The first-gen Portal's built-in Android installer is broken** (it opens a dialog with no
-buttons), so apps can't be installed the normal way. Immortal works around this with a small helper
-that the provisioning kit starts over USB — after that, the app store, "Install with Immortal," and
-sideloading all install silently with no dialog.
-
-That helper can't survive a reboot on this generation (a limitation of running without root on
-Android 9 — the same reason tools like Shizuku need re-starting). To keep installs working across
-reboots anyway, the kit **also repairs the Portal's own installer dialog**: the blank-with-no-buttons
-screen is caused by one of Meta's display overlays re-theming it white-on-white — a great community
-discovery by [u/keremimo](https://www.reddit.com/user/keremimo/) on r/FacebookPortal — and disabling
-that overlay (`cmd overlay disable`) brings the normal dialog back. Unlike the helper, that change is
-remembered across reboots — so after a restart, the app store, "Install with Immortal," and
-sideloading fall back to the **now-visible system dialog** with no reconnect needed. (The silent
-helper is still the nicer path when it's running — no dialog at all — so reconnecting to restart it
-is still worthwhile, just no longer required to install anything.)
+**The first-gen Portal's built-in Android installer is broken** — it opens a confirm dialog rendered
+white-on-white, with the "Install" button invisible in the bottom-right corner, so apps can't be
+installed the normal way. The cause is one of Meta's display overlays
+(`com.facebook.aloha.rro.niu.android`) re-theming the dialog — a great community discovery by
+[u/keremimo](https://www.reddit.com/user/keremimo/) on r/FacebookPortal. The provisioning kit
+**disables that overlay** (`cmd overlay disable`), which brings the normal, readable dialog back. The
+framework remembers this across reboots, so once the kit has run, the app store, "Install with
+Immortal," and sideloading all install through the standard Android dialog — no cable and no re-setup
+needed. (The kit also grants Immortal the install-source permission directly, since the Portal's
+on-device "install unknown apps" toggle is non-functional.)
 
 If you'd rather leave the stock dialog untouched, set `DISABLE_INSTALLER_OVERLAY=false` in
-`config.env`; then a rebooted Gen-1 with the helper down **pauses new installs until you reconnect
-and re-run the installer** — a 30-second step — and Immortal shows a clear note in the store so it's
-never a mystery. Either way, everything else keeps working across reboots: your home screen,
-screensaver, and every app you've already installed.
+`config.env` — but on a Gen-1 Portal the installer dialog then stays unreadable, so installs won't
+work until you re-enable the fix. (On newer Portals the overlay isn't present, so this setting has no
+effect there.) Everything else works across reboots regardless: your home screen, screensaver, and
+every app you've already installed.
 
 The **Portal TV** is the same generation (Android 9), so the same install mechanics apply. It has
 no touchscreen, but Immortal is fully driveable with the TV remote — the home grid, folders, App
 Store, and screensaver settings all navigate with the D-pad.
 
-Newer Portals (Portal Go, Mini, gen-2) have a working installer and don't need any of this — though
-their silent-install helper also stops after a reboot, so a new app installed then goes through the
-system dialog (and some Play-Store split apps won't parse there) until you re-run the kit. The store
-shows a note when that happens.
+Newer Portals (Portal Go, Mini, gen-2) have a working installer dialog and don't need the overlay
+fix — installs go through the standard Android installer out of the box.
 
 ### Play-Store apps via Aurora on a first-gen Portal
 
 [Aurora Store](https://auroraoss.com) lets you install Play-Store apps (Spotify, etc.) without a
-Google account. On the Gen-1 Portal+ its two default installer modes — "Session" and "Native" —
-both run into the broken stock installer, and unlike a file you download in Chrome, Aurora keeps
-its APK in private storage where Immortal's helper can't reach it. The path that *does* work is
-Aurora's **Shizuku** installer, which installs through the same privileged channel Immortal uses.
+Google account. On the Gen-1 Portal+, Aurora's default "Session" and "Native" installer modes hit
+the broken stock installer dialog. The cleanest path is Aurora's **Shizuku** installer, which
+installs silently through a privileged broker.
 
-The provisioning kit sets most of this up for you: on a Gen-1 Portal it **installs Shizuku and
-starts its server automatically** (it skips this on newer Portals, which don't need it). So all
-that's left is to point Aurora at it, a one-time, two-tap step:
+The provisioning kit sets this up for you: it **installs Shizuku and starts its server**
+automatically. So all that's left is to point Aurora at it, a one-time, two-tap step:
 
 1. Install **Aurora Store** from the Immortal App Store.
 2. In **Aurora → Settings → Installation → Installation method**, choose **Shizuku installer**.
    The first install prompts "Allow Aurora Store to access Shizuku?" — tap **Allow all the time**.
 
 After that, Aurora installs Play-Store apps silently, including split APKs — no dialog, no broken
-installer (verified end-to-end on a Portal+ installing Spotify). Shizuku's server, like Immortal's
-own helper, doesn't survive a reboot; the kit restarts it on its next run, or run
-`./provision.sh --shizuku` (`provision.ps1 -Shizuku`).
+installer (verified end-to-end on a Portal+ installing Spotify). Shizuku's server doesn't survive a
+reboot; the kit restarts it on its next run, or run `./provision.sh --shizuku`
+(`provision.ps1 -Shizuku`).
 
 #### Simpler alternative: skip Shizuku
 
 Shizuku's server can fail to stay up on some Gen-1 firmware (Android 9 may kill it right after
-launch — the kit now detects this and tells you instead of falsely reporting success). You can skip
-Shizuku entirely: Aurora's **Session** installer hands its APKs to Immortal's own silent-install
-daemon, which just needs Aurora to hold `REQUEST_INSTALL_PACKAGES`.
-
-**When you install Aurora from the Immortal App Store, the daemon grants this for you automatically**
-(it runs as the shell user, so it can set the app-op). After that, set **Aurora → Settings →
-Installation → Installation method → Session** and installs work — no Shizuku, no broken dialog
-(community-verified on a Gen-1 Portal+, including split APKs).
-
-If you installed Aurora some other way (so the daemon never saw it), grant it once manually:
+launch — the kit detects this and tells you instead of falsely reporting success). You can skip
+Shizuku entirely: with the installer-overlay fix applied, Aurora's **Session** installer routes
+through the now-readable system installer dialog. Set **Aurora → Settings → Installation →
+Installation method → Session**, and grant Aurora permission to install apps once:
 
 ```bash
 adb shell appops set com.aurora.store REQUEST_INSTALL_PACKAGES allow
 ```
+
+After that, Session installs work with the standard dialog — no Shizuku needed (community-verified on
+a Gen-1 Portal+). For apps that ship as split APKs, the Shizuku path above is the more reliable one.
 
 ## Releasing
 
