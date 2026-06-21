@@ -8,6 +8,10 @@ everything back.
 The owner never touches a terminal — they plug in a USB-C cable, accept one prompt on the
 Portal, and double-click.
 
+> **New here?** The full walkthrough — with the prompts you'll see, how to verify it worked,
+> screenshots, and troubleshooting — is at <https://starbrightlab.github.io/immortal/provisioning/>.
+> This file is the same steps for when you only have the downloaded folder in front of you.
+
 ## For the end user
 
 1. **Enable ADB on the Portal** (one time): Settings > Debug > **ADB Enabled**.

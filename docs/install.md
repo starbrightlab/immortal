@@ -6,20 +6,18 @@ or a **build from source**.
 ## The easy path: the provisioning kit
 
 The [provisioning kit](provisioning.md) does everything in one double-click: it installs
-Immortal, optionally sets it as the home screen and screensaver, pre-grants permissions,
-and can freeze OS updates so the setup sticks. It fetches the latest release automatically,
-and it's fully reversible.
+Immortal, optionally sets it as the home screen and screensaver, pre-grants permissions, fixes
+the [first-gen installer](first-gen-portals.md), and can freeze OS updates so the setup sticks. It
+fetches the latest release automatically (and even downloads `adb` for you if needed), and it's
+fully reversible.
 
-1. **Enable ADB on the Portal** (one time): Settings → Debug → **ADB Enabled**.
-2. **Connect** the Portal to your computer with a USB-C cable.
-3. **Double-click** `Provision-Portal.command` (macOS/Linux) or `Provision-Portal.bat` (Windows).
-4. When the Portal shows **"Allow USB debugging?"**, tap **Allow** (check "Always allow").
-5. Wait for "Done."
+**→ Follow the full step-by-step walkthrough: [Provisioning a Portal](provisioning.md)** — it
+covers downloading the kit, enabling ADB, the prompts you'll see, how to verify it worked, and
+troubleshooting.
 
-To undo everything, double-click `Restore-Portal`.
-
-See [Provisioning kit](provisioning.md) for what each step does, the configuration options,
-and platform-specific notes (macOS Gatekeeper, Windows "unblock").
+The gist: enable **Settings → Debug → ADB Enabled** on the Portal, connect it over USB-C,
+double-click **`Provision-Portal`**, and tap **Allow** on the Portal. To undo, double-click
+**`Restore-Portal`**.
 
 ## Build from source
 
