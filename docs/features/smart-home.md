@@ -25,6 +25,12 @@ It's a long-running, reboot-proof on-device foreground service that mirrors the
 [fleet agent](fleet.md), and it's **off until you configure a broker**. An un-configured device
 never opens a connection.
 
-Configure it under **Immortal → Settings** with your MQTT broker host (default port `1883`). The
-Home Assistant device name is shared with the fleet agent, so a Portal shows up under **one name**
-everywhere. A live status string on the settings screen tells you whether the connection is up.
+Configure it under **Immortal → Settings → Home Assistant (MQTT)**: turn on the toggle and enter
+your broker **host** (default port `1883`) and, if your broker requires it, a **username and
+password**. The Portal then appears automatically under **Settings → Devices** in Home Assistant —
+no YAML. Its device name is shared with the fleet agent, so a Portal shows up under **one name**
+everywhere, and a live status line tells you whether the connection is up.
+
+!!! tip "Full walkthrough"
+    See the [Home Assistant & MQTT setup guide](../guides/home-assistant.md) for prerequisites
+    (Mosquitto add-on, MQTT integration), an example automation, and troubleshooting.

@@ -26,8 +26,6 @@ import java.io.File
  * font the installed APK has never seen without an app update — the descriptor and renderer
  * don't change when tier 3 lands, the resolver just gains a fallback. A missing asset always
  * degrades gracefully (nearest system typeface) rather than crashing or blanking the frame.
- *
- * See [docs/screensaver-face-descriptor.md] § Asset resolution.
  */
 class AssetResolver(private val context: Context) {
 

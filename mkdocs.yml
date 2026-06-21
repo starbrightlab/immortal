@@ -72,6 +72,11 @@ nav:
       - Smart home (Home Assistant / MQTT): features/smart-home.md
       - Fleet management: features/fleet.md
       - Portal TV: features/portal-tv.md
+  - How-to guides:
+      - Installing apps & app stores: guides/installing-apps.md
+      - Multi-room audio setup: guides/multi-room-audio-setup.md
+      - Home Assistant & MQTT setup: guides/home-assistant.md
+      - Alexa & voice (first-gen): guides/voice-alexa.md
   - Hardware limitations: limitations.md
   - For developers:
       - Releasing: releasing.md

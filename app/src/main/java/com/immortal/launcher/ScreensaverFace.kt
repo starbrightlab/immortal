@@ -18,7 +18,7 @@ import org.json.JSONObject
  * additive blocks ([NowPlayingSpec], [BatterySpec]) cover what a Portal has that a browser
  * doesn't; mantelframe ignores them, and absent blocks fall back to defaults here.
  *
- * See [docs/screensaver-face-descriptor.md] for the full contract. The photo source, fit,
+ * The photo source, fit,
  * interval, and transition are NOT part of a face — they live in [ScreensaverConfig].
  */
 data class Face(

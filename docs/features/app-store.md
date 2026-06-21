@@ -26,6 +26,10 @@ Two extra entry points catch APKs from elsewhere:
   file manager.
 - **"Install an APK"** (`ApkBrowserActivity`) — lists APKs already in your Downloads.
 
+!!! tip "Other ways to install"
+    For Play-Store apps (Aurora), F-Droid, and sideloading, see the
+    [Installing apps & app stores guide](../guides/installing-apps.md).
+
 ## Self-update
 
 Immortal updates itself the same way: `UpdateManager` polls

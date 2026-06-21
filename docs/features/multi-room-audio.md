@@ -3,6 +3,9 @@
 Synchronized, whole-home music across the Portals running Immortal — the same audio, in tight
 sync, in every room — plus now-playing and transport controls on **every** device in a group.
 
+!!! tip "Just want to set it up?"
+    Follow the step-by-step [multi-room audio setup guide](../guides/multi-room-audio-setup.md).
+
 !!! info "Design deep-dive"
     This page is the user-facing overview. The architecture, what's reused vs built, and the
     licensing boundary are in the [multi-room audio design notes](../design/multi-room-audio.md).

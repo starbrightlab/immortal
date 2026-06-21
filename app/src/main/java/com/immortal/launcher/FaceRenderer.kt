@@ -41,7 +41,7 @@ import java.util.concurrent.Executors
  *
  * This is the new render path that replaces the original hardcoded overlay. [Face.immortalClassic]
  * reproduces that original face through it; richer modes (flip / analog / word / gradient /
- * neon) extend the widget builders here. See [docs/screensaver-face-descriptor.md].
+ * neon) extend the widget builders here.
  */
 class FaceRenderer(
     private val context: Context,
