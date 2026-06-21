@@ -114,8 +114,6 @@ A console window scrolling through steps like *Installing client APK*, *Granting
 Within a few seconds, the **Portal shows a "Allow USB debugging?" prompt**. Tap **Allow**, and tick
 **"Always allow from this computer"** so you won't be asked again.
 
-!!! example "📷 Screenshot to add — `docs/img/allow-usb-debugging.png`: the Portal's *Allow USB debugging?* dialog with **Always allow** ticked."
-
 ## Step 6 — Answer the questions it asks
 
 Most of the run is automatic, but it may pause to ask a few things (just type your answer and press
