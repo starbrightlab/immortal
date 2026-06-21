@@ -5,7 +5,7 @@ clock/battery/date/weather widgets that doubles as the Portal's screensaver.
 
 Swipe to change photos, tap to exit.
 
-![The photo-frame screensaver with the flip-clock face over a landscape photo](../img/screensaver.png)
+![The photo-frame screensaver showing a large clock over a landscape photo](../img/screensaver.png)
 
 ## Clock faces
 
