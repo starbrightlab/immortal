@@ -46,7 +46,7 @@ Inside you'll find:
 | `Restore-Portal.command` / `.bat` | Double-click to undo |
 | `config.env` | Optional settings (sensible defaults — most people never touch it) |
 
-!!! example "📷 Screenshot to add — `docs/img/provisioning-folder.png`: the unzipped `provisioning` folder showing the Provision/Restore files."
+![The unzipped provisioning folder showing the Provision-Portal and Restore-Portal files alongside the helper scripts](img/provisioning-folder.png)
 
 ## Step 2 — Unblock the files (first time only)
 
@@ -88,7 +88,7 @@ computer talk to the Portal over the cable.
     The exact path varies slightly by model and software version — look under **Settings** for
     **Debug**, **Developer**, or **System**. It's a one-time toggle; once on, it stays on.
 
-!!! example "📷 Screenshot to add — `docs/img/adb-enabled.png`: the Portal's Settings → Debug screen with **ADB Enabled** turned on."
+![The Portal's Settings → Debug screen with ADB Enabled turned on](img/adb-enabled.png)
 
 ## Step 4 — Connect the Portal
 

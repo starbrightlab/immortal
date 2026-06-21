@@ -2,6 +2,8 @@
 
 `StoreActivity` / `StoreCatalog` — an on-device app store backed by a hosted JSON catalog.
 
+![The on-device App Store showing the Media & Entertainment category with install buttons](../img/app-store.png)
+
 ## What it is
 
 A hosted catalog ([`catalog.json`](https://github.com/starbrightlab/immortal/blob/main/catalog.json),

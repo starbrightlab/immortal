@@ -6,6 +6,8 @@ A fullscreen app grid with a clock/date/weather header and an optional charge in
 (shown only on the Portal Go, which has a battery). It's designed for a landscape touchscreen
 and is fully navigable by remote on the [Portal TV](portal-tv.md).
 
+![The Immortal home screen — a fullscreen app grid with a clock, date, and weather header](../img/home.png)
+
 ## The grid
 
 - **App grid** — your installed apps, fullscreen.
