@@ -267,7 +267,10 @@ class FaceRenderer(
     artLp.setMarginStart(dp(16))
     if (spec.showArt) card.addView(art, artLp)
 
-    bucket(spec.position).addView(card)
+    // Explicit WRAP width: a vertical LinearLayout (the bucket) otherwise hands children
+    // MATCH_PARENT by default, which would squeeze the card to a narrower cell-mate's width
+    // (e.g. the photo caption now sharing this cell) and truncate the track title.
+    bucket(spec.position).addView(card, LinearLayout.LayoutParams(WRAP, WRAP))
     nowPlayingCard = card
     npTitle = title
     npArtist = artist
