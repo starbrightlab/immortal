@@ -30,6 +30,16 @@ Immortal is a single Android app (Jetpack Compose, minSdk 24, targetSdk 36).
 The debug build uses a `.debug` application-id suffix so it installs alongside a
 provisioned release. The provisioning kit lives in [`provisioning/`](provisioning/).
 
+To iterate against **real release conditions** (home role, device admin, self-update
+signature checks) without the install friction, build the **`dev`** variant:
+`./gradlew :app:assembleDev`. It is the release build plus `debuggable = true` — same
+application-id, same signing key, minify off — so it provisions identically, but
+`adb install -r -d` can freely replace or *downgrade* it. That sidesteps the two walls a pure
+release build hits on a dev device: a feature branch is always a lower `versionCode`
+(downgrade-blocked), and the device admin blocks `adb uninstall`. To set up a dev unit, drop the
+dev APK in `provisioning/apks/` and run provisioning as usual, then iterate with
+`adb install -r -d`. Validate the true `release` artifact before shipping.
+
 A few things worth knowing:
 
 - **Release builds must be signed with the same key every time** — in-place
