@@ -135,16 +135,27 @@ echo "  committed bump + pushed $tag"
 
 step "Create draft release, upload assets, publish"
 gh release create "$tag" --repo "$repo" --draft --title "Immortal $version_name" --notes "$notes" >/dev/null
-gh release upload "$tag" "$apk#immortal.apk" "$kit" --repo "$repo" --clobber
+# The asset's NAME is its filename — `gh upload file#label` only sets a display label, so the
+# build output must be copied to a file literally named immortal.apk (the stable self-update
+# URL is latest/download/immortal.apk). $kit is already named portal-kit.zip.
+cp "$apk" "$tmp/immortal.apk"
+gh release upload "$tag" "$tmp/immortal.apk" "$kit" --repo "$repo" --clobber
 gh release edit "$tag" --repo "$repo" --draft=false >/dev/null
 echo "  published $tag with immortal.apk + portal-kit.zip"
 
 step "Verify the published release"
-for url in "$stable_apk_url" "$stable_kit_url"; do
-  code="$(curl -fsSL -o /dev/null -w '%{http_code}' "$url" || true)"
-  [ "$code" = "200" ] || die "$url did not resolve (got ${code:-no response}) — self-update or kit download would fail"
-  echo "  ok: $url → 200"
-done
+# GitHub's latest/download redirect can lag ~15s behind publish, so retry before failing.
+verify_url(){
+  local url="$1" code="" i=0
+  for i in $(seq 1 10); do
+    code="$(curl -fsSL -o /dev/null -w '%{http_code}' "$url" || true)"
+    [ "$code" = "200" ] && { echo "  ok: $url → 200"; return 0; }
+    sleep 5
+  done
+  die "$url did not resolve after ~50s (last: ${code:-no response}) — self-update or kit download would fail"
+}
+verify_url "$stable_apk_url"
+verify_url "$stable_kit_url"
 curl -fsSL -o "$tmp/pub.apk" "$stable_apk_url"
 pub_code="$("$bt/aapt" dump badging "$tmp/pub.apk" | sed -n "s/^package:.*versionCode='\([0-9]*\)'.*/\1/p")"
 [ "$pub_code" = "$new_code" ] || die "published immortal.apk is versionCode $pub_code, expected $new_code"
