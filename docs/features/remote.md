@@ -13,6 +13,12 @@ the same always-on [fleet agent](fleet.md) that already manages the device over 
   anywhere) — this is the universal navigation primitive.
 - **Keyboard** — type on the phone; text lands in the focused field on the Portal (set / append /
   backspace / clear), no on-Portal typing.
+- **Media controls** — a **Now Playing** tab mirrors whatever's playing on the Portal (any media
+  app): album art, title/artist, a scrubber, and play/pause/skip/seek. It reads the device's media
+  session — the same source as the on-TV header mini-player — so it works with any app, and across
+  the device switcher you can control each Portal's playback from the phone. Album art comes from the
+  session bitmap when present, otherwise the Portal resolves the metadata art **URI** (often a
+  device-local `content://` the phone can't fetch itself) and relays it.
 - **App launcher grid** — every launchable app on the Portal, tap to open.
 - **Screensaver & calendar setup** — set the photo source (Immich / NAS / WebDAV / web / album /
   default feed) and the calendar feed from the phone, instead of typing URLs and credentials on the
@@ -88,8 +94,9 @@ automatically (via `WRITE_SECURE_SETTINGS`) and which comes back on its own afte
 
 ## API
 
-All under the agent's port (default `8723`). `/remote/ui` and `/remote/pair` are open on the LAN;
-the rest require `Authorization: Bearer <session-or-fleet-token>`.
+All under the agent's port (default `8723`). `/remote/ui`, `/remote/pair`, `/remote/icon` and
+`/remote/art` are open on the LAN (no secrets); the rest require
+`Authorization: Bearer <session-or-fleet-token>`.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -104,6 +111,9 @@ the rest require `Authorization: Bearer <session-or-fleet-token>`.
 | `POST` | `/remote/tap` | tap at the pointer (synthesized touch) |
 | `POST` | `/remote/swipe` | `{"dx":0.0,"dy":-300.0}` → swipe from the pointer |
 | `POST` | `/remote/scroll` | `{"dir":"up"\|"down"}` → page-scroll (one big center swipe) |
+| `GET` | `/remote/nowplaying` | current track `{active, title, artist, album, durationMs, positionMs, playing, hasArt, artVersion}` |
+| `GET` | `/remote/art` | current album art (PNG) — session bitmap, or a resolved metadata URI |
+| `POST` | `/remote/media` | `{"action":"playpause\|next\|prev\|seek","positionMs":…}` → transport on the active session |
 | `GET`/`POST` | `/remote/presets` | list, or replace with `{"presets":[{id,name,steps[]}]}` |
 | `POST` | `/remote/preset` | `{"id":"…"}` → run a saved preset's steps in order |
 | `GET` | `/remote/devices` | this device's name + mDNS-discovered peers `[{name,host,port}]` |

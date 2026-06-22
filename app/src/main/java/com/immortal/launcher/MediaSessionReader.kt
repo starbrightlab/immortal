@@ -109,6 +109,8 @@ object MediaSessionReader {
 
   fun previous() = active?.transportControls?.skipToPrevious() ?: Unit
 
+  fun seek(positionMs: Long) = active?.transportControls?.seekTo(positionMs) ?: Unit
+
   // --- session plumbing (all on the handler thread) ---------------------------
 
   private fun attach() {

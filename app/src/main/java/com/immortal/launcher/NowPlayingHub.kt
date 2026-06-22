@@ -58,4 +58,6 @@ object NowPlayingHub {
   fun next() = MediaSessionReader.next()
 
   fun previous() = MediaSessionReader.previous()
+
+  fun seek(positionMs: Long) = MediaSessionReader.seek(positionMs)
 }

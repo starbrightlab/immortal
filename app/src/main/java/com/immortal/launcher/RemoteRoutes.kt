@@ -34,8 +34,13 @@ class RemoteRoutes(private val context: Context) {
         // App icons aren't sensitive; serving them unauthenticated keeps the token out
         // of <img> URLs. Still behind the server's LAN-only peer guard.
         "/remote/icon" -> requireMethod("GET", req) { icon(req) }
+        // Album art isn't sensitive either — served unauthenticated like icons so the cover
+        // can be an <img src> without leaking the token. LAN-guarded like everything else.
+        "/remote/art" -> requireMethod("GET", req) { art() }
         // Authenticated: anything that reads the app list or drives input.
         "/remote/apps" -> authed(req) { apps() }
+        "/remote/nowplaying" -> authed(req) { json(200, ok().put("np", RemoteMedia.stateJson())) }
+        "/remote/media" -> authed(req) { media(req) }
         "/remote/key" -> authed(req) { key(req) }
         "/remote/launch" -> authed(req) { launch(req) }
         "/remote/text" -> authed(req) { text(req) }
@@ -65,6 +70,23 @@ class RemoteRoutes(private val context: Context) {
     val pkg = req.queryParam("pkg") ?: return json(400, err("pkg_required"))
     val png = RemoteApps.iconPng(context, pkg) ?: return json(404, err("no_icon"))
     return FleetHttpServer.Response.stream(200, "image/png", png.size.toLong()) { it.write(png) }
+  }
+
+  /** The current album art as PNG (in-memory bitmap, or a resolved metadata URI). */
+  private fun art(): FleetHttpServer.Response {
+    val png = RemoteMedia.artPng(context) ?: return json(404, err("no_art"))
+    return FleetHttpServer.Response.stream(200, "image/png", png.size.toLong()) { it.write(png) }
+  }
+
+  /** Transport for the active media session: `{"action":"playpause|next|prev|seek","positionMs":…}`. */
+  private fun media(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
+    val action = body.optString("action")
+    if (action !in setOf("playpause", "next", "prev", "previous", "seek"))
+        return json(400, err("unknown_action"))
+    val dispatched = RemoteMedia.command(action, body.optLong("positionMs", 0L))
+    // 409 when nothing is playing — the action was understood but there's no session to drive.
+    return json(if (dispatched) 200 else 409, JSONObject().put("ok", dispatched).put("action", action))
   }
 
   private fun key(req: FleetHttpServer.Request): FleetHttpServer.Response {
