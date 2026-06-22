@@ -136,6 +136,13 @@ class FaceRenderer(
     buildClockCluster(face.clock)
     val fullBleed = clockFace?.fullBleed == true
 
+    // Now-playing shows on EVERY face — including the full-bleed flip clock — whenever the user has
+    // the setting on (it's high-value enough to be its own switch, not tied to face selection). It's
+    // built BEFORE the caption so that when they share a cell (both default bottom-right) the
+    // now-playing card sits on top and the smaller photo caption tucks beneath it. Self-hides until
+    // music is playing.
+    if (ScreensaverConfig.load(context).showNowPlaying) buildNowPlaying(face.nowPlaying)
+
     // A full-bleed clock (e.g. the Fliqlo flip clock) owns the whole frame on its own near-black
     // background, so skip the scrim and the date/battery/weather widgets — none should overlay it.
     if (!fullBleed) {
@@ -151,11 +158,6 @@ class FaceRenderer(
       // Photo caption is photo metadata, so (like the widgets) it's skipped on a full-bleed clock.
       if (face.caption.enabled) buildCaption(face.caption)
     }
-
-    // Now-playing is independent of the face: it shows on EVERY face — including the full-bleed
-    // flip clock — whenever the user has the now-playing setting on (it's high-value enough to be
-    // its own switch, not tied to face selection). The card self-hides until music is playing.
-    if (ScreensaverConfig.load(context).showNowPlaying) buildNowPlaying(face.nowPlaying)
   }
 
   /**
