@@ -13,6 +13,9 @@ the same always-on [fleet agent](fleet.md) that already manages the device over 
 - **Keyboard** — type on the phone; text lands in the focused field on the Portal (set / append /
   backspace / clear), no on-Portal typing.
 - **App launcher grid** — every launchable app on the Portal, tap to open.
+- **Screensaver & calendar setup** — set the photo source (Immich / NAS / WebDAV / web / album /
+  default feed) and the calendar feed from the phone, instead of typing URLs and credentials on the
+  Portal. (This replaced the old standalone "set up from your phone" LAN form.)
 - **Multiple devices** — one remote drives every Portal on your Wi-Fi. Other Portals are discovered
   automatically (mDNS); pick one from the device switcher and pair it with its on-screen PIN. The
   phone keeps a per-device token, so a token never crosses between Portals.
@@ -102,3 +105,4 @@ the rest require `Authorization: Bearer <session-or-fleet-token>`.
 | `GET`/`POST` | `/remote/presets` | list, or replace with `{"presets":[{id,name,steps[]}]}` |
 | `POST` | `/remote/preset` | `{"id":"…"}` → run a saved preset's steps in order |
 | `GET` | `/remote/devices` | this device's name + mDNS-discovered peers `[{name,host,port}]` |
+| `GET`/`POST` | `/remote/sources` | read or set the screensaver photo source + calendar feed |

@@ -156,12 +156,6 @@
             android:exported="false"
             android:theme="@style/Theme.SampleApp" />
 
-        <!-- "Set up from your phone": on-device LAN web form for source credentials. -->
-        <activity
-            android:name=".LanSetupActivity"
-            android:exported="false"
-            android:theme="@style/Theme.SampleApp" />
-
         <!-- "Control from your phone": pairing screen for the phone web remote. -->
         <activity
             android:name=".RemotePairActivity"

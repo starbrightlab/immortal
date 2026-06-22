@@ -150,19 +150,20 @@ private fun ScreensaverSourcesScreen() {
       Spacer(Modifier.size(26.dp))
 
       // ── Set up from another device (LAN) ──────────────────────────────────
-      // Easier than typing an Immich API key / NAS path / long URL on the Portal: open a form on a
-      // phone or laptop on the same Wi-Fi. Offered alongside the on-Portal entry below, not instead.
+      // Easier than typing an Immich API key / NAS path / long URL on the Portal: the phone remote
+      // now hosts source + calendar setup, so pair it and enter the details from another device.
       Card {
         Row(
             modifier =
-                Modifier.fillMaxWidth().tvFocusableRow { open(LanSetupActivity::class.java) }
+                Modifier.fillMaxWidth().tvFocusableRow { open(RemotePairActivity::class.java) }
                     .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(modifier = Modifier.weight(1f)) {
             Text("Set up from your phone", color = Color.White, fontSize = 17.sp)
             Text(
-                "Enter Immich keys, NAS details or a link from another device on your Wi-Fi.",
+                "Pair the phone remote, then enter Immich keys, NAS details, a link, or the " +
+                    "calendar from another device on your Wi-Fi.",
                 color = Color(0xFF9A9A9A),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 2.dp),

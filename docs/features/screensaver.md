@@ -14,8 +14,9 @@ Choose a screensaver clock face from a face picker (`FacePickerActivity`): **fli
 
 ## Photo sources
 
-Point the frame at whatever you like — most sources can be set up **from your phone by scanning
-a QR code**, so you don't type URLs and credentials on the Portal:
+Point the frame at whatever you like — most sources can be set up **from your phone** (pair the
+[phone remote](remote.md) via its QR code, then use its *Set up photo source & calendar* panel), so
+you don't type URLs and credentials on the Portal:
 
 | Source | Notes |
 | --- | --- |

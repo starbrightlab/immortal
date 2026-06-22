@@ -45,6 +45,7 @@ class RemoteRoutes(private val context: Context) {
         "/remote/presets" -> authed(req) { presets(req) }
         "/remote/preset" -> authed(req) { runPreset(req) }
         "/remote/devices" -> authed(req) { devices() }
+        "/remote/sources" -> authed(req) { sources(req) }
         else -> json(404, err("not_found"))
       }
 
@@ -147,6 +148,40 @@ class RemoteRoutes(private val context: Context) {
           else {
             RemotePresets.save(context, arr)
             json(200, ok().put("presets", RemotePresets.listJson(context)))
+          }
+        }
+        else -> json(405, err("method_not_allowed"))
+      }
+
+  /**
+   * Screensaver photo-source + calendar setup — the unified "set up from your phone" surface (it
+   * replaced the old standalone LAN form). GET returns the current source fields (pre-fill) and
+   * calendar; POST applies a new source and/or calendar feed through the same fleet config path,
+   * then reaffirms screensaver ownership so it takes effect.
+   */
+  private fun sources(req: FleetHttpServer.Request): FleetHttpServer.Response =
+      when (req.method) {
+        "GET" -> {
+          val s = ScreensaverConfig.load(context)
+          json(200, ok().put("sources", FleetScreensaver.sourcesJson(s)).put("calendar", FleetCalendar.toJson(s)))
+        }
+        "POST" -> {
+          val body = parseJson(req.bodyText())
+          if (body == null) json(400, err("bad_json"))
+          else {
+            val applied = FleetScreensaver.apply(context, body).toMutableList()
+            // Optional calendar feed in the same save: {"calendarUrl":"…"} → FleetCalendar {"url"}.
+            if (body.has("calendarUrl")) {
+              applied += FleetCalendar.apply(context, JSONObject().put("url", body.optString("calendarUrl")))
+            }
+            SettingsGuard.reaffirmScreensaver(context)
+            val s = ScreensaverConfig.load(context)
+            json(
+                200,
+                ok()
+                    .put("applied", JSONArray(applied))
+                    .put("sources", FleetScreensaver.sourcesJson(s))
+                    .put("calendar", FleetCalendar.toJson(s)))
           }
         }
         else -> json(405, err("method_not_allowed"))

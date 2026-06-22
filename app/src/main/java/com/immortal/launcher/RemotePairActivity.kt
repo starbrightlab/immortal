@@ -79,7 +79,7 @@ private fun RemotePairScreen() {
             FleetAgentService.ensureRunning(context) // the remote rides on the agent
             val fresh = RemotePairing.newPin()
             pin = fresh
-            val ip = LanSetupServer.lanIp()
+            val ip = lanIp()
             url =
                 if (ip != null) "http://$ip:${FleetConfig.port(context)}/remote/ui" else null
           }

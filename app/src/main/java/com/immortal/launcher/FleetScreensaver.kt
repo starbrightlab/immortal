@@ -51,6 +51,39 @@ object FleetScreensaver {
           .put("overnightStartMin", s.overnightStartMin)
           .put("overnightEndMin", s.overnightEndMin)
 
+  /**
+   * The photo-source setup the remote's Setup form reads to pre-fill — the active source type plus
+   * every source's stored fields (so editing round-trips). Served only to a paired remote on the
+   * LAN; the secret fields (Immich key, share/WebDAV passwords) are included for that pre-fill,
+   * matching the on-Portal connect screens.
+   */
+  fun sourcesJson(s: ScreensaverConfig.Settings): JSONObject =
+      JSONObject()
+          .put("source", currentSource(s))
+          .put("immichUrl", s.immichUrl ?: "")
+          .put("immichKey", s.immichKey ?: "")
+          .put("smbHost", s.smbHost ?: "")
+          .put("smbShare", s.smbShare ?: "")
+          .put("smbPath", s.smbPath ?: "")
+          .put("smbUser", s.smbUser ?: "")
+          .put("smbPass", s.smbPass ?: "")
+          .put("davUrl", s.davUrl ?: "")
+          .put("davUser", s.davUser ?: "")
+          .put("davPass", s.davPass ?: "")
+          .put("webUrl", s.webUrl ?: "")
+          .put("albumUrl", s.albumUrl ?: "")
+
+  /** The active photo-source as a Setup-form key (immich/smb/dav/web/album/default). Pure. */
+  internal fun currentSource(s: ScreensaverConfig.Settings): String =
+      when {
+        s.usesImmich -> "immich"
+        s.usesSmb -> "smb"
+        s.usesDav -> "dav"
+        s.usesWebUrl -> "web"
+        s.usesUrl -> "album"
+        else -> "default"
+      }
+
   /** Coerce a fit string to a known value, or null if unrecognised. Pure. */
   internal fun coerceFit(v: String?): String? =
       when (v) {
@@ -97,6 +130,41 @@ object FleetScreensaver {
       if (u.isNotBlank()) {
         ScreensaverConfig.setAlbumUrl(context, u)
         applied.add("albumUrl")
+      }
+    }
+    // Credentialed photo sources (the remote's Setup form / fleet push). Each is atomic — it only
+    // applies when its required fields are present — so a partial push or a different source's
+    // fields don't accidentally switch the source. Mirrors the same ScreensaverConfig setters the
+    // on-Portal connect screens use.
+    run {
+      val url = body.optString("immichUrl")
+      val key = body.optString("immichKey")
+      if (url.isNotBlank() && key.isNotBlank()) {
+        ScreensaverConfig.setImmich(context, url, key)
+        applied.add("immich")
+      }
+    }
+    run {
+      val host = body.optString("smbHost")
+      val share = body.optString("smbShare")
+      if (host.isNotBlank() && share.isNotBlank()) {
+        ScreensaverConfig.setSmb(
+            context, host, share, body.optString("smbPath"), body.optString("smbUser"), body.optString("smbPass"))
+        applied.add("smb")
+      }
+    }
+    run {
+      val url = body.optString("davUrl")
+      if (url.isNotBlank()) {
+        ScreensaverConfig.setDav(context, url, body.optString("davUser"), body.optString("davPass"))
+        applied.add("dav")
+      }
+    }
+    run {
+      val url = body.optString("webUrl")
+      if (url.isNotBlank()) {
+        ScreensaverConfig.setWebUrl(context, url)
+        applied.add("webUrl")
       }
     }
     if (body.has("albumRefreshMin")) {

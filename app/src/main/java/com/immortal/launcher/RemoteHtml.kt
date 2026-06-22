@@ -9,10 +9,10 @@ package com.immortal.launcher
 
 /**
  * The single-page phone remote served at `/remote/ui` by [RemoteRoutes]. Vanilla
- * HTML/CSS/JS (no framework, no build step), matching the hand-rolled page style of
- * [LanSetupServer]. Two views toggled in-page: a PIN-pair screen and the remote itself
- * (Tier-A nav buttons + an app-launcher grid). The session token lives in localStorage;
- * every API call sends it as `Authorization: Bearer …`.
+ * HTML/CSS/JS (no framework, no build step). Two views toggled in-page: a PIN-pair screen and the
+ * remote itself (nav, touchpad, keyboard, app grid, presets, multi-device, and the screensaver /
+ * calendar source Setup that replaced the old standalone LAN form). A per-device session token
+ * lives in localStorage; every API call sends it as `Authorization: Bearer …`.
  *
  * No Kotlin `$` templating is used below (the JS does its own string work) so the raw
  * string stays verbatim.
@@ -55,6 +55,10 @@ object RemoteHtml {
   .editor .row button{padding:10px 14px;font-size:13px;background:#2a2a2c;color:#fff;border-radius:10px}
   .steprow{font-size:13px;color:#bbb;padding:5px 0;display:flex;justify-content:space-between;align-items:center}
   .delp{background:none;color:#e0908a;font-size:13px}
+  .pick{display:block;padding:8px 2px;font-size:15px;color:#fff}
+  .pick input{margin-right:8px;transform:scale(1.2)}
+  .srcf{display:none;margin:2px 0 8px}
+  .srcf.on{display:block}
   .pad{height:240px;background:#161618;border:1px solid #2a2a2c;border-radius:16px;margin:0 0 6px;
     display:flex;align-items:center;justify-content:center;color:#6c6c6c;font-size:13px;
     text-align:center;padding:0 18px;touch-action:none;-webkit-user-select:none;user-select:none}
@@ -146,6 +150,26 @@ object RemoteHtml {
     <div class=label>Apps</div>
     <div id=grid class=grid></div>
     <div id=remoteErr class=err></div>
+
+    <div class=label>Screensaver &amp; calendar</div>
+    <button class=editlink onclick=toggleSources()>Set up photo source &amp; calendar</button>
+    <div id=sourcesPanel class="editor hide">
+      <label class=pick><input type=radio name=src value=default onclick="showSrc('default')"> Default photo feed</label>
+      <label class=pick><input type=radio name=src value=immich onclick="showSrc('immich')"> Immich server</label>
+      <label class=pick><input type=radio name=src value=smb onclick="showSrc('smb')"> Network share (NAS)</label>
+      <label class=pick><input type=radio name=src value=dav onclick="showSrc('dav')"> WebDAV folder</label>
+      <label class=pick><input type=radio name=src value=web onclick="showSrc('web')"> Web page</label>
+      <label class=pick><input type=radio name=src value=album onclick="showSrc('album')"> Shared album link</label>
+      <div class=srcf id=f_immich><input id=immichUrl placeholder="Immich URL (http://192.168.x.x:2283)"><input id=immichKey placeholder="API key"></div>
+      <div class=srcf id=f_smb><input id=smbHost placeholder="Host or IP"><input id=smbShare placeholder="Share name"><input id=smbPath placeholder="Folder path (optional)"><input id=smbUser placeholder="Username (optional)"><input id=smbPass type=password placeholder="Password (optional)"></div>
+      <div class=srcf id=f_dav><input id=davUrl placeholder="WebDAV URL"><input id=davUser placeholder="Username (optional)"><input id=davPass type=password placeholder="Password (optional)"></div>
+      <div class=srcf id=f_web><input id=webUrl placeholder="Web page URL"></div>
+      <div class=srcf id=f_album><input id=albumUrl placeholder="iCloud or Google Photos share link"></div>
+      <h3>Calendar feed (optional)</h3>
+      <input id=calUrl placeholder="Public ICS link (Google or Apple)">
+      <button class=primary onclick=saveSources()>Save</button>
+      <div id=srcErr class=err></div>
+    </div>
   </div>
 
 <script>
@@ -321,6 +345,36 @@ object RemoteHtml {
     savePresets(function(){draftSteps=[];document.getElementById('pname').value='';renderPresets();renderExisting();renderDraft();});
   }
   function deletePreset(id){presetsData=presetsData.filter(function(p){return p.id!==id;});savePresets(function(){renderPresets();renderExisting();});}
+  // --- screensaver / calendar source setup ---
+  function toggleSources(){var p=document.getElementById('sourcesPanel');p.classList.toggle('hide');if(!p.classList.contains('hide'))loadSources();}
+  function showSrc(src){['immich','smb','dav','web','album'].forEach(function(s){var e=document.getElementById('f_'+s);if(e)e.classList.toggle('on',s===src);});}
+  function setVal(id,v){var e=document.getElementById(id);if(e)e.value=v||'';}
+  function gv(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+  function loadSources(){
+    api('/remote/sources').then(function(d){
+      var s=d.sources||{},src=s.source||'default';
+      var r=document.querySelector('input[name=src][value="'+src+'"]');if(r)r.checked=true;
+      setVal('immichUrl',s.immichUrl);setVal('immichKey',s.immichKey);
+      setVal('smbHost',s.smbHost);setVal('smbShare',s.smbShare);setVal('smbPath',s.smbPath);setVal('smbUser',s.smbUser);setVal('smbPass',s.smbPass);
+      setVal('davUrl',s.davUrl);setVal('davUser',s.davUser);setVal('davPass',s.davPass);
+      setVal('webUrl',s.webUrl);setVal('albumUrl',s.albumUrl);
+      setVal('calUrl',(d.calendar&&d.calendar.url)||'');
+      showSrc(src);
+    }).catch(function(){});
+  }
+  function saveSources(){
+    var src=(document.querySelector('input[name=src]:checked')||{}).value||'default';
+    var body={source:src,calendarUrl:gv('calUrl')};
+    if(src==='immich'){body.immichUrl=gv('immichUrl');body.immichKey=gv('immichKey');}
+    else if(src==='smb'){body.smbHost=gv('smbHost');body.smbShare=gv('smbShare');body.smbPath=gv('smbPath');body.smbUser=gv('smbUser');body.smbPass=gv('smbPass');}
+    else if(src==='dav'){body.davUrl=gv('davUrl');body.davUser=gv('davUser');body.davPass=gv('davPass');}
+    else if(src==='web'){body.webUrl=gv('webUrl');}
+    else if(src==='album'){body.albumUrl=gv('albumUrl');}
+    document.getElementById('srcErr').textContent='Saving…';
+    api('/remote/sources',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(d){document.getElementById('srcErr').textContent=(d&&d.ok)?'Saved ✓':'Save failed';})
+      .catch(function(){document.getElementById('srcErr').textContent='Couldn\'t save.';});
+  }
   function loadApps(){
     api('/remote/apps').then(function(d){
       appsCache=d.apps||[];
