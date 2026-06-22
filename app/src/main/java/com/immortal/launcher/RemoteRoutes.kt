@@ -9,6 +9,8 @@ package com.immortal.launcher
 
 import android.content.Context
 import android.content.Intent
+import kotlin.concurrent.thread
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -40,6 +42,8 @@ class RemoteRoutes(private val context: Context) {
         "/remote/cursor" -> authed(req) { cursor(req) }
         "/remote/tap" -> authed(req) { tap() }
         "/remote/swipe" -> authed(req) { swipe(req) }
+        "/remote/presets" -> authed(req) { presets(req) }
+        "/remote/preset" -> authed(req) { runPreset(req) }
         else -> json(404, err("not_found"))
       }
 
@@ -74,16 +78,18 @@ class RemoteRoutes(private val context: Context) {
   /** Bring up Immortal's in-app app switcher ([AppSwitcherActivity]) — our stand-in for the
    *  Portal's missing system Recents. Same-app start, so the non-exported activity is fine. */
   private fun openAppSwitcher(): FleetHttpServer.Response {
-    val ok =
-        runCatching {
-              context.startActivity(
-                  Intent(context, AppSwitcherActivity::class.java)
-                      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-              true
-            }
-            .getOrDefault(false)
+    val ok = startAppSwitcher()
     return json(if (ok) 200 else 500, JSONObject().put("ok", ok).put("action", "apps"))
   }
+
+  private fun startAppSwitcher(): Boolean =
+      runCatching {
+            context.startActivity(
+                Intent(context, AppSwitcherActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            true
+          }
+          .getOrDefault(false)
 
   private fun launch(req: FleetHttpServer.Request): FleetHttpServer.Response {
     val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
@@ -129,6 +135,47 @@ class RemoteRoutes(private val context: Context) {
                     body.optDouble("dx", 0.0).toFloat(), body.optDouble("dy", 0.0).toFloat())))
   }
 
+  /** List (GET) or replace (POST `{"presets":[…]}`) the user's saved preset macros. */
+  private fun presets(req: FleetHttpServer.Request): FleetHttpServer.Response =
+      when (req.method) {
+        "GET" -> json(200, ok().put("presets", RemotePresets.listJson(context)))
+        "POST" -> {
+          val body = parseJson(req.bodyText())
+          val arr = body?.optJSONArray("presets")
+          if (arr == null) json(400, err("presets_required"))
+          else {
+            RemotePresets.save(context, arr)
+            json(200, ok().put("presets", RemotePresets.listJson(context)))
+          }
+        }
+        else -> json(405, err("method_not_allowed"))
+      }
+
+  /** Run a saved preset by id: `{"id":"…"}`. Runs async (steps may include waits). */
+  private fun runPreset(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
+    val id = body.optString("id").ifBlank { null } ?: return json(400, err("id_required"))
+    val preset = RemotePresets.find(context, id) ?: return json(404, err("unknown_preset"))
+    val steps = preset.optJSONArray("steps") ?: JSONArray()
+    thread(name = "remote-preset") { runSteps(steps) }
+    return json(200, ok().put("running", id).put("steps", steps.length()))
+  }
+
+  /** Execute a preset's steps in order. Each maps to an action the remote already performs. */
+  private fun runSteps(steps: JSONArray) {
+    for (i in 0 until steps.length()) {
+      val s = steps.optJSONObject(i) ?: continue
+      when (s.optString("type")) {
+        "launch" -> RemoteApps.launch(context, s.optString("packageName"))
+        "key" ->
+            if (s.optString("action") == "apps") startAppSwitcher()
+            else RemoteInput.globalAction(s.optString("action"))
+        "text" -> RemoteInput.typeText(s.optString("text"), s.optString("mode").ifBlank { "set" })
+        "wait" -> runCatching { Thread.sleep(clampWaitMs(s.optLong("ms", 300))) }
+      }
+    }
+  }
+
   // --- auth + helpers ---------------------------------------------------------
 
   /** Run [block] only for a request bearing a valid session or the fleet token. */
@@ -172,5 +219,8 @@ class RemoteRoutes(private val context: Context) {
       if (!h.regionMatches(0, "Bearer ", 0, 7, ignoreCase = true)) return null
       return h.substring(7).trim().ifBlank { null }
     }
+
+    /** Clamp a preset "wait" step to a sane bound (0..10s) so a typo can't hang the runner. Pure. */
+    internal fun clampWaitMs(ms: Long): Long = ms.coerceIn(0L, 10_000L)
   }
 }

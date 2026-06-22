@@ -40,6 +40,21 @@ object RemoteHtml {
   .nav{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:4px 0 22px}
   .nav button{padding:18px 8px;font-size:15px;background:#1c1c1e;color:#fff;border-radius:14px}
   .nav button:active{background:#2e6be6}
+  .presets{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px}
+  .presets button{padding:12px 16px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:12px}
+  .presets button:active{background:#2e6be6}
+  .none{color:#6c6c6c;font-size:13px}
+  .editlink{background:none;color:#8ab4f8;font-size:13px;margin:0 0 22px;padding:2px}
+  .editor{background:#161618;border:1px solid #2a2a2c;border-radius:14px;padding:14px;margin:0 0 22px}
+  .editor.hide{display:none}
+  .editor h3{font-size:14px;margin:10px 0 4px}
+  .editor input,.editor select{padding:10px;font-size:14px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:10px;color:#fff;margin:4px 0}
+  .editor input{width:100%}
+  .editor .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .editor .row select,.editor .row input{flex:1;min-width:90px;width:auto}
+  .editor .row button{padding:10px 14px;font-size:13px;background:#2a2a2c;color:#fff;border-radius:10px}
+  .steprow{font-size:13px;color:#bbb;padding:5px 0;display:flex;justify-content:space-between;align-items:center}
+  .delp{background:none;color:#e0908a;font-size:13px}
   .pad{height:240px;background:#161618;border:1px solid #2a2a2c;border-radius:16px;margin:0 0 6px;
     display:flex;align-items:center;justify-content:center;color:#6c6c6c;font-size:13px;
     text-align:center;padding:0 18px;touch-action:none;-webkit-user-select:none;user-select:none}
@@ -76,6 +91,26 @@ object RemoteHtml {
       <button onclick="key('home')">Home</button>
       <button onclick="key('apps')">Recents</button>
       <button onclick="key('power')">Power</button>
+    </div>
+    <div class=label>Presets</div>
+    <div id=presets class=presets></div>
+    <button class=editlink onclick=toggleEditor()>Edit presets</button>
+    <div id=editor class="editor hide">
+      <div id=existing></div>
+      <h3>New preset</h3>
+      <input id=pname placeholder="Preset name" autocomplete=off>
+      <div class=row>
+        <select id=stype onchange=onType()>
+          <option value=launch>Launch app</option>
+          <option value=key>Nav key</option>
+          <option value=text>Type text</option>
+          <option value=wait>Wait</option>
+        </select>
+        <span id=sparam></span>
+        <button onclick=addStep()>Add step</button>
+      </div>
+      <div id=draft></div>
+      <button class=primary onclick=saveDraft()>Save preset</button>
     </div>
     <div class=label>Touchpad</div>
     <div id=pad class=pad>Drag to move the pointer&nbsp;&middot;&nbsp;tap to click&nbsp;&middot;&nbsp;two fingers to scroll</div>
@@ -138,8 +173,63 @@ object RemoteHtml {
   }
   function sendText(){postText('set',document.getElementById('txt').value);}
   function textOp(mode){postText(mode,'');}
+  // --- presets ---
+  var presetsData=[], draftSteps=[], appsCache=[];
+  function loadPresets(){api('/remote/presets').then(function(d){presetsData=d.presets||[];renderPresets();}).catch(function(){});}
+  function renderPresets(){
+    var c=document.getElementById('presets');c.innerHTML='';
+    if(!presetsData.length){c.innerHTML='<span class=none>No presets yet — tap “Edit presets”.</span>';return;}
+    presetsData.forEach(function(p){var b=document.createElement('button');b.textContent=p.name||'(unnamed)';b.onclick=function(){runPreset(p.id);};c.appendChild(b);});
+  }
+  function runPreset(id){api('/remote/preset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).catch(function(){});}
+  function toggleEditor(){var e=document.getElementById('editor');e.classList.toggle('hide');if(!e.classList.contains('hide')){onType();renderExisting();renderDraft();}}
+  function renderExisting(){
+    var c=document.getElementById('existing');c.innerHTML='';
+    presetsData.forEach(function(p){var d=document.createElement('div');d.className='steprow';
+      var t=document.createElement('span');t.textContent=(p.name||'(unnamed)')+' · '+((p.steps||[]).length)+' steps';
+      var x=document.createElement('button');x.className='delp';x.textContent='Delete';x.onclick=function(){deletePreset(p.id);};
+      d.appendChild(t);d.appendChild(x);c.appendChild(d);});
+  }
+  function onType(){
+    var t=document.getElementById('stype').value,s=document.getElementById('sparam');s.innerHTML='';
+    var el;
+    if(t==='launch'){el=document.createElement('select');appsCache.forEach(function(a){var o=document.createElement('option');o.value=a.packageName;o.textContent=a.label;el.appendChild(o);});}
+    else if(t==='key'){el=document.createElement('select');['home','back','recents','power'].forEach(function(k){var o=document.createElement('option');o.value=k;o.textContent=k;el.appendChild(o);});}
+    else if(t==='text'){el=document.createElement('input');el.placeholder='text to type';}
+    else {el=document.createElement('input');el.type='number';el.value='500';}
+    el.id='spval';s.appendChild(el);
+  }
+  function addStep(){
+    var t=document.getElementById('stype').value,v=document.getElementById('spval'),val=v?v.value:'',step={type:t};
+    if(t==='launch')step.packageName=val;
+    else if(t==='key')step.action=val;
+    else if(t==='text'){step.mode='set';step.text=val;}
+    else step.ms=parseInt(val,10)||500;
+    draftSteps.push(step);renderDraft();
+  }
+  function stepLabel(s){
+    if(s.type==='launch'){var a=appsCache.filter(function(x){return x.packageName===s.packageName;})[0];return 'Launch '+((a&&a.label)||s.packageName);}
+    if(s.type==='key')return 'Key: '+s.action;
+    if(s.type==='text')return 'Type: '+s.text;
+    return 'Wait '+s.ms+'ms';
+  }
+  function renderDraft(){
+    var c=document.getElementById('draft');c.innerHTML='';
+    draftSteps.forEach(function(s,idx){var d=document.createElement('div');d.className='steprow';
+      var t=document.createElement('span');t.textContent=(idx+1)+'. '+stepLabel(s);
+      var x=document.createElement('button');x.className='delp';x.textContent='remove';x.onclick=function(){draftSteps.splice(idx,1);renderDraft();};
+      d.appendChild(t);d.appendChild(x);c.appendChild(d);});
+  }
+  function savePresets(then){api('/remote/presets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({presets:presetsData})}).then(function(d){presetsData=d.presets||presetsData;if(then)then();}).catch(function(){});}
+  function saveDraft(){
+    var name=document.getElementById('pname').value.trim();if(!name||!draftSteps.length)return;
+    presetsData.push({id:'p'+Date.now()+Math.floor(Math.random()*1000),name:name,steps:draftSteps.slice()});
+    savePresets(function(){draftSteps=[];document.getElementById('pname').value='';renderPresets();renderExisting();renderDraft();});
+  }
+  function deletePreset(id){presetsData=presetsData.filter(function(p){return p.id!==id;});savePresets(function(){renderPresets();renderExisting();});}
   function loadApps(){
     api('/remote/apps').then(function(d){
+      appsCache=d.apps||[];
       var g=document.getElementById('grid');g.innerHTML='';
       (d.apps||[]).forEach(function(a){
         var b=document.createElement('button');b.className='tile';b.onclick=function(){launch(a.packageName);};
@@ -178,7 +268,7 @@ object RemoteHtml {
   }
   function start(name){
     if(name)document.getElementById('devName').textContent=name;
-    show('remote');setupPad();loadApps();
+    show('remote');setupPad();loadApps();loadPresets();
   }
   // Scan-to-pair: a QR encodes the URL with #pin=NNNNNN, so the page auto-pairs.
   (function(){

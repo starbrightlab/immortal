@@ -13,6 +13,9 @@ the same always-on [fleet agent](fleet.md) that already manages the device over 
 - **Keyboard** — type on the phone; text lands in the focused field on the Portal (set / append /
   backspace / clear), no on-Portal typing.
 - **App launcher grid** — every launchable app on the Portal, tap to open.
+- **Presets** — user-defined one-tap macros: an ordered list of steps (launch an app, a nav key,
+  type text, or wait), built and edited right on the remote page. e.g. *"Movie night" = Home →
+  launch the app*.
 
 Back/Home/Power go through the device's accessibility layer (see *How input works* below) and work
 across all apps. **Recents** opens Immortal's own app switcher — the Portal has no system
@@ -70,10 +73,9 @@ automatically (via `WRITE_SECURE_SETTINGS`) and which comes back on its own afte
 
 Later phases extend the same `/remote/*` routes:
 
-- **Native D-pad for Immortal's own UI** — within Immortal's screens we own the Compose focus, so a
-  true reboot-proof D-pad (no injection) can drive the launcher/settings/screensaver; it won't
-  extend to third-party apps (use the touchpad there).
-- **User-definable presets** — named macros that combine input + config pushes.
+- **Config-push preset steps** — extend presets with a step that pushes screensaver/calendar
+  settings (reusing the fleet's `/screensaver` + `/calendar`), so one tap can both drive input and
+  reconfigure the device — the remote×fleet bridge.
 - **Multi-room** — drive any Portal on the fleet from one remote.
 
 ## API
@@ -93,3 +95,5 @@ the rest require `Authorization: Bearer <session-or-fleet-token>`.
 | `POST` | `/remote/cursor` | `{"dx":12.0,"dy":-4.0}` → move the on-TV pointer (relative px) |
 | `POST` | `/remote/tap` | tap at the pointer (synthesized touch) |
 | `POST` | `/remote/swipe` | `{"dx":0.0,"dy":-300.0}` → scroll/swipe from the pointer |
+| `GET`/`POST` | `/remote/presets` | list, or replace with `{"presets":[{id,name,steps[]}]}` |
+| `POST` | `/remote/preset` | `{"id":"…"}` → run a saved preset's steps in order |

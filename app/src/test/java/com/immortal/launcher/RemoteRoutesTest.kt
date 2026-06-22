@@ -34,4 +34,11 @@ class RemoteRoutesTest {
     assertNull(RemoteRoutes.bearer("Bearer ")) // blank token
     assertNull(RemoteRoutes.bearer("Bearer    "))
   }
+
+  @Test
+  fun clampWaitMs_boundsPresetWaits() {
+    assertEquals(300L, RemoteRoutes.clampWaitMs(300L))
+    assertEquals(0L, RemoteRoutes.clampWaitMs(-5L))
+    assertEquals(10_000L, RemoteRoutes.clampWaitMs(999_999L))
+  }
 }
