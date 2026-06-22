@@ -779,6 +779,11 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
   }
   val battery = batteryState()
 
+  // Quick-connect: the remote header button enables the remote and pops a QR/PIN modal.
+  var showPair by remember { mutableStateOf(false) }
+  var pairUrl by remember { mutableStateOf<String?>(null) }
+  var pairPin by remember { mutableStateOf<String?>(null) }
+
   // Layout: the big clock anchors the left; the weather and date stack on the
   // right, right-aligned, so the header reads as a balanced pair of blocks. The
   // clock and the right-hand stack are centred against each other.
@@ -804,6 +809,22 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
             },
     ) {
       Box(contentAlignment = Alignment.Center) { StackedPhotoIcon() }
+    }
+    // Remote — one-tap "control from your phone": turn the remote on (if off) and show a
+    // QR/PIN modal, so a phone pairs without digging into Settings.
+    Spacer(Modifier.size(14.dp))
+    Surface(
+        color = Color(0x33FFFFFF),
+        shape = androidx.compose.foundation.shape.CircleShape,
+        modifier =
+            Modifier.size(56.dp).tvFocusable(androidx.compose.foundation.shape.CircleShape) {
+              val (u, p) = enableRemoteAndMintPin(context)
+              pairUrl = u
+              pairPin = p
+              showPair = true
+            },
+    ) {
+      Box(contentAlignment = Alignment.Center) { RemoteGlyph() }
     }
     // "Hey" button — push-to-talk for the active assistant. The launcher stays
     // dumb: it just broadcasts the trigger; Millennium owns assistant selection,
@@ -855,6 +876,37 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
           fontSize = 18.sp,
           modifier = Modifier.padding(top = 4.dp),
       )
+    }
+  }
+
+  if (showPair) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = { showPair = false }) {
+      Surface(color = Color(0xFF101012), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
+          Text("Control from your phone", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+          Text(
+              "Scan with a phone on the same Wi-Fi, or open the address and enter the code.",
+              color = Color(0xFF9A9A9A),
+              fontSize = 13.sp,
+              modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
+          )
+          RemotePairCard(pairUrl, pairPin)
+          Spacer(Modifier.size(16.dp))
+          Surface(
+              color = Color(0xFF2E6BE6),
+              shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+              modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(
+                "Done",
+                color = Color.White,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.fillMaxWidth().tvFocusableRow { showPair = false }.padding(vertical = 14.dp),
+            )
+          }
+        }
+      }
     }
   }
 }
@@ -1161,6 +1213,32 @@ private fun MicGlyph() {
     // Stem + base.
     drawLine(Color.White, Offset(w * 0.5f, w * 0.72f), Offset(w * 0.5f, w * 0.84f), strokeWidth = s)
     drawLine(Color.White, Offset(w * 0.38f, w * 0.84f), Offset(w * 0.62f, w * 0.84f), strokeWidth = s)
+  }
+}
+
+/** White line-art phone glyph for the header "remote" (control from your phone) button. */
+@Composable
+private fun RemoteGlyph() {
+  Canvas(modifier = Modifier.size(28.dp)) {
+    val w = size.minDimension
+    val s = w * 0.08f
+    val stroke =
+        Stroke(
+            width = s,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            join = androidx.compose.ui.graphics.StrokeJoin.Round,
+        )
+    // Phone body (portrait rounded rect).
+    drawRoundRect(
+        color = Color.White,
+        topLeft = Offset(w * 0.34f, w * 0.12f),
+        size = Size(w * 0.32f, w * 0.66f),
+        cornerRadius = CornerRadius(w * 0.10f, w * 0.10f),
+        style = stroke,
+    )
+    // Speaker slit near the top, home dot near the bottom.
+    drawLine(Color.White, Offset(w * 0.44f, w * 0.22f), Offset(w * 0.56f, w * 0.22f), strokeWidth = s)
+    drawCircle(color = Color.White, radius = w * 0.045f, center = Offset(w * 0.5f, w * 0.67f))
   }
 }
 
