@@ -336,7 +336,10 @@ class FaceRenderer(
     date.gravity = align
     col.addView(place, LinearLayout.LayoutParams(WRAP, WRAP))
     col.addView(date, LinearLayout.LayoutParams(WRAP, WRAP))
-    bucket(spec.position).addView(col, LinearLayout.LayoutParams(WRAP, WRAP))
+    // Top margin gives breathing room from whatever sits above in the same cell (the now-playing
+    // card). A GONE sibling contributes no space, so a lone caption isn't pushed off the bottom.
+    bucket(spec.position)
+        .addView(col, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(18) })
     captionPanel = col
     captionPlace = place
     captionDate = date
