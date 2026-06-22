@@ -7,8 +7,9 @@ the same always-on [fleet agent](fleet.md) that already manages the device over 
 ## What it does
 
 - **Navigation buttons** — Back, Home, Recents, Power dialog.
-- **Touchpad** — a trackpad on the phone moves a pointer drawn on the TV; tap to click, two-finger
-  drag to scroll. Works in **any** app (the Portal is a touchscreen, so a synthesized touch lands
+- **Touchpad** — a trackpad on the phone moves a pointer drawn on the TV; tap to click, and ▲ ▼
+  buttons scroll (one big swipe each — the Portal ignores a stream of tiny per-frame swipes, so a
+  two-finger drag can't drive it). Works in **any** app (the Portal is a touchscreen, so a touch lands
   anywhere) — this is the universal navigation primitive.
 - **Keyboard** — type on the phone; text lands in the focused field on the Portal (set / append /
   backspace / clear), no on-Portal typing.
@@ -101,7 +102,8 @@ the rest require `Authorization: Bearer <session-or-fleet-token>`.
 | `POST` | `/remote/text` | `{"mode":"set\|append\|backspace\|clear","text":"…"}` → edit the focused field |
 | `POST` | `/remote/cursor` | `{"dx":12.0,"dy":-4.0}` → move the on-TV pointer (relative px) |
 | `POST` | `/remote/tap` | tap at the pointer (synthesized touch) |
-| `POST` | `/remote/swipe` | `{"dx":0.0,"dy":-300.0}` → scroll/swipe from the pointer |
+| `POST` | `/remote/swipe` | `{"dx":0.0,"dy":-300.0}` → swipe from the pointer |
+| `POST` | `/remote/scroll` | `{"dir":"up"\|"down"}` → page-scroll (one big center swipe) |
 | `GET`/`POST` | `/remote/presets` | list, or replace with `{"presets":[{id,name,steps[]}]}` |
 | `POST` | `/remote/preset` | `{"id":"…"}` → run a saved preset's steps in order |
 | `GET` | `/remote/devices` | this device's name + mDNS-discovered peers `[{name,host,port}]` |

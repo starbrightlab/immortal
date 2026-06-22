@@ -8,14 +8,17 @@
 package com.immortal.launcher
 
 /**
- * The single-page phone remote served at `/remote/ui` by [RemoteRoutes]. Vanilla
- * HTML/CSS/JS (no framework, no build step). Two views toggled in-page: a PIN-pair screen and the
- * remote itself (nav, touchpad, keyboard, app grid, presets, multi-device, and the screensaver /
- * calendar source Setup that replaced the old standalone LAN form). A per-device session token
- * lives in localStorage; every API call sends it as `Authorization: Bearer …`.
+ * The single-page phone remote served at `/remote/ui` by [RemoteRoutes]. Vanilla HTML/CSS/JS (no
+ * framework, no build step). A PIN-pair screen, then a tabbed remote — **Remote** (nav + on-demand
+ * keyboard + a lower-half touchpad with scroll buttons), **Apps** (presets + app grid), **Setup**
+ * (device add/switch + the screensaver/calendar source form that replaced the old standalone LAN
+ * form). A per-device session token lives in localStorage; every API call sends it as a Bearer.
  *
- * No Kotlin `$` templating is used below (the JS does its own string work) so the raw
- * string stays verbatim.
+ * Touchpad scrolling is discrete `▲ ▼` buttons (one big swipe each via `/remote/scroll`): the
+ * Portal ignores a stream of tiny per-frame swipes, so a two-finger drag can't drive it.
+ *
+ * No Kotlin `$` templating is used below (the JS does its own string work) so the raw string stays
+ * verbatim.
  */
 object RemoteHtml {
   val PAGE: String =
@@ -27,25 +30,58 @@ object RemoteHtml {
 <title>Immortal remote</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
   body{margin:0;background:#0e0e10;color:#fff;font-family:-apple-system,Roboto,Segoe UI,sans-serif}
-  .wrap{max-width:560px;margin:0 auto;padding:18px}
-  h1{font-size:22px;margin:6px 0 2px}
-  .sub{color:#9a9a9a;font-size:14px;margin:0 0 18px}
+  .wrap{max-width:560px;margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column}
   .hide{display:none!important}
+  button{font:inherit;border:0;cursor:pointer}
+  .primary{width:100%;padding:15px;font-size:17px;font-weight:600;border-radius:12px;background:#2e6be6;color:#fff}
+  .err{color:#e0908a;font-size:14px;min-height:18px;margin-top:8px}
+  .none{color:#6c6c6c;font-size:13px}
+  .label{color:#9a9a9a;font-size:13px;font-weight:600;margin:8px 2px 8px}
+  .link{color:#8ab4f8;font-size:13px;background:none;white-space:nowrap}
+
+  #pairView{padding:22px}
+  h1{font-size:22px;margin:6px 0 2px}
+  .sub{color:#9a9a9a;font-size:14px;margin:0 0 16px}
   .pin{width:100%;letter-spacing:.4em;text-align:center;font-size:30px;padding:16px;margin:10px 0;
     background:#0e0e10;border:1px solid #3a3a3c;border-radius:12px;color:#fff}
-  button{font:inherit;border:0;cursor:pointer}
-  .primary{width:100%;padding:16px;font-size:18px;font-weight:600;border-radius:12px;background:#2e6be6;color:#fff}
-  .err{color:#e0908a;font-size:14px;min-height:18px;margin-top:8px}
-  .nav{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:4px 0 22px}
-  .nav button{padding:18px 8px;font-size:15px;background:#1c1c1e;color:#fff;border-radius:14px}
+
+  #remoteView{flex:1;display:flex;flex-direction:column;min-height:0}
+  .topbar{display:flex;gap:8px;align-items:center;padding:9px 12px;border-bottom:1px solid #202022}
+  .topbar select{flex:1;min-width:0;padding:9px;font-size:15px;background:#1c1c1e;border:1px solid #3a3a3c;border-radius:10px;color:#fff}
+  .panel{flex:1;min-height:0}
+  .panel.scroll{overflow-y:auto;padding:14px}
+  #tabRemote{display:flex;flex-direction:column;padding:14px}
+  .tabbar{display:flex;border-top:1px solid #202022}
+  .tabbar button{flex:1;padding:10px 0;background:none;color:#777;font-size:12px}
+  .tabbar button.on{color:#fff;box-shadow:inset 0 2px 0 #2e6be6}
+
+  .nav{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .nav button{padding:14px 4px;font-size:13px;background:#1c1c1e;color:#fff;border-radius:13px}
   .nav button:active{background:#2e6be6}
+  .kbtoggle{width:100%;padding:12px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:12px;margin-top:10px}
+  .kbpanel{margin-top:10px}
+  .kbd{display:flex;gap:8px}
+  .kbd input{flex:1;min-width:0;padding:13px;font-size:16px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:12px;color:#fff}
+  .kbd button{padding:0 18px;font-size:15px;font-weight:600;background:#2e6be6;color:#fff;border-radius:12px}
+  .keyops{display:flex;gap:8px;margin-top:8px}
+  .keyops button{flex:1;padding:11px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:12px}
+  .padwrap{flex:1;display:flex;gap:8px;min-height:120px;margin-top:12px}
+  .pad{flex:1;background:#161618;border:1px solid #2a2a2c;border-radius:16px;display:flex;align-items:center;
+    justify-content:center;color:#6c6c6c;font-size:13px;text-align:center;padding:0 16px;
+    touch-action:none;-webkit-user-select:none;user-select:none}
+  .pad.active{border-color:#2e6be6}
+  .scrollcol{display:flex;flex-direction:column;gap:8px;width:56px}
+  .scrollcol button{flex:1;background:#1c1c1e;color:#fff;border-radius:14px;font-size:20px}
+  .scrollcol button:active{background:#2e6be6}
+  .padhint{color:#7c7c7c;font-size:12px;min-height:16px;margin-top:6px;text-align:center}
+
   .presets{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px}
   .presets button{padding:12px 16px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:12px}
   .presets button:active{background:#2e6be6}
-  .none{color:#6c6c6c;font-size:13px}
-  .editlink{background:none;color:#8ab4f8;font-size:13px;margin:0 0 22px;padding:2px}
-  .editor{background:#161618;border:1px solid #2a2a2c;border-radius:14px;padding:14px;margin:0 0 22px}
+  .editlink{background:none;color:#8ab4f8;font-size:13px;margin:0 0 16px;padding:2px}
+  .editor{background:#161618;border:1px solid #2a2a2c;border-radius:14px;padding:14px;margin:0 0 18px}
   .editor.hide{display:none}
   .editor h3{font-size:14px;margin:10px 0 4px}
   .editor input,.editor select{padding:10px;font-size:14px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:10px;color:#fff;margin:4px 0}
@@ -55,29 +91,16 @@ object RemoteHtml {
   .editor .row button{padding:10px 14px;font-size:13px;background:#2a2a2c;color:#fff;border-radius:10px}
   .steprow{font-size:13px;color:#bbb;padding:5px 0;display:flex;justify-content:space-between;align-items:center}
   .delp{background:none;color:#e0908a;font-size:13px}
-  .pick{display:block;padding:8px 2px;font-size:15px;color:#fff}
-  .pick input{margin-right:8px;transform:scale(1.2)}
+  .pick{display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:15px;color:#fff}
+  .pick input[type=radio]{width:18px;height:18px;min-width:18px;margin:0;padding:0;flex:none;accent-color:#2e6be6}
   .srcf{display:none;margin:2px 0 8px}
   .srcf.on{display:block}
-  .pad{height:240px;background:#161618;border:1px solid #2a2a2c;border-radius:16px;margin:0 0 6px;
-    display:flex;align-items:center;justify-content:center;color:#6c6c6c;font-size:13px;
-    text-align:center;padding:0 18px;touch-action:none;-webkit-user-select:none;user-select:none}
-  .pad.active{border-color:#2e6be6}
-  .padhint{color:#7c7c7c;font-size:12px;margin:0 2px 22px;min-height:16px}
-  .kbd{display:flex;gap:8px;margin-bottom:8px}
-  .kbd input{flex:1;min-width:0;padding:14px;font-size:16px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:12px;color:#fff}
-  .kbd button{padding:0 18px;font-size:15px;font-weight:600;background:#2e6be6;color:#fff;border-radius:12px}
-  .keyops{display:flex;gap:8px;margin-bottom:22px}
-  .keyops button{flex:1;padding:12px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:12px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px}
   .tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;background:none;color:#fff;border-radius:14px}
   .tile:active{background:#1c1c1e}
   .tile img{width:48px;height:48px;border-radius:12px;background:#1c1c1e}
   .tile span{font-size:12px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .label{color:#9a9a9a;font-size:13px;font-weight:600;margin:6px 2px 10px}
-  .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
-  .top select{flex:1;min-width:0;padding:10px;font-size:16px;background:#1c1c1e;border:1px solid #3a3a3c;border-radius:10px;color:#fff}
-  .link{color:#8ab4f8;font-size:13px;background:none;white-space:nowrap}
+  .devrow{display:flex;gap:16px;margin-bottom:8px}
   .addpanel{background:#161618;border:1px solid #2a2a2c;border-radius:14px;padding:14px;margin-bottom:18px}
   .discovered{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
   .discovered button{padding:10px 14px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:10px}
@@ -92,83 +115,105 @@ object RemoteHtml {
   </div>
 
   <div id=remoteView class=hide>
-    <div class=top>
+    <div class=topbar>
       <select id=devsel onchange=switchDevice()></select>
-      <button class=link onclick=toggleAdd()>+ Device</button>
-      <button class=link onclick=forgetDevice()>Forget</button>
     </div>
-    <div id=addPanel class="addpanel hide">
-      <p class=sub>Add another Portal on your Wi-Fi: pick a discovered device, then enter the PIN from its <b>Settings &rsaquo; Remote</b> screen.</p>
-      <div id=discovered class=discovered></div>
-      <div id=addPair class=hide>
-        <p class=sub id=addPairName></p>
-        <input id=addpin class=pin inputmode=numeric maxlength=6 placeholder="000000" autocomplete=off>
-        <button class=primary onclick=addPairSubmit()>Pair device</button>
-        <div id=addErr class=err></div>
-      </div>
-    </div>
-    <div class=label>Navigation</div>
-    <div class=nav>
-      <button onclick="key('back')">Back</button>
-      <button onclick="key('home')">Home</button>
-      <button onclick="key('apps')">Recents</button>
-      <button onclick="key('power')">Power</button>
-    </div>
-    <div class=label>Presets</div>
-    <div id=presets class=presets></div>
-    <button class=editlink onclick=toggleEditor()>Edit presets</button>
-    <div id=editor class="editor hide">
-      <div id=existing></div>
-      <h3>New preset</h3>
-      <input id=pname placeholder="Preset name" autocomplete=off>
-      <div class=row>
-        <select id=stype onchange=onType()>
-          <option value=launch>Launch app</option>
-          <option value=key>Nav key</option>
-          <option value=text>Type text</option>
-          <option value=wait>Wait</option>
-          <option value=config>Set screensaver</option>
-        </select>
-        <span id=sparam></span>
-        <button onclick=addStep()>Add step</button>
-      </div>
-      <div id=draft></div>
-      <button class=primary onclick=saveDraft()>Save preset</button>
-    </div>
-    <div class=label>Touchpad</div>
-    <div id=pad class=pad>Drag to move the pointer&nbsp;&middot;&nbsp;tap to click&nbsp;&middot;&nbsp;two fingers to scroll</div>
-    <div id=padHint class=padhint></div>
-    <div class=label>Keyboard</div>
-    <div class=kbd>
-      <input id=txt placeholder="Type, then Send to the focused field" autocomplete=off autocapitalize=off autocorrect=off>
-      <button onclick="sendText()">Send</button>
-    </div>
-    <div class=keyops>
-      <button onclick="textOp('backspace')">&#9003; Backspace</button>
-      <button onclick="textOp('clear')">Clear</button>
-    </div>
-    <div class=label>Apps</div>
-    <div id=grid class=grid></div>
-    <div id=remoteErr class=err></div>
 
-    <div class=label>Screensaver &amp; calendar</div>
-    <button class=editlink onclick=toggleSources()>Set up photo source &amp; calendar</button>
-    <div id=sourcesPanel class="editor hide">
-      <label class=pick><input type=radio name=src value=default onclick="showSrc('default')"> Default photo feed</label>
-      <label class=pick><input type=radio name=src value=immich onclick="showSrc('immich')"> Immich server</label>
-      <label class=pick><input type=radio name=src value=smb onclick="showSrc('smb')"> Network share (NAS)</label>
-      <label class=pick><input type=radio name=src value=dav onclick="showSrc('dav')"> WebDAV folder</label>
-      <label class=pick><input type=radio name=src value=web onclick="showSrc('web')"> Web page</label>
-      <label class=pick><input type=radio name=src value=album onclick="showSrc('album')"> Shared album link</label>
-      <div class=srcf id=f_immich><input id=immichUrl placeholder="Immich URL (http://192.168.x.x:2283)"><input id=immichKey placeholder="API key"></div>
-      <div class=srcf id=f_smb><input id=smbHost placeholder="Host or IP"><input id=smbShare placeholder="Share name"><input id=smbPath placeholder="Folder path (optional)"><input id=smbUser placeholder="Username (optional)"><input id=smbPass type=password placeholder="Password (optional)"></div>
-      <div class=srcf id=f_dav><input id=davUrl placeholder="WebDAV URL"><input id=davUser placeholder="Username (optional)"><input id=davPass type=password placeholder="Password (optional)"></div>
-      <div class=srcf id=f_web><input id=webUrl placeholder="Web page URL"></div>
-      <div class=srcf id=f_album><input id=albumUrl placeholder="iCloud or Google Photos share link"></div>
-      <h3>Calendar feed (optional)</h3>
-      <input id=calUrl placeholder="Public ICS link (Google or Apple)">
-      <button class=primary onclick=saveSources()>Save</button>
-      <div id=srcErr class=err></div>
+    <div id=tabRemote class=panel>
+      <div class=nav>
+        <button onclick="key('back')">Back</button>
+        <button onclick="key('home')">Home</button>
+        <button onclick="key('apps')">Recents</button>
+        <button onclick="key('power')">Power</button>
+      </div>
+      <button class=kbtoggle onclick=toggleKb()>Keyboard</button>
+      <div id=kbPanel class="kbpanel hide">
+        <div class=kbd>
+          <input id=txt placeholder="Type, then Send to the focused field" autocomplete=off autocapitalize=off autocorrect=off>
+          <button onclick=sendText()>Send</button>
+        </div>
+        <div class=keyops>
+          <button onclick="textOp('backspace')">&#9003; Backspace</button>
+          <button onclick="textOp('clear')">Clear</button>
+        </div>
+      </div>
+      <div class=padwrap>
+        <div id=pad class=pad>Drag to move the pointer&nbsp;&middot;&nbsp;tap to click</div>
+        <div class=scrollcol>
+          <button onclick="scrollDir('up')" aria-label="Scroll up">&#9650;</button>
+          <button onclick="scrollDir('down')" aria-label="Scroll down">&#9660;</button>
+        </div>
+      </div>
+      <div id=padHint class=padhint></div>
+    </div>
+
+    <div id=tabApps class="panel scroll hide">
+      <div class=label>Presets</div>
+      <div id=presets class=presets></div>
+      <button class=editlink onclick=toggleEditor()>Edit presets</button>
+      <div id=editor class="editor hide">
+        <div id=existing></div>
+        <h3>New preset</h3>
+        <input id=pname placeholder="Preset name" autocomplete=off>
+        <div class=row>
+          <select id=stype onchange=onType()>
+            <option value=launch>Launch app</option>
+            <option value=key>Nav key</option>
+            <option value=text>Type text</option>
+            <option value=wait>Wait</option>
+            <option value=config>Set screensaver</option>
+          </select>
+          <span id=sparam></span>
+          <button onclick=addStep()>Add step</button>
+        </div>
+        <div id=draft></div>
+        <button class=primary onclick=saveDraft()>Save preset</button>
+      </div>
+      <div class=label>Apps</div>
+      <div id=grid class=grid></div>
+      <div id=remoteErr class=err></div>
+    </div>
+
+    <div id=tabSetup class="panel scroll hide">
+      <div class=label>Devices</div>
+      <div class=devrow>
+        <button class=link onclick=toggleAdd()>+ Add device</button>
+        <button class=link onclick=forgetDevice()>Forget this device</button>
+      </div>
+      <div id=addPanel class="addpanel hide">
+        <p class=sub>Pick a discovered device, then enter the PIN from its <b>Settings &rsaquo; Remote</b> screen.</p>
+        <div id=discovered class=discovered></div>
+        <div id=addPair class=hide>
+          <p class=sub id=addPairName></p>
+          <input id=addpin class=pin inputmode=numeric maxlength=6 placeholder="000000" autocomplete=off>
+          <button class=primary onclick=addPairSubmit()>Pair device</button>
+          <div id=addErr class=err></div>
+        </div>
+      </div>
+      <div class=label>Screensaver &amp; calendar</div>
+      <div class=editor>
+        <label class=pick><input type=radio name=src value=default onclick="showSrc('default')"> Default photo feed</label>
+        <label class=pick><input type=radio name=src value=immich onclick="showSrc('immich')"> Immich server</label>
+        <label class=pick><input type=radio name=src value=smb onclick="showSrc('smb')"> Network share (NAS)</label>
+        <label class=pick><input type=radio name=src value=dav onclick="showSrc('dav')"> WebDAV folder</label>
+        <label class=pick><input type=radio name=src value=web onclick="showSrc('web')"> Web page</label>
+        <label class=pick><input type=radio name=src value=album onclick="showSrc('album')"> Shared album link</label>
+        <div class=srcf id=f_immich><input id=immichUrl placeholder="Immich URL (http://192.168.x.x:2283)"><input id=immichKey placeholder="API key"></div>
+        <div class=srcf id=f_smb><input id=smbHost placeholder="Host or IP"><input id=smbShare placeholder="Share name"><input id=smbPath placeholder="Folder path (optional)"><input id=smbUser placeholder="Username (optional)"><input id=smbPass type=password placeholder="Password (optional)"></div>
+        <div class=srcf id=f_dav><input id=davUrl placeholder="WebDAV URL"><input id=davUser placeholder="Username (optional)"><input id=davPass type=password placeholder="Password (optional)"></div>
+        <div class=srcf id=f_web><input id=webUrl placeholder="Web page URL"></div>
+        <div class=srcf id=f_album><input id=albumUrl placeholder="iCloud or Google Photos share link"></div>
+        <h3>Calendar feed (optional)</h3>
+        <input id=calUrl placeholder="Public ICS link (Google or Apple)">
+        <button class=primary onclick=saveSources()>Save</button>
+        <div id=srcErr class=err></div>
+      </div>
+    </div>
+
+    <div class=tabbar>
+      <button id=tb_remote class=on onclick="showTab('remote')">Remote</button>
+      <button id=tb_apps onclick="showTab('apps')">Apps</button>
+      <button id=tb_setup onclick="showTab('setup')">Setup</button>
     </div>
   </div>
 
@@ -191,7 +236,7 @@ object RemoteHtml {
     return fetch((a?a.base:'')+path,opts).then(function(r){
       if(r.status===401){ // creds for this device went stale — forget it and fall back
         var l=devicesList();l.splice(activeIdx(),1);saveDevices(l);setActive(0);
-        if(l.length){renderDevSel();loadApps();loadPresets();}else show('pair');
+        if(l.length){renderDevSel();}else show('pair');
         throw new Error('unauthorized');
       }
       return r.json();
@@ -216,8 +261,8 @@ object RemoteHtml {
     devicesList().forEach(function(dv,i){var o=document.createElement('option');o.value=i;o.textContent=dv.name;sel.appendChild(o);});
     sel.value=activeIdx();
   }
-  function switchDevice(){setActive(parseInt(document.getElementById('devsel').value,10));document.getElementById('addPanel').classList.add('hide');loadApps();loadPresets();}
-  function forgetDevice(){var l=devicesList();if(!l.length)return;l.splice(activeIdx(),1);saveDevices(l);setActive(0);if(l.length){renderDevSel();loadApps();loadPresets();}else{location.hash='';show('pair');}}
+  function switchDevice(){setActive(parseInt(document.getElementById('devsel').value,10));document.getElementById('addPanel').classList.add('hide');loadApps();loadPresets();loadSources();}
+  function forgetDevice(){var l=devicesList();if(!l.length)return;l.splice(activeIdx(),1);saveDevices(l);setActive(0);if(l.length){renderDevSel();showTab('remote');}else{location.hash='';show('pair');}}
   function toggleAdd(){var p=document.getElementById('addPanel');p.classList.toggle('hide');document.getElementById('addPair').classList.add('hide');if(!p.classList.contains('hide'))loadDiscovered();}
   function loadDiscovered(){
     api('/remote/devices').then(function(d){
@@ -243,32 +288,37 @@ object RemoteHtml {
         if(d.ok&&d.token){
           var l=devicesList();l.push({name:d.name||pendingPeer.name,base:pendingPeer.base,token:d.token});
           saveDevices(l);setActive(l.length-1);renderDevSel();
-          document.getElementById('addPanel').classList.add('hide');pendingPeer=null;loadApps();loadPresets();
+          document.getElementById('addPanel').classList.add('hide');pendingPeer=null;showTab('remote');
         } else document.getElementById('addErr').textContent='That code didn\'t work.';
       })
       .catch(function(){document.getElementById('addErr').textContent='Couldn\'t reach that device.';});
   }
+  function showTab(name){
+    ['remote','apps','setup'].forEach(function(t){
+      document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('hide',t!==name);
+      document.getElementById('tb_'+t).classList.toggle('on',t===name);
+    });
+    if(name==='apps'){loadApps();loadPresets();}
+    if(name==='setup'){loadSources();}
+  }
   function key(action){
-    api('/remote/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action})})
-      .catch(function(){});
+    api('/remote/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action})}).catch(function(){});
+  }
+  function scrollDir(dir){
+    api('/remote/scroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:dir})}).then(gestureGone).catch(function(){});
   }
   function launch(pkg){
-    api('/remote/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({packageName:pkg})})
-      .catch(function(){});
+    api('/remote/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({packageName:pkg})}).catch(function(){});
   }
+  function toggleKb(){var p=document.getElementById('kbPanel');p.classList.toggle('hide');if(!p.classList.contains('hide'))document.getElementById('txt').focus();}
   function postText(mode,text){
     api('/remote/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode,text:text||''})})
-      .then(function(d){
-        document.getElementById('remoteErr').textContent=(d&&d.applied===false)
-          ? 'Select a text field on the Portal first, then send.' : '';
-      }).catch(function(){});
+      .then(function(d){padHint((d&&d.applied===false)?'Select a text field on the Portal first, then send.':'');}).catch(function(){});
   }
   function sendText(){postText('set',document.getElementById('txt').value);}
   function textOp(mode){postText(mode,'');}
   // --- presets ---
   var presetsData=[], draftSteps=[], appsCache=[];
-  // Curated screensaver config actions for preset steps (the remote×fleet bridge). No
-  // credential forms — just the common one-tap settings; albumUrl takes a value.
   var CONFIG_ACTIONS=[
     {label:'Screensaver on',body:{enabled:true}},
     {label:'Screensaver off',body:{enabled:false}},
@@ -346,7 +396,6 @@ object RemoteHtml {
   }
   function deletePreset(id){presetsData=presetsData.filter(function(p){return p.id!==id;});savePresets(function(){renderPresets();renderExisting();});}
   // --- screensaver / calendar source setup ---
-  function toggleSources(){var p=document.getElementById('sourcesPanel');p.classList.toggle('hide');if(!p.classList.contains('hide'))loadSources();}
   function showSrc(src){['immich','smb','dav','web','album'].forEach(function(s){var e=document.getElementById('f_'+s);if(e)e.classList.toggle('on',s===src);});}
   function setVal(id,v){var e=document.getElementById(id);if(e)e.value=v||'';}
   function gv(id){var e=document.getElementById(id);return e?e.value.trim():'';}
@@ -387,36 +436,30 @@ object RemoteHtml {
       });
     }).catch(function(){});
   }
-  var SENS=2.2, SCROLL=2.0, padReady=false;   // phone-px -> TV-px multipliers
+  var SENS=2.2, padReady=false;   // phone-px -> TV-px pointer multiplier
   function padHint(t){document.getElementById('padHint').textContent=t||'';}
   function gestureGone(d){if(d&&d.error==='no_gestures')padHint('Touchpad needs the accessibility service — re-open Settings › Remote on the Portal.');}
   function setupPad(){
     if(padReady)return; padReady=true;
     var pad=document.getElementById('pad');
-    var lastX=0,lastY=0,startX=0,startY=0,startT=0,moved=false,mode=0;
+    var lastX=0,lastY=0,startX=0,startY=0,startT=0,moved=false;
     var accDx=0,accDy=0,flush=false;
     function send(){flush=false;if(accDx||accDy){var dx=accDx,dy=accDy;accDx=0;accDy=0;
       api('/remote/cursor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dx:dx*SENS,dy:dy*SENS})}).then(gestureGone).catch(function(){});}}
     function queue(dx,dy){accDx+=dx;accDy+=dy;if(!flush){flush=true;setTimeout(send,35);}}
-    function scroll(dy){api('/remote/swipe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dx:0,dy:dy*SCROLL})}).then(gestureGone).catch(function(){});}
     pad.addEventListener('touchstart',function(e){e.preventDefault();pad.classList.add('active');
-      if(e.touches.length===2){mode=2;lastY=(e.touches[0].clientY+e.touches[1].clientY)/2;}
-      else{mode=1;var t=e.touches[0];lastX=startX=t.clientX;lastY=startY=t.clientY;startT=Date.now();moved=false;}
+      var t=e.touches[0];lastX=startX=t.clientX;lastY=startY=t.clientY;startT=Date.now();moved=false;
     },{passive:false});
     pad.addEventListener('touchmove',function(e){e.preventDefault();
-      if(mode===2&&e.touches.length>=2){var my=(e.touches[0].clientY+e.touches[1].clientY)/2;var d=my-lastY;lastY=my;if(d)scroll(d);return;}
       var t=e.touches[0];var dx=t.clientX-lastX,dy=t.clientY-lastY;lastX=t.clientX;lastY=t.clientY;
       if(Math.abs(t.clientX-startX)>8||Math.abs(t.clientY-startY)>8)moved=true;
       queue(dx,dy);
     },{passive:false});
     pad.addEventListener('touchend',function(){pad.classList.remove('active');
-      if(mode===1&&!moved&&Date.now()-startT<300){api('/remote/tap',{method:'POST'}).then(gestureGone).catch(function(){});}
-      mode=0;
+      if(!moved&&Date.now()-startT<300){api('/remote/tap',{method:'POST'}).then(gestureGone).catch(function(){});}
     });
   }
-  function startActive(){
-    show('remote');renderDevSel();setupPad();loadApps();loadPresets();
-  }
+  function startActive(){show('remote');renderDevSel();showTab('remote');setupPad();}
   // Scan-to-pair: a QR encodes the URL with #pin=NNNNNN, so the page auto-pairs this Portal.
   (function(){
     var m=location.hash.match(/pin=(\d{6})/);

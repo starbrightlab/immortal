@@ -42,6 +42,7 @@ class RemoteRoutes(private val context: Context) {
         "/remote/cursor" -> authed(req) { cursor(req) }
         "/remote/tap" -> authed(req) { tap() }
         "/remote/swipe" -> authed(req) { swipe(req) }
+        "/remote/scroll" -> authed(req) { scroll(req) }
         "/remote/presets" -> authed(req) { presets(req) }
         "/remote/preset" -> authed(req) { runPreset(req) }
         "/remote/devices" -> authed(req) { devices() }
@@ -235,6 +236,13 @@ class RemoteRoutes(private val context: Context) {
       }
       "calendar" -> FleetCalendar.apply(context, b)
     }
+  }
+
+  /** Page-scroll the foreground content: `{"dir":"up"|"down"}` (one big center swipe). */
+  private fun scroll(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
+    if (!RemoteInput.gesturesAvailable()) return json(503, err("no_gestures"))
+    return json(200, ok().put("dispatched", RemoteInput.scrollPage(body.optString("dir") != "up")))
   }
 
   // --- auth + helpers ---------------------------------------------------------

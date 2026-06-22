@@ -182,6 +182,22 @@ object RemoteInput {
     return dispatch(svc, path, durationMs = 120)
   }
 
+  /**
+   * Page-scroll the foreground content with ONE long vertical swipe down the screen centre —
+   * the reliable scroll on the Portal. [down] = true reveals content below (finger swipes up);
+   * false reveals above. (A stream of tiny per-frame swipes gets cancelled and ignored, which is
+   * why the remote uses discrete scroll buttons instead of a two-finger drag.)
+   */
+  fun scrollPage(down: Boolean): Boolean {
+    val svc = service ?: return false
+    val dm = svc.resources.displayMetrics
+    val cx = dm.widthPixels / 2f
+    val y1 = dm.heightPixels * (if (down) 0.72f else 0.28f)
+    val y2 = dm.heightPixels * (if (down) 0.28f else 0.72f)
+    val path = Path().apply { moveTo(cx, y1); lineTo(cx, y2) }
+    return dispatch(svc, path, durationMs = 250)
+  }
+
   /** Centre the pointer the first time we're used after a (re)connect. */
   private fun initCursor(w: Int, h: Int) {
     if (curX < 0f) {
