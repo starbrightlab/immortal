@@ -73,20 +73,45 @@ object PhotoCaption {
   fun placeName(lat: Double, lng: Double): String? {
     val key = "%.2f,%.2f".format(Locale.US, lat, lng)
     cache[key]?.let { return it.ifEmpty { null } }
-    val place = runCatching { fetchPlace(lat, lng) }.getOrNull()
-    cache[key] = place ?: "" // cache misses too, so a dead/edge lookup isn't retried each photo
+    // Cache only a COMPLETED lookup — a resolved place, or a valid response with nothing to show.
+    // A network/redirect failure is transient, so leave it UNCACHED and let the next photo cycle
+    // retry; caching it would brand this spot permanently blank on a single bad fetch.
+    val result = runCatching { fetchPlace(lat, lng) }
+    if (result.isFailure) return null
+    val place = result.getOrNull()
+    cache[key] = place ?: ""
     return place
   }
 
   private fun fetchPlace(lat: Double, lng: Double): String? {
-    val spec =
+    // BigDataCloud 307-redirects api.bigdatacloud.net -> api-bdc.io (a different host).
+    // HttpURLConnection's auto-redirect does NOT follow 307/308, so we'd otherwise read the empty
+    // redirect body and fail to parse. Follow redirects ourselves (any 3xx, cross-host/protocol).
+    var spec =
         "https://api.bigdatacloud.net/data/reverse-geocode-client" +
             "?latitude=$lat&longitude=$lng&localityLanguage=en"
-    val c = URL(spec).openConnection() as HttpURLConnection
-    c.connectTimeout = 8000
-    c.readTimeout = 8000
-    c.setRequestProperty("User-Agent", "PortalPhotoFrame/1.0")
-    val body = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+    var hops = 0
+    while (true) {
+      val c = URL(spec).openConnection() as HttpURLConnection
+      c.connectTimeout = 8000
+      c.readTimeout = 8000
+      c.instanceFollowRedirects = false // we handle every hop, so 307/308 aren't silently dropped
+      c.setRequestProperty("User-Agent", "PortalPhotoFrame/1.0")
+      val code = c.responseCode
+      val location = if (code in 300..399) c.getHeaderField("Location") else null
+      if (location != null && hops < 3) {
+        c.disconnect()
+        spec = URL(URL(spec), location).toString() // resolve relative or absolute
+        hops++
+        continue
+      }
+      val body = c.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+      return parsePlace(body)
+    }
+  }
+
+  /** Pull a "City, Country" label from a BigDataCloud reverse-geocode JSON body. Pure. */
+  internal fun parsePlace(body: String): String? {
     val o = JSONObject(body)
     val city = o.optString("city", "").ifBlank { o.optString("locality", "") }
     val region = o.optString("principalSubdivision", "")
