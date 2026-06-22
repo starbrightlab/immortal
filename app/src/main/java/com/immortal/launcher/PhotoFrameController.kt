@@ -85,11 +85,9 @@ class PhotoFrameController(
   private var kenBurns: AnimatorSet? = null
   private var kenBurnsStyle = 0
 
-  // Caption ("taken at <place> · <date>") shown bottom-right for the user's own photos (local
-  // folder / SMB), hidden when there's no EXIF date or location. Built lazily in [buildCaption].
-  private lateinit var captionPanel: LinearLayout
-  private lateinit var captionPlace: TextView
-  private lateinit var captionDate: TextView
+  // The "place · date" caption is now a FaceRenderer grid element (so it stacks with the
+  // now-playing card instead of overlapping it). This controller still reads the EXIF here
+  // (own photos only — local folder / SMB) and pushes it via [FaceRenderer.setCaption].
 
   // The overlay (clock / date / weather / battery / now-playing) is built and driven by the
   // FaceRenderer from a Face descriptor; this controller owns only the photo/video layer.
@@ -388,62 +386,7 @@ class PhotoFrameController(
 
     root.addView(faceRenderer.view)
     buildCalendar(root)
-    buildCaption(root)
     return root
-  }
-
-  /** A tvOS-style "taken at <place> · <date>" caption, bottom-right over the photo (the clock
-   *  cluster lives bottom-left, the calendar top). Two lines — bold place over a lighter date —
-   *  with a soft shadow for legibility, no backing plate. Hidden until a photo with EXIF lands. */
-  private fun buildCaption(root: FrameLayout) {
-    captionPanel = LinearLayout(context)
-    captionPanel.orientation = LinearLayout.VERTICAL
-    captionPanel.gravity = Gravity.END
-    captionPanel.visibility = View.GONE
-
-    captionPlace = text(19f, Color.WHITE, false)
-    captionPlace.typeface = Typeface.DEFAULT_BOLD
-    captionPlace.gravity = Gravity.END
-    captionPlace.maxLines = 1
-    captionPlace.ellipsize = TextUtils.TruncateAt.END
-
-    captionDate = text(14f, 0xCCFFFFFF.toInt(), true)
-    captionDate.gravity = Gravity.END
-    captionDate.maxLines = 1
-
-    captionPanel.addView(captionPlace)
-    captionPanel.addView(captionDate)
-    val lp = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.BOTTOM or Gravity.END)
-    lp.setMargins(0, 0, dp(40), dp(36))
-    root.addView(captionPanel, lp)
-  }
-
-  private fun hideCaption() {
-    if (this::captionPanel.isInitialized) captionPanel.visibility = View.GONE
-  }
-
-  /** Show whatever caption data we have: place line (if any) over the date line (if any).
-   *  Hidden entirely when neither is present. */
-  private fun showCaption(meta: PhotoCaption.Meta, place: String?) {
-    if (!this::captionPanel.isInitialized) return
-    val date = PhotoCaption.formatDate(meta.dateMillis)
-    if (place.isNullOrBlank() && date == null) {
-      captionPanel.visibility = View.GONE
-      return
-    }
-    if (place.isNullOrBlank()) {
-      captionPlace.visibility = View.GONE
-    } else {
-      captionPlace.visibility = View.VISIBLE
-      captionPlace.text = place
-    }
-    if (date == null) {
-      captionDate.visibility = View.GONE
-    } else {
-      captionDate.visibility = View.VISIBLE
-      captionDate.text = date
-    }
-    captionPanel.visibility = View.VISIBLE
   }
 
   /** Read EXIF date/GPS for a local file off [metaIo], reverse-geocode the place, then publish
@@ -468,12 +411,13 @@ class PhotoFrameController(
 
   private fun publishCaption(meta: PhotoCaption.Meta?, g: Int) {
     if (meta == null || meta.isEmpty) {
-      ui.post { if (g == gen) hideCaption() }
+      ui.post { if (g == gen) faceRenderer.setCaption(null, null) }
       return
     }
     // Resolve the place name on this background thread (network) before touching the UI.
     val place = if (meta.hasLocation) PhotoCaption.placeName(meta.lat!!, meta.lng!!) else null
-    ui.post { if (g == gen) showCaption(meta, place) }
+    val date = PhotoCaption.formatDate(meta.dateMillis)
+    ui.post { if (g == gen) faceRenderer.setCaption(place, date) }
   }
 
   /** A clean upcoming-events panel top-right, over the photo. Its own translucent
@@ -793,7 +737,7 @@ class PhotoFrameController(
 
   private fun showVideo(path: String, g: Int) {
     cancelKenBurns()
-    hideCaption()
+    faceRenderer.setCaption(null, null)
     photo.setImageDrawable(null)
     photo.visibility = View.GONE
     videoView.visibility = View.VISIBLE
@@ -897,7 +841,7 @@ class PhotoFrameController(
         show(bmp)
         // EXIF caption only for SMB here — it reads the user's own files. The HTTP remote sources
         // (iCloud/Google/Immich/DAV) serve EXIF-stripped images, so they carry no caption.
-        if (smbSource != null) loadCaptionForSmb(url, g) else hideCaption()
+        if (smbSource != null) loadCaptionForSmb(url, g) else faceRenderer.setCaption(null, null)
         ui.postDelayed(remoteTick, intervalMs())
       }
     }
@@ -1029,7 +973,7 @@ class PhotoFrameController(
   private fun show(bmp: Bitmap) {
     // The caption belongs to whichever photo is incoming; hide it now and let the per-source
     // metadata load re-show it (web/CDN photos never re-show it — they carry no EXIF).
-    hideCaption()
+    faceRenderer.setCaption(null, null)
     photo
         .animate()
         .alpha(0.15f)

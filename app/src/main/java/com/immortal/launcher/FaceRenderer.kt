@@ -97,6 +97,11 @@ class FaceRenderer(
   private var lastArtBitmap: Bitmap? = null
   private var npListener: NowPlayingHub.Listener? = null
 
+  // Photo caption (place / date). A grid element like the rest, fed per-photo via [setCaption].
+  private var captionPanel: LinearLayout? = null
+  private var captionPlace: TextView? = null
+  private var captionDate: TextView? = null
+
   fun start(face: Face) {
     this.face = face
     buildOverlay()
@@ -122,6 +127,11 @@ class FaceRenderer(
   private fun buildOverlay() {
     view.removeAllViews()
     buckets.clear()
+    // Caption views are rebuilt below (or not, on a full-bleed face) — drop stale refs so a
+    // late setCaption() can't poke a detached view from the previous face.
+    captionPanel = null
+    captionPlace = null
+    captionDate = null
 
     buildClockCluster(face.clock)
     val fullBleed = clockFace?.fullBleed == true
@@ -138,6 +148,8 @@ class FaceRenderer(
           )
       view.addView(scrim, 0, FrameLayout.LayoutParams(MATCH, dp(320), Gravity.BOTTOM))
       buildStandaloneWidgets(face)
+      // Photo caption is photo metadata, so (like the widgets) it's skipped on a full-bleed clock.
+      if (face.caption.enabled) buildCaption(face.caption)
     }
 
     // Now-playing is independent of the face: it shows on EVERY face — including the full-bleed
@@ -296,6 +308,57 @@ class FaceRenderer(
             ui.post { if (lastArtUrl == want) art.setImageBitmap(bmp) }
           }
     }
+  }
+
+  /**
+   * The photo caption ("place" bold over a lighter "date") as a grid element, so it stacks with
+   * whatever else lands in the same cell (notably the now-playing card — both default to
+   * bottom-right) instead of overlapping it. Hidden until [setCaption] gets real metadata.
+   */
+  private fun buildCaption(spec: CaptionSpec) {
+    val align = horizontalGravity(spec.position)
+    val col = LinearLayout(context)
+    col.orientation = LinearLayout.VERTICAL
+    col.gravity = align
+    col.visibility = View.GONE
+    val place = text(19f, Color.WHITE, false)
+    place.typeface = Typeface.DEFAULT_BOLD
+    place.maxLines = 1
+    place.ellipsize = TextUtils.TruncateAt.END
+    place.gravity = align
+    val date = text(14f, 0xCCFFFFFF.toInt(), true)
+    date.maxLines = 1
+    date.gravity = align
+    col.addView(place, LinearLayout.LayoutParams(WRAP, WRAP))
+    col.addView(date, LinearLayout.LayoutParams(WRAP, WRAP))
+    bucket(spec.position).addView(col, LinearLayout.LayoutParams(WRAP, WRAP))
+    captionPanel = col
+    captionPlace = place
+    captionDate = date
+  }
+
+  /**
+   * Push the latest photo caption (main thread). A blank/absent place AND date hides it; otherwise
+   * each line shows only when it has content. No-op when the caption isn't built (disabled, or a
+   * full-bleed face).
+   */
+  fun setCaption(place: String?, date: String?) {
+    val col = captionPanel ?: return
+    val p = place?.takeIf { it.isNotBlank() }
+    val d = date?.takeIf { it.isNotBlank() }
+    if (p == null && d == null) {
+      col.visibility = View.GONE
+      return
+    }
+    captionPlace?.apply {
+      visibility = if (p == null) View.GONE else View.VISIBLE
+      text = p ?: ""
+    }
+    captionDate?.apply {
+      visibility = if (d == null) View.GONE else View.VISIBLE
+      text = d ?: ""
+    }
+    col.visibility = View.VISIBLE
   }
 
   // --- periodic loops ---------------------------------------------------------

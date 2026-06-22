@@ -29,6 +29,7 @@ data class Face(
     val weather: WeatherSpec = WeatherSpec(),
     val nowPlaying: NowPlayingSpec = NowPlayingSpec(),
     val battery: BatterySpec = BatterySpec(),
+    val caption: CaptionSpec = CaptionSpec(),
 ) {
   companion object {
     /**
@@ -95,6 +96,7 @@ data class Face(
       val weather = json.optJSONObject("weather") ?: JSONObject()
       val np = json.optJSONObject("nowPlaying")
       val batt = json.optJSONObject("battery")
+      val cap = json.optJSONObject("caption")
       return Face(
           id = id,
           name = json.optString("name", ""),
@@ -103,6 +105,7 @@ data class Face(
           weather = WeatherSpec.fromJson(weather),
           nowPlaying = if (np != null) NowPlayingSpec.fromJson(np) else NowPlayingSpec(),
           battery = if (batt != null) BatterySpec.fromJson(batt) else BatterySpec(),
+          caption = if (cap != null) CaptionSpec.fromJson(cap) else CaptionSpec(),
       )
     }
   }
@@ -323,6 +326,24 @@ data class BatterySpec(
         BatterySpec(
             enabled = o.optBoolean("enabled", true),
             position = GridPosition.fromWire(o.optString("position", "bottom-left")),
+        )
+  }
+}
+
+/**
+ * Immortal extension: the "place · date" photo caption (own-photos only; see [PhotoCaption]).
+ * A grid element like the rest, so it stacks with whatever shares its cell — notably the
+ * now-playing card, which also defaults to bottom-right — instead of overlapping it.
+ */
+data class CaptionSpec(
+    val enabled: Boolean = true,
+    val position: GridPosition = GridPosition.BOTTOM_RIGHT,
+) {
+  companion object {
+    fun fromJson(o: JSONObject): CaptionSpec =
+        CaptionSpec(
+            enabled = o.optBoolean("enabled", true),
+            position = GridPosition.fromWire(o.optString("position", "bottom-right")),
         )
   }
 }
