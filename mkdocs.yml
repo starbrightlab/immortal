@@ -71,6 +71,7 @@ nav:
       - Multi-room audio & now-playing: features/multi-room-audio.md
       - Smart home (Home Assistant / MQTT): features/smart-home.md
       - Fleet management: features/fleet.md
+      - Phone remote: features/remote.md
       - Portal TV: features/portal-tv.md
   - How-to guides:
       - Installing apps & app stores: guides/installing-apps.md

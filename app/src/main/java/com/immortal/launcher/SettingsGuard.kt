@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Meta Platforms, Inc. and affiliates.
+ * Copyright (c) 2026 Starbright Lab.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -189,5 +189,17 @@ object SettingsGuard {
       android.util.Log.i("ImmortalQuickBar", "BarWatch a11y ${if (on) "enabled" else "disabled"}")
     }
         .onFailure { android.util.Log.w("ImmortalQuickBar", "couldn't toggle BarWatch a11y", it) }
+  }
+
+  /**
+   * Bring [BarWatchService] into line with whether ANY feature that needs it is on:
+   * the quick-button cluster ([QuickBarConfig]) or the phone remote ([RemotePairing]),
+   * which both ride the one accessibility service. Because it's shared, neither feature
+   * may disable it while the other still needs it — so always toggle via this reconcile
+   * (never call [setBarWatchEnabled] directly from a feature switch). Idempotent.
+   */
+  fun reconcileBarWatch(context: Context) {
+    val needed = QuickBarConfig.isEnabled(context) || RemotePairing.isEnabled(context)
+    setBarWatchEnabled(context, needed)
   }
 }

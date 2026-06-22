@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (c) Meta Platforms, Inc. and affiliates.
+<!-- Copyright (c) 2026 Starbright Lab.
      This source code is licensed under the MIT license found in the
      LICENSE file in the root directory of this source tree. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -159,6 +159,12 @@
         <!-- "Set up from your phone": on-device LAN web form for source credentials. -->
         <activity
             android:name=".LanSetupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SampleApp" />
+
+        <!-- "Control from your phone": pairing screen for the phone web remote. -->
+        <activity
+            android:name=".RemotePairActivity"
             android:exported="false"
             android:theme="@style/Theme.SampleApp" />
 

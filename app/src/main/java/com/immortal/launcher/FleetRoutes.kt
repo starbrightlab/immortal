@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Meta Platforms, Inc. and affiliates.
+ * Copyright (c) 2026 Starbright Lab.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -39,12 +39,18 @@ class FleetRoutes(private val context: Context) {
   @Volatile private var catalog: List<CatalogApp> = emptyList()
   private val inFlight = ConcurrentHashMap.newKeySet<String>()
 
+  /** The phone-remote surface (`/remote/…`), which does its own pairing/session auth. */
+  private val remote = RemoteRoutes(context)
+
   /** Load (and later refresh) the catalog snapshot used by /info, /install, /update. */
   fun refreshCatalog() {
     StoreCatalog.loadCatalog(context) { catalog = it }
   }
 
   fun handle(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    // The phone remote authenticates by paired session (or fleet token), not by the
+    // bearer gate below — so it's routed first, before the token check.
+    if (req.path.startsWith("/remote/")) return remote.handle(req)
     if (!authorized(req)) return resp(401, err("unauthorized"))
     return when (req.path) {
       "/info" -> requireMethod("GET", req) { info() }

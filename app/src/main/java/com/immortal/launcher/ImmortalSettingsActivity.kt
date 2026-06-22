@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Meta Platforms, Inc. and affiliates.
+ * Copyright (c) 2026 Starbright Lab.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -339,6 +339,8 @@ private fun SettingsMain(
       MultiRoomNavRow(onOpen = onOpenMultiRoom)
 
       MqttNavRow(onOpen = onOpenMqtt)
+
+      RemoteNavRow()
 
       QuickButtonsSection()
 
@@ -732,9 +734,10 @@ private fun QuickButtonsSection() {
             val on = it == "on"
             enabled = on
             QuickBarConfig.setEnabled(context, on)
-            // Enabling the bar watcher both detects the bar and hosts the cluster overlay; it
-            // runs only while the feature is on, so this is the whole on/off switch.
-            SettingsGuard.setBarWatchEnabled(context, on)
+            // Enabling the bar watcher both detects the bar and hosts the cluster overlay.
+            // Reconcile (don't set directly): the phone remote shares this accessibility
+            // service, so it must stay on if the remote still needs it.
+            SettingsGuard.reconcileBarWatch(context)
           },
       )
     }
@@ -793,6 +796,38 @@ private fun MqttNavRow(onOpen: () -> Unit) {
         Text("Home Assistant (MQTT)", color = Color.White, fontSize = 17.sp)
         Text(
             if (MqttConfig.isEnabled(context)) MqttStatus.text.ifBlank { "On" } else "Off",
+            color = Color(0xFF9A9A9A),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+      }
+      Text("›", color = Color(0xFF7C7C7C), fontSize = 26.sp)
+    }
+  }
+}
+
+/** Opens the phone-remote pairing screen ([RemotePairActivity]); shows on/off at a glance. */
+@Composable
+private fun RemoteNavRow() {
+  val context = LocalContext.current
+  Spacer(Modifier.size(26.dp))
+  SectionLabel("Remote")
+  Card {
+    Row(
+        modifier =
+            Modifier.fillMaxWidth()
+                .tvFocusableRow {
+                  runCatching {
+                    context.startActivity(Intent(context, RemotePairActivity::class.java))
+                  }
+                }
+                .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text("Control from your phone", color = Color.White, fontSize = 17.sp)
+        Text(
+            if (RemotePairing.isEnabled(context)) "On — pair a phone as a remote" else "Off",
             color = Color(0xFF9A9A9A),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 2.dp),

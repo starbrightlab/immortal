@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Meta Platforms, Inc. and affiliates.
+ * Copyright (c) 2026 Starbright Lab.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -114,7 +114,9 @@ class FleetAgentService : Service() {
     fun ensureRunning(context: Context) {
       runCatching {
             FleetConfig.applyPendingProvisioning(context)
-            if (!FleetConfig.isEnabled(context)) return
+            // Start the agent if fleet management is provisioned OR the phone remote has
+            // been turned on — the remote rides on this same service as its transport.
+            if (!FleetConfig.isEnabled(context) && !RemotePairing.isEnabled(context)) return
             val intent = Intent(context, FleetAgentService::class.java)
             if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent)
             else context.startService(intent)
