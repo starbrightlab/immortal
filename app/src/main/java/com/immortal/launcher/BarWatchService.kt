@@ -28,7 +28,8 @@ class BarWatchService : AccessibilityService() {
 
   override fun onServiceConnected() {
     QuickBar.attach(this) // host the cluster as a TYPE_ACCESSIBILITY_OVERLAY (renders on the bar)
-    RemoteInput.register(this) // let the phone-remote routes fire global actions through us
+    RemoteInput.register(this) // let the phone-remote routes drive input through us
+    RemoteCursor.attach(this) // host the remote touchpad's on-TV pointer overlay
     updateBar()
   }
 
@@ -39,6 +40,7 @@ class BarWatchService : AccessibilityService() {
   override fun onUnbind(intent: android.content.Intent?): Boolean {
     QuickBar.detach()
     RemoteInput.unregister()
+    RemoteCursor.detach()
     return super.onUnbind(intent)
   }
 

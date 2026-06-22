@@ -2,13 +2,16 @@
 <!-- Copyright (c) 2026 Starbright Lab.
      This source code is licensed under the MIT license found in the
      LICENSE file in the root directory of this source tree. -->
-<!-- Watches window changes only, to detect the system top bar being revealed (so the
-     quick-button cluster can show in sync). flagRetrieveInteractiveWindows + window content
-     are needed for getWindows(); it inspects window bounds/type, not content. -->
+<!-- Watches window changes (to sync the quick-button cluster with the system top bar) and
+     hosts the phone-remote input surfaces. flagRetrieveInteractiveWindows + window content
+     are needed for getWindows() and reading the focused field for text entry.
+     canPerformGestures lets the remote's touchpad dispatch taps/swipes (the reboot-proof,
+     no-INJECT_EVENTS way to drive any app on this touchscreen). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowsChanged"
     android:accessibilityFlags="flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="0"
     android:description="@string/bar_watch_desc" />

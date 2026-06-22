@@ -37,6 +37,9 @@ class RemoteRoutes(private val context: Context) {
         "/remote/key" -> authed(req) { key(req) }
         "/remote/launch" -> authed(req) { launch(req) }
         "/remote/text" -> authed(req) { text(req) }
+        "/remote/cursor" -> authed(req) { cursor(req) }
+        "/remote/tap" -> authed(req) { tap() }
+        "/remote/swipe" -> authed(req) { swipe(req) }
         else -> json(404, err("not_found"))
       }
 
@@ -97,6 +100,33 @@ class RemoteRoutes(private val context: Context) {
     val applied = RemoteInput.typeText(body.optString("text"), mode)
     // applied=false usually means no editable field has focus — report it so the UI can hint.
     return json(200, ok().put("applied", applied).put("mode", mode))
+  }
+
+  /** Move the on-TV pointer by a relative delta: `{"dx":12.0,"dy":-4.0}` (screen px). */
+  private fun cursor(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
+    if (!RemoteInput.gesturesAvailable()) return json(503, err("no_gestures"))
+    RemoteInput.cursorMove(body.optDouble("dx", 0.0).toFloat(), body.optDouble("dy", 0.0).toFloat())
+    return json(200, ok())
+  }
+
+  /** Tap at the current pointer position (synthesized touch). */
+  private fun tap(): FleetHttpServer.Response {
+    if (!RemoteInput.gesturesAvailable()) return json(503, err("no_gestures"))
+    return json(200, ok().put("dispatched", RemoteInput.tap()))
+  }
+
+  /** Scroll/swipe from the pointer by a relative delta: `{"dx":0.0,"dy":-300.0}`. */
+  private fun swipe(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
+    if (!RemoteInput.gesturesAvailable()) return json(503, err("no_gestures"))
+    return json(
+        200,
+        ok()
+            .put(
+                "dispatched",
+                RemoteInput.swipe(
+                    body.optDouble("dx", 0.0).toFloat(), body.optDouble("dy", 0.0).toFloat())))
   }
 
   // --- auth + helpers ---------------------------------------------------------

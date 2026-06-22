@@ -40,6 +40,11 @@ object RemoteHtml {
   .nav{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:4px 0 22px}
   .nav button{padding:18px 8px;font-size:15px;background:#1c1c1e;color:#fff;border-radius:14px}
   .nav button:active{background:#2e6be6}
+  .pad{height:240px;background:#161618;border:1px solid #2a2a2c;border-radius:16px;margin:0 0 6px;
+    display:flex;align-items:center;justify-content:center;color:#6c6c6c;font-size:13px;
+    text-align:center;padding:0 18px;touch-action:none;-webkit-user-select:none;user-select:none}
+  .pad.active{border-color:#2e6be6}
+  .padhint{color:#7c7c7c;font-size:12px;margin:0 2px 22px;min-height:16px}
   .kbd{display:flex;gap:8px;margin-bottom:8px}
   .kbd input{flex:1;min-width:0;padding:14px;font-size:16px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:12px;color:#fff}
   .kbd button{padding:0 18px;font-size:15px;font-weight:600;background:#2e6be6;color:#fff;border-radius:12px}
@@ -72,6 +77,9 @@ object RemoteHtml {
       <button onclick="key('apps')">Recents</button>
       <button onclick="key('power')">Power</button>
     </div>
+    <div class=label>Touchpad</div>
+    <div id=pad class=pad>Drag to move the pointer&nbsp;&middot;&nbsp;tap to click&nbsp;&middot;&nbsp;two fingers to scroll</div>
+    <div id=padHint class=padhint></div>
     <div class=label>Keyboard</div>
     <div class=kbd>
       <input id=txt placeholder="Type, then Send to the focused field" autocomplete=off autocapitalize=off autocorrect=off>
@@ -141,9 +149,36 @@ object RemoteHtml {
       });
     }).catch(function(){});
   }
+  var SENS=2.2, SCROLL=2.0, padReady=false;   // phone-px -> TV-px multipliers
+  function padHint(t){document.getElementById('padHint').textContent=t||'';}
+  function gestureGone(d){if(d&&d.error==='no_gestures')padHint('Touchpad needs the accessibility service — re-open Settings › Remote on the Portal.');}
+  function setupPad(){
+    if(padReady)return; padReady=true;
+    var pad=document.getElementById('pad');
+    var lastX=0,lastY=0,startX=0,startY=0,startT=0,moved=false,mode=0;
+    var accDx=0,accDy=0,flush=false;
+    function send(){flush=false;if(accDx||accDy){var dx=accDx,dy=accDy;accDx=0;accDy=0;
+      api('/remote/cursor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dx:dx*SENS,dy:dy*SENS})}).then(gestureGone).catch(function(){});}}
+    function queue(dx,dy){accDx+=dx;accDy+=dy;if(!flush){flush=true;setTimeout(send,35);}}
+    function scroll(dy){api('/remote/swipe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dx:0,dy:dy*SCROLL})}).then(gestureGone).catch(function(){});}
+    pad.addEventListener('touchstart',function(e){e.preventDefault();pad.classList.add('active');
+      if(e.touches.length===2){mode=2;lastY=(e.touches[0].clientY+e.touches[1].clientY)/2;}
+      else{mode=1;var t=e.touches[0];lastX=startX=t.clientX;lastY=startY=t.clientY;startT=Date.now();moved=false;}
+    },{passive:false});
+    pad.addEventListener('touchmove',function(e){e.preventDefault();
+      if(mode===2&&e.touches.length>=2){var my=(e.touches[0].clientY+e.touches[1].clientY)/2;var d=my-lastY;lastY=my;if(d)scroll(d);return;}
+      var t=e.touches[0];var dx=t.clientX-lastX,dy=t.clientY-lastY;lastX=t.clientX;lastY=t.clientY;
+      if(Math.abs(t.clientX-startX)>8||Math.abs(t.clientY-startY)>8)moved=true;
+      queue(dx,dy);
+    },{passive:false});
+    pad.addEventListener('touchend',function(){pad.classList.remove('active');
+      if(mode===1&&!moved&&Date.now()-startT<300){api('/remote/tap',{method:'POST'}).then(gestureGone).catch(function(){});}
+      mode=0;
+    });
+  }
   function start(name){
     if(name)document.getElementById('devName').textContent=name;
-    show('remote');loadApps();
+    show('remote');setupPad();loadApps();
   }
   // Scan-to-pair: a QR encodes the URL with #pin=NNNNNN, so the page auto-pairs.
   (function(){

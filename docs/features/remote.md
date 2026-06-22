@@ -7,6 +7,9 @@ the same always-on [fleet agent](fleet.md) that already manages the device over 
 ## What it does
 
 - **Navigation buttons** — Back, Home, Recents, Power dialog.
+- **Touchpad** — a trackpad on the phone moves a pointer drawn on the TV; tap to click, two-finger
+  drag to scroll. Works in **any** app (the Portal is a touchscreen, so a synthesized touch lands
+  anywhere) — this is the universal navigation primitive.
 - **Keyboard** — type on the phone; text lands in the focused field on the Portal (set / append /
   backspace / clear), no on-Portal typing.
 - **App launcher grid** — every launchable app on the Portal, tap to open.
@@ -37,20 +40,28 @@ its own — pairing survives a Portal reboot.
 
 ## How input works (and its limits)
 
-The Portals are non-root Android 9/10 and Immortal holds no `INJECT_EVENTS` permission, so raw
-D-pad/key events **cannot** be injected into other apps. Instead the remote routes through an
-`AccessibilityService` (`BarWatchService`), which turning the remote on enables automatically
-(via `WRITE_SECURE_SETTINGS` — the same service the quick-button cluster uses):
+The Portals are non-root Android 9/10. Raw key events (a real D-pad) **cannot** be injected: the
+OS won't grant a normal app `INJECT_EVENTS` at all — it's a signature permission with no
+`development` flag, so even `pm grant` refuses it ("not a changeable permission type"). Shizuku can
+inject (its helper runs as the shell uid, which holds the permission) but that helper is started by
+adb and dies on reboot, so it can't be the basis of a reboot-proof feature. Everything below
+instead routes through an `AccessibilityService` (`BarWatchService`), which the remote enables
+automatically (via `WRITE_SECURE_SETTINGS`) and which comes back on its own after a reboot:
 
 - **Global actions** need no extra permission. Verified on a PortalGo, **Back / Home / Power**
   work; **Recents / Notifications / Quick settings** are accepted by the framework but no-op
   (Meta's Portal SystemUI has no overview, shade, or QS). So the remote exposes Back/Home/Power
   as global actions and routes **Recents** to the in-app app switcher instead.
+- **Touchpad** is `dispatchGesture` (needs `canPerformGestures`, declared on the service) — a
+  synthesized tap/swipe at the pointer's screen coordinates. Because the Portal is a touchscreen
+  this drives *any* app, and it's reboot-proof. The pointer itself is drawn on the TV via a
+  `TYPE_ACCESSIBILITY_OVERLAY` (the same overlay class the quick-button cluster uses). This is the
+  reboot-proof replacement for a hardware D-pad: you point at what you want instead of stepping a
+  focus highlight. (A focus-based D-pad via `focusSearch`/`ACTION_FOCUS` was tried and dropped — it
+  no-ops on the Portal's Compose/custom UIs.)
 - **Text** is set directly on the focused editable node (`ACTION_SET_TEXT`) — no IME swap. It works
   wherever an editable field has input focus; `/remote/text` reports whether it applied so the UI
-  can hint "focus a field first". (A D-pad via accessibility `focusSearch`/`ACTION_FOCUS` was tried
-  and dropped — it's non-functional on the Portal's Compose/custom UIs, which don't expose an
-  input-focus node to search from. Directional/pointer navigation comes via the Phase 3 touchpad.)
+  can hint "focus a field first".
 - A live **screen mirror** isn't practical on these models (the accessibility screenshot API is
   Android 11+; `MediaProjection` needs a per-session consent dialog), so the remote follows the
   *TV-remote* model: you look at the TV, not the phone.
@@ -59,10 +70,11 @@ D-pad/key events **cannot** be injected into other apps. Instead the remote rout
 
 Later phases extend the same `/remote/*` routes:
 
-- **Phase 3** — a gesture **touchpad** (tap/swipe anywhere, since the Portal is a touchscreen
-  underneath; sidesteps the missing SystemUI surfaces) and **user-definable presets** (named macros
-  that combine input + config pushes).
-- **Phase 4** — drive **any Portal on the fleet** from one remote (multi-room).
+- **Native D-pad for Immortal's own UI** — within Immortal's screens we own the Compose focus, so a
+  true reboot-proof D-pad (no injection) can drive the launcher/settings/screensaver; it won't
+  extend to third-party apps (use the touchpad there).
+- **User-definable presets** — named macros that combine input + config pushes.
+- **Multi-room** — drive any Portal on the fleet from one remote.
 
 ## API
 
@@ -78,3 +90,6 @@ the rest require `Authorization: Bearer <session-or-fleet-token>`.
 | `POST` | `/remote/key` | `{"action":"…"}` — `back`/`home`/`power` (global action) or `apps` (in-app switcher) |
 | `POST` | `/remote/launch` | `{"packageName":"…"}` → open an app |
 | `POST` | `/remote/text` | `{"mode":"set\|append\|backspace\|clear","text":"…"}` → edit the focused field |
+| `POST` | `/remote/cursor` | `{"dx":12.0,"dy":-4.0}` → move the on-TV pointer (relative px) |
+| `POST` | `/remote/tap` | tap at the pointer (synthesized touch) |
+| `POST` | `/remote/swipe` | `{"dx":0.0,"dy":-300.0}` → scroll/swipe from the pointer |

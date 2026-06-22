@@ -8,6 +8,9 @@
 package com.immortal.launcher
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
@@ -113,6 +116,69 @@ object RemoteInput {
     val root = svc.rootInActiveWindow ?: return null
     val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
     return if (focused != null && focused.isEditable) focused else null
+  }
+
+  // --- touchpad (gesture dispatch + on-TV cursor) -----------------------------
+  // The reboot-proof, no-INJECT_EVENTS way to navigate any app: synthesize touches via
+  // the accessibility service (needs canPerformGestures) and draw the pointer with
+  // [RemoteCursor]. The cursor is tracked in screen pixels; the phone sends relative deltas.
+
+  @Volatile private var curX = -1f
+  @Volatile private var curY = -1f
+
+  /** True if the connected service was granted gesture dispatch (canPerformGestures). */
+  fun gesturesAvailable(): Boolean {
+    val svc = service ?: return false
+    val caps = svc.serviceInfo?.capabilities ?: return false
+    return caps and AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES != 0
+  }
+
+  /** Move the on-TV pointer by a relative delta (px), clamped to the screen. */
+  fun cursorMove(dx: Float, dy: Float): Boolean {
+    val svc = service ?: return false
+    val dm = svc.resources.displayMetrics
+    initCursor(dm.widthPixels, dm.heightPixels)
+    curX = (curX + dx).coerceIn(0f, dm.widthPixels - 1f)
+    curY = (curY + dy).coerceIn(0f, dm.heightPixels - 1f)
+    RemoteCursor.showAt(curX.toInt(), curY.toInt())
+    return true
+  }
+
+  /** Tap at the current pointer position (a synthesized touch). */
+  fun tap(): Boolean {
+    val svc = service ?: return false
+    val dm = svc.resources.displayMetrics
+    initCursor(dm.widthPixels, dm.heightPixels)
+    RemoteCursor.showAt(curX.toInt(), curY.toInt())
+    val path = Path().apply { moveTo(curX, curY) }
+    return dispatch(svc, path, durationMs = 50)
+  }
+
+  /** Swipe/scroll from the current pointer by a relative delta (px) — content scrolls. */
+  fun swipe(dx: Float, dy: Float): Boolean {
+    val svc = service ?: return false
+    val dm = svc.resources.displayMetrics
+    initCursor(dm.widthPixels, dm.heightPixels)
+    val x2 = (curX + dx).coerceIn(0f, dm.widthPixels - 1f)
+    val y2 = (curY + dy).coerceIn(0f, dm.heightPixels - 1f)
+    val path = Path().apply { moveTo(curX, curY); lineTo(x2, y2) }
+    return dispatch(svc, path, durationMs = 120)
+  }
+
+  /** Centre the pointer the first time we're used after a (re)connect. */
+  private fun initCursor(w: Int, h: Int) {
+    if (curX < 0f) {
+      curX = w / 2f
+      curY = h / 2f
+    }
+  }
+
+  private fun dispatch(svc: AccessibilityService, path: Path, durationMs: Long): Boolean {
+    val stroke = GestureDescription.StrokeDescription(path, 0, durationMs)
+    val gesture = GestureDescription.Builder().addStroke(stroke).build()
+    return runCatching { svc.dispatchGesture(gesture, null, null) }
+        .onFailure { Log.w(TAG, "dispatchGesture failed", it) }
+        .getOrDefault(false)
   }
 
   // --- pure helpers (unit-tested) ---------------------------------------------
