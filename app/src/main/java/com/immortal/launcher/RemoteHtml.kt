@@ -57,10 +57,10 @@ object RemoteHtml {
   .tabbar button{flex:1;padding:10px 0;background:none;color:#777;font-size:12px}
   .tabbar button.on{color:#fff;box-shadow:inset 0 2px 0 #2e6be6}
 
-  .nav{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  .nav button{padding:14px 4px;font-size:13px;background:#1c1c1e;color:#fff;border-radius:13px}
-  .nav button:active{background:#2e6be6}
-  .kbtoggle{width:100%;padding:12px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:12px;margin-top:10px}
+  .toprow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .botrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .toprow button,.botrow button{padding:14px 4px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:13px}
+  .toprow button:active,.botrow button:active{background:#2e6be6}
   .kbpanel{margin-top:10px}
   .kbd{display:flex;gap:8px}
   .kbd input{flex:1;min-width:0;padding:13px;font-size:16px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:12px;color:#fff}
@@ -68,6 +68,7 @@ object RemoteHtml {
   .keyops{display:flex;gap:8px;margin-top:8px}
   .keyops button{flex:1;padding:11px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:12px}
   .padwrap{flex:1;display:flex;gap:8px;min-height:120px;margin-top:12px}
+  .padcol{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
   .pad{flex:1;background:#161618;border:1px solid #2a2a2c;border-radius:16px;display:flex;align-items:center;
     justify-content:center;color:#6c6c6c;font-size:13px;text-align:center;padding:0 16px;
     touch-action:none;-webkit-user-select:none;user-select:none}
@@ -120,13 +121,11 @@ object RemoteHtml {
     </div>
 
     <div id=tabRemote class=panel>
-      <div class=nav>
-        <button onclick="key('back')">Back</button>
-        <button onclick="key('home')">Home</button>
-        <button onclick="key('apps')">Recents</button>
+      <div class=toprow>
         <button onclick="key('power')">Power</button>
+        <button onclick="key('apps')">Recents</button>
+        <button onclick=toggleKb()>Keyboard</button>
       </div>
-      <button class=kbtoggle onclick=toggleKb()>Keyboard</button>
       <div id=kbPanel class="kbpanel hide">
         <div class=kbd>
           <input id=txt placeholder="Type, then Send to the focused field" autocomplete=off autocapitalize=off autocorrect=off>
@@ -138,10 +137,16 @@ object RemoteHtml {
         </div>
       </div>
       <div class=padwrap>
-        <div id=pad class=pad>Drag to move the pointer&nbsp;&middot;&nbsp;tap to click</div>
+        <div class=padcol>
+          <div id=pad class=pad>Drag to move the pointer&nbsp;&middot;&nbsp;tap to click</div>
+          <div class=botrow>
+            <button onclick="key('back')">Back</button>
+            <button onclick="key('home')">Home</button>
+          </div>
+        </div>
         <div class=scrollcol>
-          <button onclick="scrollDir('up')" aria-label="Scroll up">&#9650;</button>
-          <button onclick="scrollDir('down')" aria-label="Scroll down">&#9660;</button>
+          <button onclick="scrollDir('up')" aria-label="Page up">&#9650;</button>
+          <button onclick="scrollDir('down')" aria-label="Page down">&#9660;</button>
         </div>
       </div>
       <div id=padHint class=padhint></div>
