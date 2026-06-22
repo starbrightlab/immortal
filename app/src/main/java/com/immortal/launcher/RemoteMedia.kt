@@ -9,12 +9,9 @@ package com.immortal.launcher
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import java.io.ByteArrayOutputStream
-import java.net.URL
 import org.json.JSONObject
 
 /**
@@ -25,9 +22,6 @@ import org.json.JSONObject
  * the notification-listener access already held for now-playing.
  */
 object RemoteMedia {
-  /** Cap on re-encoded URI art; matches the on-TV art size closely enough for a phone card. */
-  private const val MAX_EDGE = 384
-
   // Lazy so merely loading this object (e.g. the pure stateJson serializer in tests) doesn't
   // touch the Android main looper; only command() — on-device — ever needs it.
   private val main by lazy { Handler(Looper.getMainLooper()) }
@@ -79,7 +73,7 @@ object RemoteMedia {
    */
   fun artPng(context: Context): ByteArray? {
     val s = NowPlayingHub.current ?: return null
-    val bmp = s.artBitmap ?: resolveUriArt(context, s.artUrl) ?: return null
+    val bmp = s.artBitmap ?: MediaArt.resolveUri(context, s.artUrl) ?: return null
     return runCatching {
           ByteArrayOutputStream().use { out ->
             bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
@@ -91,35 +85,4 @@ object RemoteMedia {
 
   private fun artVersion(s: NowPlayingState): Int =
       listOf(s.title, s.artist, s.album, s.artUrl).joinToString("").hashCode()
-
-  /** Load art bytes from a metadata URI and decode them downscaled. Any failure → null (placeholder). */
-  private fun resolveUriArt(context: Context, url: String): Bitmap? {
-    if (url.isBlank()) return null
-    return runCatching {
-          val bytes =
-              if (url.startsWith("http://") || url.startsWith("https://")) {
-                val conn = URL(url).openConnection()
-                conn.connectTimeout = 4000
-                conn.readTimeout = 4000
-                conn.getInputStream().use { it.readBytes() }
-              } else {
-                // content://, file://, android.resource:// — device-local, only we can read it.
-                context.contentResolver.openInputStream(Uri.parse(url))?.use { it.readBytes() }
-              }
-          bytes?.let { decodeDownscaled(it) }
-        }
-        .getOrNull()
-  }
-
-  /** Decode [bytes] with an inSampleSize that keeps the longest edge near [MAX_EDGE]. */
-  private fun decodeDownscaled(bytes: ByteArray): Bitmap? {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    val longest = maxOf(bounds.outWidth, bounds.outHeight)
-    val opts =
-        BitmapFactory.Options().apply {
-          inSampleSize = if (longest > MAX_EDGE) Integer.highestOneBit(longest / MAX_EDGE) else 1
-        }
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-  }
 }

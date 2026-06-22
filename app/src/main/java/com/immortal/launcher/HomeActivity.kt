@@ -908,6 +908,18 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MiniPlayer(state: NowPlayingState, modifier: Modifier = Modifier) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  // Some media apps hand cover art as a URI rather than an embedded bitmap. Resolve it off the
+  // main thread (content:// or http) so the header shows the cover too — the screensaver and the
+  // phone remote already do this via [MediaArt]; the mini-player was the one place that didn't.
+  var urlArt by remember(state.artUrl, state.artBitmap) { mutableStateOf<android.graphics.Bitmap?>(null) }
+  androidx.compose.runtime.LaunchedEffect(state.artUrl, state.artBitmap) {
+    urlArt =
+        if (state.artBitmap == null && state.artUrl.isNotBlank())
+            withContext(Dispatchers.IO) { MediaArt.resolveUri(context, state.artUrl) }
+        else null
+  }
+  val cover = state.artBitmap ?: urlArt
   Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
     // The album art IS the play/pause button — same 56dp circle as the other header
     // buttons, just filled with the cover instead of a flat tint.
@@ -915,7 +927,7 @@ private fun MiniPlayer(state: NowPlayingState, modifier: Modifier = Modifier) {
         modifier = Modifier.size(56.dp).clip(CircleShape).tvFocusable(CircleShape) { NowPlayingHub.playPause() },
         contentAlignment = Alignment.Center,
     ) {
-      val bmp = state.artBitmap
+      val bmp = cover
       if (bmp != null) {
         Image(
             bitmap = bmp.asImageBitmap(),
