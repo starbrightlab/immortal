@@ -211,7 +211,9 @@ class RemoteRoutes(private val context: Context) {
       when (s.optString("type")) {
         "launch" -> RemoteApps.launch(context, s.optString("packageName"))
         "key" ->
-            if (s.optString("action") == "apps") startAppSwitcher()
+            // "recents" maps to the in-app switcher too (the Portal has no system Recents), matching
+            // the live Recents button — otherwise a "recents" preset step would silently no-op.
+            if (s.optString("action") == "apps" || s.optString("action") == "recents") startAppSwitcher()
             else RemoteInput.globalAction(s.optString("action"))
         "text" -> RemoteInput.typeText(s.optString("text"), s.optString("mode").ifBlank { "set" })
         "wait" -> runCatching { Thread.sleep(clampWaitMs(s.optLong("ms", 300))) }

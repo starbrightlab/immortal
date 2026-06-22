@@ -413,7 +413,8 @@ object RemoteHtml {
   }
   function saveSources(){
     var src=(document.querySelector('input[name=src]:checked')||{}).value||'default';
-    var body={source:src,calendarUrl:gv('calUrl')};
+    var body={source:src};
+    var cal=gv('calUrl');if(cal)body.calendarUrl=cal; // only send when set, so a blank field can't wipe an existing feed
     if(src==='immich'){body.immichUrl=gv('immichUrl');body.immichKey=gv('immichKey');}
     else if(src==='smb'){body.smbHost=gv('smbHost');body.smbShare=gv('smbShare');body.smbPath=gv('smbPath');body.smbUser=gv('smbUser');body.smbPass=gv('smbPass');}
     else if(src==='dav'){body.davUrl=gv('davUrl');body.davUser=gv('davUser');body.davPass=gv('davPass');}
@@ -421,7 +422,10 @@ object RemoteHtml {
     else if(src==='album'){body.albumUrl=gv('albumUrl');}
     document.getElementById('srcErr').textContent='Saving…';
     api('/remote/sources',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      .then(function(d){document.getElementById('srcErr').textContent=(d&&d.ok)?'Saved ✓':'Save failed';})
+      .then(function(d){ // confirm the source actually took (a blank required field is dropped server-side)
+        var ok=d&&d.ok&&d.sources&&d.sources.source===src;
+        document.getElementById('srcErr').textContent=ok?'Saved ✓':'Not saved — check the required fields.';
+      })
       .catch(function(){document.getElementById('srcErr').textContent='Couldn\'t save.';});
   }
   function loadApps(){
