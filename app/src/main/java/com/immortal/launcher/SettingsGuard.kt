@@ -9,6 +9,8 @@ package com.immortal.launcher
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 
 /**
@@ -207,5 +209,43 @@ object SettingsGuard {
    */
   fun reconcileBarWatch(context: Context) {
     setBarWatchEnabled(context, true)
+  }
+
+  /**
+   * Force [BarWatchService] to (re)bind if it's enabled in settings but not actually connected.
+   * An app update (a real self-update, or `install -r` in dev) unbinds the service while LEAVING
+   * it in `enabled_accessibility_services`, so [setBarWatchEnabled]'s "already listed" early-return
+   * won't rebind it — the service stays inert and the phone remote's nav buttons and touchpad
+   * (which all route through it) go dead, while volume / screensaver / app-launch (which don't)
+   * keep working. Toggling our component out of the list and back in makes the system rebind.
+   *
+   * Call from a USER action (enabling the remote) — NOT from the frequent app-start reconcile,
+   * where the service is simply mid-bind and [RemoteInput.available] is briefly false anyway.
+   */
+  fun ensureBarWatchConnected(context: Context) {
+    if (RemoteInput.available()) return // already connected — don't churn the binding
+    runCatching {
+      val comp = ComponentName(context, BarWatchService::class.java).flattenToString()
+      val cr = context.contentResolver
+      val others =
+          (Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: "")
+              .split(':')
+              .filter { it.isNotBlank() && !it.equals(comp, ignoreCase = true) }
+      Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+      // Drop our component, then re-add it after a real beat. The system's settings observer
+      // coalesces back-to-back writes into the unchanged final value (no rebind) — it has to
+      // observe the service LEAVE the list before it'll bind it on rejoin, so the gap must clear
+      // the observer's debounce window (a few hundred ms proved too short; ~2s is reliable).
+      Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, others.joinToString(":"))
+      Handler(Looper.getMainLooper()).postDelayed({
+        runCatching {
+          Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+          Settings.Secure.putString(
+              cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (others + comp).joinToString(":"))
+          android.util.Log.i("ImmortalQuickBar", "BarWatch a11y re-bound (was enabled but not connected)")
+        }
+      }, 2000)
+    }
+        .onFailure { android.util.Log.w("ImmortalQuickBar", "couldn't re-bind BarWatch a11y", it) }
   }
 }

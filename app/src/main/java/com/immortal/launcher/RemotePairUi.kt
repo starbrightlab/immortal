@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.sp
 fun enableRemoteAndMintPin(context: Context): Pair<String?, String?> {
   RemotePairing.setEnabled(context, true)
   SettingsGuard.reconcileBarWatch(context)
+  // The nav buttons + touchpad route through the accessibility service; if an app update left it
+  // enabled-but-unbound, force a rebind now so the remote isn't half-dead on connect.
+  SettingsGuard.ensureBarWatchConnected(context)
   FleetAgentService.ensureRunning(context)
   val pin = RemotePairing.newPin()
   val ip = lanIp()
