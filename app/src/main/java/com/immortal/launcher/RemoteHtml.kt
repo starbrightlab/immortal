@@ -105,6 +105,7 @@ object RemoteHtml {
           <option value=key>Nav key</option>
           <option value=text>Type text</option>
           <option value=wait>Wait</option>
+          <option value=config>Set screensaver</option>
         </select>
         <span id=sparam></span>
         <button onclick=addStep()>Add step</button>
@@ -175,6 +176,18 @@ object RemoteHtml {
   function textOp(mode){postText(mode,'');}
   // --- presets ---
   var presetsData=[], draftSteps=[], appsCache=[];
+  // Curated screensaver config actions for preset steps (the remote×fleet bridge). No
+  // credential forms — just the common one-tap settings; albumUrl takes a value.
+  var CONFIG_ACTIONS=[
+    {label:'Screensaver on',body:{enabled:true}},
+    {label:'Screensaver off',body:{enabled:false}},
+    {label:'Use default photo feed',body:{source:'default'}},
+    {label:'Shuffle on',body:{shuffle:true}},
+    {label:'Shuffle off',body:{shuffle:false}},
+    {label:'Show now-playing',body:{showNowPlaying:true}},
+    {label:'Hide now-playing',body:{showNowPlaying:false}},
+    {label:'Set album URL',needsText:'albumUrl'}
+  ];
   function loadPresets(){api('/remote/presets').then(function(d){presetsData=d.presets||[];renderPresets();}).catch(function(){});}
   function renderPresets(){
     var c=document.getElementById('presets');c.innerHTML='';
@@ -192,6 +205,13 @@ object RemoteHtml {
   }
   function onType(){
     var t=document.getElementById('stype').value,s=document.getElementById('sparam');s.innerHTML='';
+    if(t==='config'){
+      var sel=document.createElement('select');sel.id='spval';
+      CONFIG_ACTIONS.forEach(function(a,i){var o=document.createElement('option');o.value=i;o.textContent=a.label;sel.appendChild(o);});
+      var tx=document.createElement('input');tx.id='spval2';tx.placeholder='album URL';tx.style.display='none';
+      sel.onchange=function(){tx.style.display=CONFIG_ACTIONS[sel.value].needsText?'':'none';};
+      s.appendChild(sel);s.appendChild(tx);return;
+    }
     var el;
     if(t==='launch'){el=document.createElement('select');appsCache.forEach(function(a){var o=document.createElement('option');o.value=a.packageName;o.textContent=a.label;el.appendChild(o);});}
     else if(t==='key'){el=document.createElement('select');['home','back','recents','power'].forEach(function(k){var o=document.createElement('option');o.value=k;o.textContent=k;el.appendChild(o);});}
@@ -204,6 +224,12 @@ object RemoteHtml {
     if(t==='launch')step.packageName=val;
     else if(t==='key')step.action=val;
     else if(t==='text'){step.mode='set';step.text=val;}
+    else if(t==='config'){
+      var a=CONFIG_ACTIONS[val],body;
+      if(a.needsText){var tv=(document.getElementById('spval2').value||'').trim();if(!tv)return;body={};body[a.needsText]=tv;step.label=a.label+': '+tv;}
+      else{body=JSON.parse(JSON.stringify(a.body));step.label=a.label;}
+      step.target='screensaver';step.body=body;
+    }
     else step.ms=parseInt(val,10)||500;
     draftSteps.push(step);renderDraft();
   }
@@ -211,6 +237,7 @@ object RemoteHtml {
     if(s.type==='launch'){var a=appsCache.filter(function(x){return x.packageName===s.packageName;})[0];return 'Launch '+((a&&a.label)||s.packageName);}
     if(s.type==='key')return 'Key: '+s.action;
     if(s.type==='text')return 'Type: '+s.text;
+    if(s.type==='config')return s.label||'Set screensaver';
     return 'Wait '+s.ms+'ms';
   }
   function renderDraft(){

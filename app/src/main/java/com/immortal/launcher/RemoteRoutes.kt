@@ -172,7 +172,26 @@ class RemoteRoutes(private val context: Context) {
             else RemoteInput.globalAction(s.optString("action"))
         "text" -> RemoteInput.typeText(s.optString("text"), s.optString("mode").ifBlank { "set" })
         "wait" -> runCatching { Thread.sleep(clampWaitMs(s.optLong("ms", 300))) }
+        "config" -> applyConfig(s.optString("target").ifBlank { "screensaver" }, s.optJSONObject("body"))
       }
+    }
+  }
+
+  /**
+   * The remote×fleet bridge: a preset step can push device config, reusing the very same
+   * fleet subsystems the laptop tool drives ([FleetScreensaver] / [FleetCalendar]) — so a
+   * one-tap preset can both drive input and reconfigure the Portal (e.g. set the screensaver
+   * source then go Home). Mirrors the `/screensaver` route's post-apply reaffirm/reschedule.
+   */
+  private fun applyConfig(target: String, body: JSONObject?) {
+    val b = body ?: return
+    when (target) {
+      "screensaver" -> {
+        val applied = FleetScreensaver.apply(context, b)
+        SettingsGuard.reaffirmScreensaver(context)
+        if (applied.any { it.startsWith("overnight") }) SleepScheduler.applyOvernightNow(context)
+      }
+      "calendar" -> FleetCalendar.apply(context, b)
     }
   }
 

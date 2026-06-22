@@ -14,8 +14,10 @@ the same always-on [fleet agent](fleet.md) that already manages the device over 
   backspace / clear), no on-Portal typing.
 - **App launcher grid** — every launchable app on the Portal, tap to open.
 - **Presets** — user-defined one-tap macros: an ordered list of steps (launch an app, a nav key,
-  type text, or wait), built and edited right on the remote page. e.g. *"Movie night" = Home →
-  launch the app*.
+  type text, wait, or **push a screensaver setting**), built and edited right on the remote page.
+  e.g. *"Movie night" = Home → launch the app*, or *"Photos = default feed + show now-playing"*.
+  The screensaver step reuses the fleet's config path, so one tap can both drive input **and**
+  reconfigure the device — the remote × fleet bridge.
 
 Back/Home/Power go through the device's accessibility layer (see *How input works* below) and work
 across all apps. **Recents** opens Immortal's own app switcher — the Portal has no system
@@ -73,10 +75,8 @@ automatically (via `WRITE_SECURE_SETTINGS`) and which comes back on its own afte
 
 Later phases extend the same `/remote/*` routes:
 
-- **Config-push preset steps** — extend presets with a step that pushes screensaver/calendar
-  settings (reusing the fleet's `/screensaver` + `/calendar`), so one tap can both drive input and
-  reconfigure the device — the remote×fleet bridge.
-- **Multi-room** — drive any Portal on the fleet from one remote.
+- **Multi-room** — drive any Portal on the fleet from one remote (pick a room; commands proxy to
+  that device).
 
 ## API
 
