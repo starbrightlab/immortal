@@ -1,0 +1,5 @@
+# Dev-only files that must NOT ship in portal-kit.zip, which is built with
+# `git archive HEAD:provisioning` (see scripts/cut-release.sh). A subtree archive reads
+# attributes relative to this directory, so these paths are provisioning-relative.
+.gitignore export-ignore
+.gitattributes export-ignore

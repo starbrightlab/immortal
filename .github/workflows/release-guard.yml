@@ -1,0 +1,27 @@
+name: Release guard
+
+# Block any change that would desync the release metadata — the classic "bumped the APK
+# but forgot version.json" (or vice-versa) that silently stops every device updating.
+on:
+  pull_request:
+    paths:
+      - "version.json"
+      - "app/build.gradle.kts"
+      - "scripts/check-version-sync.sh"
+  push:
+    branches: [main]
+    paths:
+      - "version.json"
+      - "app/build.gradle.kts"
+      - "scripts/check-version-sync.sh"
+
+jobs:
+  version-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: version.json ⇄ build.gradle.kts must agree
+        run: scripts/check-version-sync.sh

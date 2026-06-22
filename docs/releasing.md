@@ -2,6 +2,43 @@
 
 Immortal is hosted from its own GitHub repo. Two files drive what devices see.
 
+## Cutting a release (the one safe command)
+
+```sh
+scripts/cut-release.sh <versionName> "<release notes>"
+# e.g.
+scripts/cut-release.sh 1.44 "Adds the home-header remote button and a tidier remote layout."
+```
+
+That single command does the whole release and **fails fast at every gate**, so the two
+things that historically broke releases — forgetting the `version.json` bump, and misnaming
+the APK — can't happen:
+
+1. **Preflight** — `gh` authenticated; a clean tree on an up-to-date `main`; the signing key
+   present; Android build-tools found; the tag still free.
+2. **Bumps `versionCode` (auto, current + 1) / `versionName` / `notes` in both
+   `app/build.gradle.kts` and `version.json` together**, then re-checks they agree.
+3. **Builds the signed APK and verifies it** — `aapt` confirms the APK's version matches what
+   was just written (no stale build); `apksigner` confirms it's signed with the **same key as
+   the currently-published `immortal.apk`** (a different key silently breaks self-update).
+4. **Builds `portal-kit.zip`** from the committed `provisioning/` tree (`git archive` — only
+   tracked files, never local junk or secrets).
+5. Commits, tags, pushes; creates the Release as a **draft**, uploads exactly **`immortal.apk`
+   + `portal-kit.zip`**, then publishes (drafts aren't "latest", so `latest/download` keeps
+   resolving to the previous release until the new assets are in place).
+6. Verifies both `latest/download/` URLs resolve **and** the published `immortal.apk` reports
+   the `versionCode` shipped.
+
+Requires `gh` (write access), the Android SDK build-tools, and `keystore.properties` (see
+[Signing](#signing)). A release attaches exactly two assets: `immortal.apk` and
+`portal-kit.zip` — nothing else, no versioned APK copies.
+
+!!! note "Drift is blocked in CI too"
+    [`release-guard.yml`](https://github.com/starbrightlab/immortal/blob/main/.github/workflows/release-guard.yml)
+    runs `scripts/check-version-sync.sh` on every change to `version.json` or
+    `app/build.gradle.kts`: if their `versionCode`/`versionName` disagree (or `apkUrl` isn't
+    the stable URL, or `notes` is empty), the check fails before it can reach a release.
+
 ## `version.json` — the self-update manifest
 
 Immortal polls
@@ -9,16 +46,17 @@ Immortal polls
 advertises a higher `versionCode`, the device downloads and installs the new build over itself
 (`UpdateManager`). No cable, no laptop.
 
-To cut a release: bump `versionCode` / `versionName`, build a signed release, and attach it as
-`immortal.apk` to a GitHub Release. Devices update on their next check.
+It advertises the build by `versionCode`, points devices at the stable
+`releases/latest/download/immortal.apk`, and carries the release `notes`. Don't hand-edit it to
+cut a release — [`cut-release.sh`](#cutting-a-release-the-one-safe-command) writes it (in lockstep
+with gradle) and the release guard keeps it honest.
 
 !!! danger "The release asset **must** be named `immortal.apk`"
     The manifest's `apkUrl` (and the store catalog) point at the stable
     `releases/latest/download/immortal.apk`. If a release attaches only a versioned name, that
-    URL 404s and **breaks self-update for every device.** Use
-    [`scripts/publish-release.sh`](https://github.com/starbrightlab/immortal/blob/main/scripts/publish-release.sh)
-    `<tag> <signed.apk>` to upload the asset under both the stable and versioned names and verify
-    the URL resolves.
+    URL 404s and **breaks self-update for every device** — which is exactly what happened once
+    (a release shipped only `immortal-1.42.apk`). `cut-release.sh` always uploads the asset as
+    `immortal.apk` and then verifies the URL resolves, so this can't recur.
 
 ## `catalog.json` — the app-store catalog
 

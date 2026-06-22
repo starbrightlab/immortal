@@ -5,3 +5,7 @@
 # LF endings regardless of host OS. CRLF makes the on-device shell fail with
 # "syntax error: unexpected 'do'" etc. Keep this even on Windows checkouts.
 *.sh text eol=lf
+
+# portal-kit.zip is built with `git archive HEAD:provisioning` (see cut-release.sh). Files
+# that must stay out of the shipped kit are marked export-ignore in provisioning/.gitattributes
+# (a subtree archive reads attributes relative to that subtree, not this root file).
