@@ -7,11 +7,18 @@
 
 package com.immortal.launcher.settings
 
+import android.content.Context
 import com.immortal.launcher.CalendarFeed
 import com.immortal.launcher.CalendarUrlEntryActivity
 import com.immortal.launcher.FleetCalendar
 import com.immortal.launcher.FleetScreensaver
 import com.immortal.launcher.FrameMode
+import com.immortal.launcher.ImmortalSettings
+import com.immortal.launcher.MqttConfig
+import com.immortal.launcher.MqttService
+import com.immortal.launcher.MultiRoomService
+import com.immortal.launcher.QuickBar
+import com.immortal.launcher.QuickBarConfig
 import com.immortal.launcher.ScreensaverConfig
 import com.immortal.launcher.SettingsGuard
 import com.immortal.launcher.SleepScheduler
@@ -234,6 +241,185 @@ object SettingsDomains {
           },
       )
 
+  /**
+   * Immortal's own launcher preferences ([ImmortalSettings]). The multi-room fields gate on the
+   * master toggle. `hideStatusBar` re-applies the immersive policy; the multi-room fields resync
+   * the Snapcast/MA bridge — the same side effects the on-device screen runs.
+   */
+  val immortal: SettingsDomain<ImmortalSettings.Settings> =
+      SettingsDomain(
+          id = "immortal",
+          title = "Immortal",
+          load = ImmortalSettings::load,
+          specs =
+              listOf(
+                  EnumSpec(
+                      "weatherUnit",
+                      "Temperature unit",
+                      get = { it.weatherUnit },
+                      set = ImmortalSettings::setWeatherUnit,
+                      options =
+                          listOf(
+                              ImmortalSettings.UNIT_AUTO to "Auto",
+                              ImmortalSettings.UNIT_F to "Fahrenheit",
+                              ImmortalSettings.UNIT_C to "Celsius")),
+                  EnumSpec(
+                      "tileSize",
+                      "App tile size",
+                      get = { it.tileSize },
+                      set = ImmortalSettings::setTileSize,
+                      options =
+                          listOf(
+                              ImmortalSettings.SIZE_STANDARD to "Standard",
+                              ImmortalSettings.SIZE_LARGE to "Large",
+                              ImmortalSettings.SIZE_XL to "XL")),
+                  EnumSpec(
+                      "weatherWidget",
+                      "Weather widget",
+                      get = { it.weatherWidget },
+                      set = ImmortalSettings::setWeatherWidget,
+                      options =
+                          listOf(
+                              ImmortalSettings.WIDGET_OFF to "Off",
+                              ImmortalSettings.WIDGET_HOURLY to "Hourly",
+                              ImmortalSettings.WIDGET_DAILY to "Daily")),
+                  EnumSpec(
+                      "clockFormat",
+                      "Clock",
+                      get = { it.clockFormat },
+                      set = ImmortalSettings::setClockFormat,
+                      options =
+                          listOf(
+                              ImmortalSettings.CLOCK_AUTO to "Auto",
+                              ImmortalSettings.CLOCK_12 to "12-hour",
+                              ImmortalSettings.CLOCK_24 to "24-hour")),
+                  BoolSpec(
+                      "showMiniPlayer",
+                      "Mini player",
+                      get = { it.showMiniPlayer },
+                      set = ImmortalSettings::setShowMiniPlayer),
+                  BoolSpec(
+                      "hideStatusBar",
+                      "Hide status bar",
+                      get = { it.hideStatusBar },
+                      set = ImmortalSettings::setHideStatusBar),
+                  BoolSpec(
+                      "multiRoomEnabled",
+                      "Multi-room audio",
+                      get = { it.multiRoomEnabled },
+                      set = ImmortalSettings::setMultiRoomEnabled),
+                  StringSpec(
+                      "snapcastHost",
+                      "Snapcast host",
+                      get = { it.snapcastHost },
+                      set = ImmortalSettings::setSnapcastHost,
+                      visible = { _, s -> s.multiRoomEnabled }),
+                  StringSpec(
+                      "maUsername",
+                      "Music Assistant user",
+                      get = { it.maUsername },
+                      set = ImmortalSettings::setMaUsername,
+                      visible = { _, s -> s.multiRoomEnabled }),
+                  StringSpec(
+                      "maPassword",
+                      "Music Assistant password",
+                      get = { it.maPassword },
+                      set = ImmortalSettings::setMaPassword,
+                      secret = true,
+                      visible = { _, s -> s.multiRoomEnabled }),
+              ),
+          onApplied = { c, keys ->
+            if ("hideStatusBar" in keys) SettingsGuard.applyStatusBar(c)
+            if (keys.any { it in setOf("multiRoomEnabled", "snapcastHost", "maUsername", "maPassword") })
+                MultiRoomService.sync(c)
+          },
+      )
+
+  /**
+   * The Home Assistant MQTT publisher ([MqttConfig]). Uses the Context itself as the snapshot
+   * (this config has no aggregate `Settings`); the broker fields gate on the master toggle, and
+   * cert validation on TLS. [SettingsDomain.explicitApply] = batch so a future on-device renderer
+   * doesn't reconnect the broker per keystroke; each apply resyncs the service once.
+   */
+  val mqtt: SettingsDomain<Context> =
+      SettingsDomain(
+          id = "mqtt",
+          title = "Home Assistant (MQTT)",
+          load = { it },
+          explicitApply = true,
+          specs =
+              listOf(
+                  BoolSpec("enabled", "Publish to MQTT", get = { MqttConfig.isEnabled(it) }, set = MqttConfig::setEnabled),
+                  StringSpec(
+                      "host",
+                      "Broker host",
+                      get = { MqttConfig.host(it) },
+                      set = MqttConfig::setHost,
+                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  IntSpec(
+                      "port",
+                      "Port",
+                      get = { MqttConfig.port(it) },
+                      set = MqttConfig::setPort,
+                      min = 1,
+                      max = 65535,
+                      asText = true,
+                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  StringSpec(
+                      "username",
+                      "Username",
+                      get = { MqttConfig.username(it) },
+                      set = MqttConfig::setUsername,
+                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  StringSpec(
+                      "password",
+                      "Password",
+                      get = { MqttConfig.password(it) },
+                      set = MqttConfig::setPassword,
+                      secret = true,
+                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  BoolSpec(
+                      "useTls",
+                      "Use TLS",
+                      get = { MqttConfig.useTls(it) },
+                      set = MqttConfig::setUseTls,
+                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  BoolSpec(
+                      "validateCert",
+                      "Validate certificate",
+                      get = { MqttConfig.validateCert(it) },
+                      set = MqttConfig::setValidateCert,
+                      visible = { c, _ -> MqttConfig.isEnabled(c) && MqttConfig.useTls(c) }),
+              ),
+          onApplied = { c, _ -> MqttService.sync(c) },
+      )
+
+  /** The floating quick-button cluster ([QuickBarConfig]); Context as snapshot. */
+  val quickbar: SettingsDomain<Context> =
+      SettingsDomain(
+          id = "quickbar",
+          title = "Quick buttons",
+          load = { it },
+          specs =
+              listOf(
+                  BoolSpec(
+                      "enabled",
+                      "App-switcher button",
+                      get = { QuickBarConfig.isEnabled(it) },
+                      set = QuickBarConfig::setEnabled),
+                  BoolSpec(
+                      "alwaysShow",
+                      "Always show",
+                      get = { QuickBarConfig.alwaysShow(it) },
+                      set = QuickBarConfig::setAlwaysShow,
+                      visible = { c, _ -> QuickBarConfig.isEnabled(c) }),
+              ),
+          onApplied = { c, _ ->
+            SettingsGuard.reconcileBarWatch(c)
+            QuickBar.applyConfig()
+          },
+      )
+
   /** Every registered domain. */
-  val all: List<SettingsDomain<*>> = listOf(screensaver, calendar)
+  val all: List<SettingsDomain<*>> = listOf(screensaver, calendar, immortal, mqtt, quickbar)
 }

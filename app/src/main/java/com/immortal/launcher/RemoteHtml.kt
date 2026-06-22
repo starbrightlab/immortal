@@ -395,10 +395,11 @@ object RemoteHtml {
   function renderControl(domId,ctl){
     var row=document.createElement('div');row.className='setrow';
     var t=document.createElement('div');t.className='t';t.textContent=ctl.title;
-    if(ctl.type==='string'){
+    if(ctl.type==='string'||(ctl.type==='int'&&ctl.asText)){
       row.className='setrow col';row.appendChild(t);
-      var inp=document.createElement('input');inp.value=ctl.value||'';if(ctl.help)inp.placeholder=ctl.help;
-      inp.onchange=function(){setPut(domId,ctl.key,inp.value);};
+      var inp=document.createElement('input');inp.value=(ctl.value!=null?ctl.value:'');if(ctl.help)inp.placeholder=ctl.help;
+      if(ctl.type==='int')inp.inputMode='numeric';
+      inp.onchange=function(){var v=ctl.type==='int'?parseInt(inp.value,10):inp.value;if(ctl.type==='int'&&isNaN(v))return;setPut(domId,ctl.key,v);};
       row.appendChild(inp);return row;
     }
     row.appendChild(t);

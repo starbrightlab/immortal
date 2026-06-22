@@ -96,6 +96,8 @@ class IntSpec<S>(
     val step: Int = 1,
     /** Time-of-day values wrap at the bounds; everything else clamps. Drives the UI stepper only. */
     val wrap: Boolean = false,
+    /** Render as a number field instead of a stepper (for wide-range values like a port). */
+    val asText: Boolean = false,
     val format: (Int) -> String = { it.toString() },
     val help: String? = null,
     val aliases: List<String> = emptyList(),
@@ -119,6 +121,7 @@ class IntSpec<S>(
           .put("max", max)
           .put("step", step)
           .put("wrap", wrap)
+          .put("asText", asText)
 
   override fun applyFrom(c: Context, body: JSONObject): Boolean {
     val k = firstPresent(key, aliases, body) ?: return false
