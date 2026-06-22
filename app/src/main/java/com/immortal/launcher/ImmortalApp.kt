@@ -45,6 +45,11 @@ class ImmortalApp : Application() {
     // Apply the user's status-bar choice (default hidden — the wall-frame look).
     SettingsGuard.applyStatusBar(this)
 
+    // Keep our accessibility service enabled — baseline launcher infrastructure now (it backs
+    // the Calls→stock-home bridge, the phone remote, and the quick-button cluster). No-op
+    // without WRITE_SECURE_SETTINGS, so it effectively turns on only once provisioned.
+    SettingsGuard.reconcileBarWatch(this)
+
     // Arm the overnight screen-off window (and apply it if we're inside it now).
     SleepScheduler.applyOvernightNow(this)
 

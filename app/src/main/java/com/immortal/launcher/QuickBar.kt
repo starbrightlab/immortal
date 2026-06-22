@@ -92,7 +92,11 @@ object QuickBar {
   private fun refresh() {
     val v = view ?: return
     val ctx = host ?: return
-    v.visibility = if (QuickBarConfig.alwaysShow(ctx) || barVisible) View.VISIBLE else View.GONE
+    // BarWatchService is baseline-enabled now (it also backs the remote + the Calls→stock-home
+    // bridge), so the service being connected no longer implies the quick-button feature is on.
+    // Gate the cluster on its own setting; show only when enabled AND (always-show or bar shown).
+    val visible = QuickBarConfig.isEnabled(ctx) && (QuickBarConfig.alwaysShow(ctx) || barVisible)
+    v.visibility = if (visible) View.VISIBLE else View.GONE
   }
 
   private fun statusBarHeight(ctx: Context): Int {

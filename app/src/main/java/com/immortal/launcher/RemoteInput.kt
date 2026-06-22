@@ -14,6 +14,7 @@ import android.graphics.Path
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
+import kotlin.concurrent.thread
 
 /**
  * The bridge from the fleet agent's HTTP thread ([RemoteRoutes]) to the accessibility
@@ -89,6 +90,22 @@ object RemoteInput {
   /** The global-action button names [globalActionCode] accepts (for the UI / docs). The
    *  "apps" button is handled separately (in-app switcher), not as a global action. */
   internal val ACTIONS = listOf("back", "home", "power")
+
+  /**
+   * Fire the system Back action [times] times, [delayMs] apart, off the main thread. Backs the
+   * Calls→stock-home bridge: a short burst of system Back presses is the reliable way back to
+   * Meta's stock launcher on the Portal (where deep-link / HOME launches are flaky). No-op if no
+   * accessibility service is connected.
+   */
+  fun backRepeat(times: Int, delayMs: Long) {
+    if (service == null) return
+    thread(name = "immortal-back") {
+      repeat(times) { i ->
+        globalAction("back")
+        if (i < times - 1) runCatching { Thread.sleep(delayMs) }
+      }
+    }
+  }
 
   // --- text entry -------------------------------------------------------------
 

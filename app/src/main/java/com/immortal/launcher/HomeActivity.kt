@@ -127,6 +127,11 @@ private data class AppEntry(
     val folder: String? = null,
 )
 
+/** Calls→stock-home bridge: how many system Back presses reach Meta's launcher, and the gap
+ *  between them (verified on the Portal TV — 5 presses lands on the stock launcher's Apps tab). */
+private const val STOCK_HOME_BACK_PRESSES = 5
+private const val STOCK_HOME_BACK_INTERVAL_MS = 300L
+
 /**
  * The custom Portal home launcher. Replaces the stock Aloha home (selected via
  * `cmd package set-home-activity`). Shows a clock/date/weather header, an App
@@ -246,6 +251,15 @@ class HomeActivity : ComponentActivity() {
     // (cleared in onResume) so the frame can't slam over an in-progress call.
     DreamPolicy.bridgeAt = System.currentTimeMillis()
     DreamPolicy.inStockHandoff = true
+
+    // Preferred path: a short burst of system Back presses reliably surfaces Meta's stock
+    // launcher (verified on the Portal TV) — unlike the portal:// deep link or a HOME launch,
+    // which cold-start ripleyhome's idle dream and bounce the user. Needs our accessibility
+    // service (baseline-enabled on provisioned devices); falls back to the deep link otherwise.
+    if (RemoteInput.available()) {
+      RemoteInput.backRepeat(STOCK_HOME_BACK_PRESSES, STOCK_HOME_BACK_INTERVAL_MS)
+      return
+    }
 
     fun fire(intent: Intent): Boolean =
         runCatching {

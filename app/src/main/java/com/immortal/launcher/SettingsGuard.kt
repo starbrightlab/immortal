@@ -184,6 +184,7 @@ object SettingsGuard {
       val cur = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
       val parts = cur.split(':').filter { it.isNotBlank() && !it.equals(comp, ignoreCase = true) }
       val next = (if (on) parts + comp else parts).joinToString(":")
+      if (next == cur) return // already in the desired state — don't rewrite (avoids a rebind)
       Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, next)
       if (on) Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
       android.util.Log.i("ImmortalQuickBar", "BarWatch a11y ${if (on) "enabled" else "disabled"}")
@@ -192,14 +193,16 @@ object SettingsGuard {
   }
 
   /**
-   * Bring [BarWatchService] into line with whether ANY feature that needs it is on:
-   * the quick-button cluster ([QuickBarConfig]) or the phone remote ([RemotePairing]),
-   * which both ride the one accessibility service. Because it's shared, neither feature
-   * may disable it while the other still needs it — so always toggle via this reconcile
-   * (never call [setBarWatchEnabled] directly from a feature switch). Idempotent.
+   * Keep [BarWatchService] enabled. It is baseline launcher infrastructure now — it backs the
+   * Calls→stock-home bridge (5 system Back presses via accessibility, the reliable way back to
+   * Meta's launcher), the phone remote, and the quick-button cluster. Enabled at app start
+   * ([ImmortalApp]) and reboot; requires `WRITE_SECURE_SETTINGS`, so a silent no-op without it
+   * (i.e. it effectively turns on only on provisioned devices). Idempotent.
+   *
+   * Note: the cluster overlay is gated separately on [QuickBarConfig.isEnabled] (in [QuickBar]),
+   * so the service being on doesn't, by itself, show the quick buttons.
    */
   fun reconcileBarWatch(context: Context) {
-    val needed = QuickBarConfig.isEnabled(context) || RemotePairing.isEnabled(context)
-    setBarWatchEnabled(context, needed)
+    setBarWatchEnabled(context, true)
   }
 }

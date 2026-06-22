@@ -734,10 +734,10 @@ private fun QuickButtonsSection() {
             val on = it == "on"
             enabled = on
             QuickBarConfig.setEnabled(context, on)
-            // Enabling the bar watcher both detects the bar and hosts the cluster overlay.
-            // Reconcile (don't set directly): the phone remote shares this accessibility
-            // service, so it must stay on if the remote still needs it.
+            // The accessibility service is baseline-enabled (reconcile is a no-op here); the
+            // cluster's visibility is gated on this setting, so just refresh the overlay.
             SettingsGuard.reconcileBarWatch(context)
+            QuickBar.applyConfig()
           },
       )
     }
