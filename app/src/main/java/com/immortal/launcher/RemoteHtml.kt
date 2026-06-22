@@ -65,9 +65,11 @@ object RemoteHtml {
   .npbar input{width:100%;accent-color:#2e6be6}
   .nptimes{display:flex;justify-content:space-between;width:100%;max-width:340px;font-size:12px;color:#7c7c7c}
   .npctrl{display:flex;align-items:center;gap:22px;margin-top:20px}
-  .npctrl button{background:#1c1c1e;color:#fff;border-radius:50%;width:60px;height:60px;font-size:22px}
-  .npctrl button.play{width:76px;height:76px;background:#2e6be6;font-size:26px}
+  .npctrl button{background:#1c1c1e;color:#fff;border-radius:50%;width:60px;height:60px;display:flex;align-items:center;justify-content:center}
+  .npctrl button.play{width:76px;height:76px;background:#2e6be6}
   .npctrl button:active{background:#2a2a2c}
+  .npctrl button svg{width:26px;height:26px;display:block}
+  .npctrl button.play svg{width:32px;height:32px}
   .npempty{color:#7c7c7c;font-size:15px;text-align:center;padding:56px 16px}
 
   .toprow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -237,9 +239,9 @@ object RemoteHtml {
         <div class=npbar><input id=npSeek type=range min=0 max=1000 value=0 oninput="npScrubInput()" onchange="npScrubCommit()"></div>
         <div class=nptimes><span id=npPos>0:00</span><span id=npDur></span></div>
         <div class=npctrl>
-          <button onclick="media('prev')" aria-label="Previous">&#9198;</button>
-          <button id=npPlay class=play onclick="media('playpause')" aria-label="Play or pause">&#9654;</button>
-          <button onclick="media('next')" aria-label="Next">&#9197;</button>
+          <button onclick="media('prev')" aria-label="Previous"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 6h2v12H7zM18 6v12l-9-6z"/></svg></button>
+          <button id=npPlay class=play onclick="media('playpause')" aria-label="Play or pause"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+          <button onclick="media('next')" aria-label="Next"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6v12l9-6zM15 6h2v12h-2z"/></svg></button>
         </div>
       </div>
     </div>
@@ -344,6 +346,10 @@ object RemoteHtml {
     if(name==='media')startNowPlaying();else stopNowPlaying();
   }
   // --- now playing (media controls) ---
+  // Inline SVG (not Unicode ▶/⏸) so the controls render as crisp monochrome glyphs everywhere —
+  // iOS renders the media-symbol codepoints as colour emoji.
+  var SVG_PLAY='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  var SVG_PAUSE='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
   var npTimer=null,npTick=null,npData=null,npFetchedAt=0,npArtVer=null,npSeeking=false;
   function fmt(ms){if(!ms||ms<0)ms=0;var s=Math.floor(ms/1000),m=Math.floor(s/60);s=s%60;return m+':'+(s<10?'0':'')+s;}
   function curPos(){ // interpolate between polls so the bar moves smoothly without hammering
@@ -360,7 +366,7 @@ object RemoteHtml {
     card.classList.remove('hide');empty.classList.add('hide');
     document.getElementById('npTitle').textContent=npData.title||'';
     document.getElementById('npSub').textContent=[npData.artist,npData.album].filter(Boolean).join(' — ');
-    document.getElementById('npPlay').innerHTML=npData.playing?'&#9208;':'&#9654;';
+    document.getElementById('npPlay').innerHTML=npData.playing?SVG_PAUSE:SVG_PLAY;
     var img=document.getElementById('npArt');
     if(npData.hasArt){
       if(npArtVer!==npData.artVersion){npArtVer=npData.artVersion;var a=active();img.src=(a?a.base:'')+'/remote/art?v='+npData.artVersion;}
