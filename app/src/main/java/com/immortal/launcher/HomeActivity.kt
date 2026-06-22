@@ -892,19 +892,7 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
           )
           RemotePairCard(pairUrl, pairPin)
           Spacer(Modifier.size(16.dp))
-          Surface(
-              color = Color(0xFF2E6BE6),
-              shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-              modifier = Modifier.fillMaxWidth(),
-          ) {
-            Text(
-                "Done",
-                color = Color.White,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.fillMaxWidth().tvFocusableRow { showPair = false }.padding(vertical = 14.dp),
-            )
-          }
+          PairDoneButton { showPair = false }
         }
       }
     }

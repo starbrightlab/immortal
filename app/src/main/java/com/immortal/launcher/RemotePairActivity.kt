@@ -104,15 +104,7 @@ private fun RemotePairScreen() {
       RemotePairCard(url, pin)
 
       Spacer(Modifier.size(28.dp))
-      Surface(color = Color(0xFF2E6BE6), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "Done",
-            color = Color.White,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.fillMaxWidth().tvFocusableRow { activity?.finish() }.padding(vertical = 16.dp),
-        )
-      }
+      PairDoneButton { activity?.finish() }
     }
   }
 }

@@ -9,6 +9,7 @@ package com.immortal.launcher
 
 import android.content.Context
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -90,6 +91,29 @@ fun RemotePairCard(url: String?, pin: String?, modifier: Modifier = Modifier) {
         )
         Text("Code expires in a few minutes", color = Color(0xFF7C7C7C), fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
       }
+    }
+  }
+}
+
+/**
+ * Compact, centred "Done" for the pairing surfaces (modal + [RemotePairActivity]). A wrap-content
+ * pill rather than a full-width bar, which looked heavy in the dialog. Ring focus for the remote.
+ */
+@Composable
+fun PairDoneButton(modifier: Modifier = Modifier, onDone: () -> Unit) {
+  Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    Surface(
+        color = Color(0xFF2E6BE6),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.tvFocusable(RoundedCornerShape(12.dp)) { onDone() },
+    ) {
+      Text(
+          "Done",
+          color = Color.White,
+          fontSize = 16.sp,
+          fontWeight = FontWeight.SemiBold,
+          modifier = Modifier.padding(horizontal = 44.dp, vertical = 12.dp),
+      )
     }
   }
 }
