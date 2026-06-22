@@ -72,10 +72,11 @@ object RemoteHtml {
   .npctrl button.play svg{width:32px;height:32px}
   .npempty{color:#7c7c7c;font-size:15px;text-align:center;padding:56px 16px}
 
-  .toprow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .toprow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .botrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .toprow button,.botrow button{padding:14px 4px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:13px}
-  .toprow button:active,.botrow button:active{background:#2e6be6}
+  .volrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+  .toprow button,.botrow button,.volrow button{padding:14px 4px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:13px}
+  .toprow button:active,.botrow button:active,.volrow button:active{background:#2e6be6}
   .kbpanel{margin-top:10px}
   .kbd{display:flex;gap:8px}
   .kbd input{flex:1;min-width:0;padding:13px;font-size:16px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:12px;color:#fff}
@@ -138,6 +139,7 @@ object RemoteHtml {
     <div id=tabRemote class=panel>
       <div class=toprow>
         <button onclick="key('power')">Power</button>
+        <button onclick="key('screensaver')">Screensaver</button>
         <button onclick="key('apps')">Recents</button>
         <button onclick=toggleKb()>Keyboard</button>
       </div>
@@ -163,6 +165,11 @@ object RemoteHtml {
           <button onclick="scrollDir('up')" aria-label="Page up">&#9650;</button>
           <button onclick="scrollDir('down')" aria-label="Page down">&#9660;</button>
         </div>
+      </div>
+      <div class=volrow>
+        <button onclick="vol('down')" aria-label="Volume down">Vol &#8722;</button>
+        <button onclick="vol('mute')" aria-label="Mute">Mute</button>
+        <button onclick="vol('up')" aria-label="Volume up">Vol &#43;</button>
       </div>
       <div id=padHint class=padhint></div>
     </div>
@@ -397,6 +404,9 @@ object RemoteHtml {
   }
   function key(action){
     api('/remote/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action})}).catch(function(){});
+  }
+  function vol(dir){
+    api('/remote/volume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:dir})}).catch(function(){});
   }
   function scrollDir(dir){
     api('/remote/scroll',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dir:dir})}).then(gestureGone).catch(function(){});

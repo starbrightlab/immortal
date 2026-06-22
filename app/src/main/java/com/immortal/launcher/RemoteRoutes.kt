@@ -9,6 +9,7 @@ package com.immortal.launcher
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import kotlin.concurrent.thread
 import org.json.JSONArray
 import org.json.JSONObject
@@ -41,6 +42,7 @@ class RemoteRoutes(private val context: Context) {
         "/remote/apps" -> authed(req) { apps() }
         "/remote/nowplaying" -> authed(req) { json(200, ok().put("np", RemoteMedia.stateJson())) }
         "/remote/media" -> authed(req) { media(req) }
+        "/remote/volume" -> authed(req) { volume(req) }
         "/remote/key" -> authed(req) { key(req) }
         "/remote/launch" -> authed(req) { launch(req) }
         "/remote/text" -> authed(req) { text(req) }
@@ -89,11 +91,30 @@ class RemoteRoutes(private val context: Context) {
     return json(if (dispatched) 200 else 409, JSONObject().put("ok", dispatched).put("action", action))
   }
 
+  /** Media volume for the active (music) stream: `{"dir":"up|down|mute"}`. Shows the system
+   *  volume UI on the TV. Uses AudioManager directly — no accessibility needed. */
+  private fun volume(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
+    val dir = body.optString("dir")
+    val adjust =
+        when (dir) {
+          "up" -> AudioManager.ADJUST_RAISE
+          "down" -> AudioManager.ADJUST_LOWER
+          "mute" -> AudioManager.ADJUST_TOGGLE_MUTE
+          else -> return json(400, err("unknown_dir"))
+        }
+    val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    runCatching { am.adjustStreamVolume(AudioManager.STREAM_MUSIC, adjust, AudioManager.FLAG_SHOW_UI) }
+    return json(200, ok().put("dir", dir))
+  }
+
   private fun key(req: FleetHttpServer.Request): FleetHttpServer.Response {
     val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
     val action = body.optString("action")
     // The Portal has no system Recents; "apps" opens the launcher's own app switcher instead.
     if (action == "apps") return openAppSwitcher()
+    // "screensaver" starts the photo frame (same as the home-screen screensaver button).
+    if (action == "screensaver") return openScreensaver()
     if (RemoteInput.globalActionCode(action) == null) return json(400, err("unknown_action"))
     if (!RemoteInput.available()) return json(503, err("no_accessibility"))
     val dispatched = RemoteInput.globalAction(action)
@@ -115,6 +136,20 @@ class RemoteRoutes(private val context: Context) {
             true
           }
           .getOrDefault(false)
+
+  /** Start the photo-frame screensaver ([PhotoFramePreviewActivity]) — the same thing the
+   *  home-screen screensaver button does. Same-app start, so the non-exported activity is fine. */
+  private fun openScreensaver(): FleetHttpServer.Response {
+    val ok =
+        runCatching {
+              context.startActivity(
+                  Intent(context, PhotoFramePreviewActivity::class.java)
+                      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+              true
+            }
+            .getOrDefault(false)
+    return json(if (ok) 200 else 500, JSONObject().put("ok", ok).put("action", "screensaver"))
+  }
 
   private fun launch(req: FleetHttpServer.Request): FleetHttpServer.Response {
     val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
