@@ -49,4 +49,14 @@ class RemoteInputTest {
   fun actions_areAllResolvable() {
     RemoteInput.ACTIONS.forEach { assertEquals(true, RemoteInput.globalActionCode(it) != null) }
   }
+
+  @Test
+  fun nextText_appliesEditModes() {
+    assertEquals("hello", RemoteInput.nextText("old", "hello", "set"))
+    assertEquals("abc", RemoteInput.nextText("ab", "c", "append"))
+    assertEquals("ab", RemoteInput.nextText("abc", "", "backspace"))
+    assertEquals("", RemoteInput.nextText("", "", "backspace")) // backspace on empty stays empty
+    assertEquals("", RemoteInput.nextText("abc", "ignored", "clear"))
+    assertEquals("x", RemoteInput.nextText("anything", "x", "weird")) // unknown mode == set
+  }
 }

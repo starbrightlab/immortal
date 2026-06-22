@@ -8,23 +8,29 @@
 package com.immortal.launcher
 
 import android.accessibilityservice.AccessibilityService
+import android.os.Bundle
 import android.util.Log
+import android.view.accessibility.AccessibilityNodeInfo
 
 /**
  * The bridge from the fleet agent's HTTP thread ([RemoteRoutes]) to the accessibility
  * layer, so a phone "remote" can drive the Portal. The Portal is non-root Android 9/10
  * and we hold no `INJECT_EVENTS` (signature) permission, so raw D-pad/key events can't
- * be injected into other apps — but an enabled [AccessibilityService] can fire the
- * system **global actions** (Back / Home / Recents / Notifications / Quick settings),
- * which is the whole Tier-A soft-remote surface and needs no extra permission.
+ * be injected into other apps. Instead an enabled [AccessibilityService] gives us three
+ * working surfaces with no extra permission:
+ *  - **global actions** ([globalAction]) — Back / Home / Power.
+ *  - **text entry** ([typeText]) — set the focused editable field's text directly.
  *
- * [BarWatchService] — already a connected, general-purpose accessibility service on
- * provisioned devices — registers itself here on connect (the same way it hosts
- * [QuickBar]); the routes call [globalAction]. A no-op until a service is registered,
- * so an un-provisioned device with no enabled service simply reports "unavailable".
+ * [BarWatchService] — a connected, general-purpose accessibility service (the remote
+ * self-enables it, see [SettingsGuard.reconcileBarWatch]) — registers itself here on
+ * connect (the same way it hosts [QuickBar]); the routes call into us. A no-op until a
+ * service is registered, so a device with no enabled service reports "unavailable".
  *
- * Directional focus nav, gestures (touchpad) and text entry arrive in later phases;
- * this object is the single seam they'll extend.
+ * Directional/pointer navigation is deliberately NOT done here: D-pad focus movement via
+ * accessibility (`focusSearch` + `ACTION_FOCUS`) was tried and proved non-functional on the
+ * Portal's Compose/custom UIs (no input-focus node to search from). It's delivered instead
+ * by the gesture touchpad in a later phase — the right fit for a touchscreen. This object is
+ * the single seam those gestures will extend.
  */
 object RemoteInput {
   private const val TAG = "ImmortalRemote"
@@ -80,4 +86,43 @@ object RemoteInput {
   /** The global-action button names [globalActionCode] accepts (for the UI / docs). The
    *  "apps" button is handled separately (in-app switcher), not as a global action. */
   internal val ACTIONS = listOf("back", "home", "power")
+
+  // --- text entry -------------------------------------------------------------
+
+  /**
+   * Edit the currently focused editable field on the device. [mode] is "set" (replace
+   * with [text]), "append", "backspace" (drop last char), or "clear". Returns true only
+   * if a service is connected, an editable field has input focus, and the platform
+   * accepted the edit. No IME swap needed — we set the node's text directly.
+   */
+  fun typeText(text: String, mode: String): Boolean {
+    val svc = service ?: return false
+    val node = focusedEditable(svc) ?: return false
+    val next = nextText(node.text?.toString() ?: "", text, mode)
+    val args =
+        Bundle().apply {
+          putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, next)
+        }
+    return runCatching { node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args) }
+        .onFailure { Log.w(TAG, "typeText failed", it) }
+        .getOrDefault(false)
+  }
+
+  /** The input-focused editable node, or null if nothing editable has focus. */
+  private fun focusedEditable(svc: AccessibilityService): AccessibilityNodeInfo? {
+    val root = svc.rootInActiveWindow ?: return null
+    val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+    return if (focused != null && focused.isEditable) focused else null
+  }
+
+  // --- pure helpers (unit-tested) ---------------------------------------------
+
+  /** Compute the new field text for an edit [mode]. Pure. */
+  internal fun nextText(current: String, text: String, mode: String): String =
+      when (mode.lowercase().trim()) {
+        "append" -> current + text
+        "backspace" -> if (current.isNotEmpty()) current.dropLast(1) else ""
+        "clear" -> ""
+        else -> text // "set"
+      }
 }

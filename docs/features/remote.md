@@ -4,9 +4,11 @@ Use a phone or tablet on the same Wi-Fi as a **remote control** for a Portal —
 buttons and an app launcher in a web page, with nothing to install on the phone. It rides on
 the same always-on [fleet agent](fleet.md) that already manages the device over the network.
 
-## What it does (Phase 1)
+## What it does
 
 - **Navigation buttons** — Back, Home, Recents, Power dialog.
+- **Keyboard** — type on the phone; text lands in the focused field on the Portal (set / append /
+  backspace / clear), no on-Portal typing.
 - **App launcher grid** — every launchable app on the Portal, tap to open.
 
 Back/Home/Power go through the device's accessibility layer (see *How input works* below) and work
@@ -44,6 +46,11 @@ D-pad/key events **cannot** be injected into other apps. Instead the remote rout
   work; **Recents / Notifications / Quick settings** are accepted by the framework but no-op
   (Meta's Portal SystemUI has no overview, shade, or QS). So the remote exposes Back/Home/Power
   as global actions and routes **Recents** to the in-app app switcher instead.
+- **Text** is set directly on the focused editable node (`ACTION_SET_TEXT`) — no IME swap. It works
+  wherever an editable field has input focus; `/remote/text` reports whether it applied so the UI
+  can hint "focus a field first". (A D-pad via accessibility `focusSearch`/`ACTION_FOCUS` was tried
+  and dropped — it's non-functional on the Portal's Compose/custom UIs, which don't expose an
+  input-focus node to search from. Directional/pointer navigation comes via the Phase 3 touchpad.)
 - A live **screen mirror** isn't practical on these models (the accessibility screenshot API is
   Android 11+; `MediaProjection` needs a per-session consent dialog), so the remote follows the
   *TV-remote* model: you look at the TV, not the phone.
@@ -52,10 +59,9 @@ D-pad/key events **cannot** be injected into other apps. Instead the remote rout
 
 Later phases extend the same `/remote/*` routes:
 
-- **Phase 2** — on-screen keyboard (text entry into focused fields) and directional focus
-  navigation for standard UIs.
 - **Phase 3** — a gesture **touchpad** (tap/swipe anywhere, since the Portal is a touchscreen
-  underneath) and **user-definable presets** (named macros that combine input + config pushes).
+  underneath; sidesteps the missing SystemUI surfaces) and **user-definable presets** (named macros
+  that combine input + config pushes).
 - **Phase 4** — drive **any Portal on the fleet** from one remote (multi-room).
 
 ## API
@@ -71,3 +77,4 @@ the rest require `Authorization: Bearer <session-or-fleet-token>`.
 | `GET` | `/remote/icon?pkg=…` | App icon (PNG) |
 | `POST` | `/remote/key` | `{"action":"…"}` — `back`/`home`/`power` (global action) or `apps` (in-app switcher) |
 | `POST` | `/remote/launch` | `{"packageName":"…"}` → open an app |
+| `POST` | `/remote/text` | `{"mode":"set\|append\|backspace\|clear","text":"…"}` → edit the focused field |

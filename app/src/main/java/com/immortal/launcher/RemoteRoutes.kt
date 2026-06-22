@@ -36,6 +36,7 @@ class RemoteRoutes(private val context: Context) {
         "/remote/apps" -> authed(req) { apps() }
         "/remote/key" -> authed(req) { key(req) }
         "/remote/launch" -> authed(req) { launch(req) }
+        "/remote/text" -> authed(req) { text(req) }
         else -> json(404, err("not_found"))
       }
 
@@ -86,6 +87,16 @@ class RemoteRoutes(private val context: Context) {
     val pkg = body.optString("packageName").ifBlank { null } ?: return json(400, err("packageName_required"))
     val launched = RemoteApps.launch(context, pkg)
     return json(if (launched) 200 else 404, JSONObject().put("ok", launched).put("packageName", pkg))
+  }
+
+  /** Edit the focused field: `{"mode":"set|append|backspace|clear","text":"…"}`. */
+  private fun text(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    val body = parseJson(req.bodyText()) ?: return json(400, err("bad_json"))
+    if (!RemoteInput.available()) return json(503, err("no_accessibility"))
+    val mode = body.optString("mode").ifBlank { "set" }
+    val applied = RemoteInput.typeText(body.optString("text"), mode)
+    // applied=false usually means no editable field has focus — report it so the UI can hint.
+    return json(200, ok().put("applied", applied).put("mode", mode))
   }
 
   // --- auth + helpers ---------------------------------------------------------

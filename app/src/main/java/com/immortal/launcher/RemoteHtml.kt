@@ -40,6 +40,11 @@ object RemoteHtml {
   .nav{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:4px 0 22px}
   .nav button{padding:18px 8px;font-size:15px;background:#1c1c1e;color:#fff;border-radius:14px}
   .nav button:active{background:#2e6be6}
+  .kbd{display:flex;gap:8px;margin-bottom:8px}
+  .kbd input{flex:1;min-width:0;padding:14px;font-size:16px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:12px;color:#fff}
+  .kbd button{padding:0 18px;font-size:15px;font-weight:600;background:#2e6be6;color:#fff;border-radius:12px}
+  .keyops{display:flex;gap:8px;margin-bottom:22px}
+  .keyops button{flex:1;padding:12px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:12px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px}
   .tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;background:none;color:#fff;border-radius:14px}
   .tile:active{background:#1c1c1e}
@@ -66,6 +71,15 @@ object RemoteHtml {
       <button onclick="key('home')">Home</button>
       <button onclick="key('apps')">Recents</button>
       <button onclick="key('power')">Power</button>
+    </div>
+    <div class=label>Keyboard</div>
+    <div class=kbd>
+      <input id=txt placeholder="Type, then Send to the focused field" autocomplete=off autocapitalize=off autocorrect=off>
+      <button onclick="sendText()">Send</button>
+    </div>
+    <div class=keyops>
+      <button onclick="textOp('backspace')">&#9003; Backspace</button>
+      <button onclick="textOp('clear')">Clear</button>
     </div>
     <div class=label>Apps</div>
     <div id=grid class=grid></div>
@@ -107,6 +121,15 @@ object RemoteHtml {
     api('/remote/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({packageName:pkg})})
       .catch(function(){});
   }
+  function postText(mode,text){
+    api('/remote/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode,text:text||''})})
+      .then(function(d){
+        document.getElementById('remoteErr').textContent=(d&&d.applied===false)
+          ? 'Select a text field on the Portal first, then send.' : '';
+      }).catch(function(){});
+  }
+  function sendText(){postText('set',document.getElementById('txt').value);}
+  function textOp(mode){postText(mode,'');}
   function loadApps(){
     api('/remote/apps').then(function(d){
       var g=document.getElementById('grid');g.innerHTML='';
