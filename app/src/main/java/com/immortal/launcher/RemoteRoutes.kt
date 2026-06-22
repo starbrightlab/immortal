@@ -44,6 +44,7 @@ class RemoteRoutes(private val context: Context) {
         "/remote/swipe" -> authed(req) { swipe(req) }
         "/remote/presets" -> authed(req) { presets(req) }
         "/remote/preset" -> authed(req) { runPreset(req) }
+        "/remote/devices" -> authed(req) { devices() }
         else -> json(404, err("not_found"))
       }
 
@@ -150,6 +151,12 @@ class RemoteRoutes(private val context: Context) {
         }
         else -> json(405, err("method_not_allowed"))
       }
+
+  /** Peers discovered on the LAN via mDNS, plus this device's own name, for the device switcher. */
+  private fun devices(): FleetHttpServer.Response =
+      json(
+          200,
+          ok().put("self", FleetConfig.name(context)).put("devices", RemoteDiscovery.peersJson()))
 
   /** Run a saved preset by id: `{"id":"…"}`. Runs async (steps may include waits). */
   private fun runPreset(req: FleetHttpServer.Request): FleetHttpServer.Response {

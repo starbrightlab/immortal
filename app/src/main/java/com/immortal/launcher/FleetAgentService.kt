@@ -50,6 +50,9 @@ class FleetAgentService : Service() {
         runCatching { FleetHttpServer(port) { req -> routes.handle(req) }.also { it.start() } }
             .onFailure { Log.w(TAG, "fleet server failed to start on :$port", it) }
             .getOrNull()
+    // Advertise this Portal + browse for peers, so the phone remote can list other devices.
+    runCatching { RemoteDiscovery.start(applicationContext, FleetConfig.name(this), port) }
+        .onFailure { Log.w(TAG, "remote discovery failed to start", it) }
   }
 
   /**
@@ -76,6 +79,7 @@ class FleetAgentService : Service() {
   override fun onDestroy() {
     runCatching { server?.stop() }
     server = null
+    runCatching { RemoteDiscovery.stop() }
     runCatching { wifiLock?.release() }
     wifiLock = null
     super.onDestroy()

@@ -71,8 +71,12 @@ object RemoteHtml {
   .tile img{width:48px;height:48px;border-radius:12px;background:#1c1c1e}
   .tile span{font-size:12px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .label{color:#9a9a9a;font-size:13px;font-weight:600;margin:6px 2px 10px}
-  .top{display:flex;align-items:baseline;justify-content:space-between}
-  .link{color:#8ab4f8;font-size:13px;background:none}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+  .top select{flex:1;min-width:0;padding:10px;font-size:16px;background:#1c1c1e;border:1px solid #3a3a3c;border-radius:10px;color:#fff}
+  .link{color:#8ab4f8;font-size:13px;background:none;white-space:nowrap}
+  .addpanel{background:#161618;border:1px solid #2a2a2c;border-radius:14px;padding:14px;margin-bottom:18px}
+  .discovered{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .discovered button{padding:10px 14px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:10px}
 </style></head><body><div class=wrap>
 
   <div id=pairView>
@@ -84,7 +88,21 @@ object RemoteHtml {
   </div>
 
   <div id=remoteView class=hide>
-    <div class=top><h1 id=devName>Portal</h1><button class=link onclick=unpair()>Unpair</button></div>
+    <div class=top>
+      <select id=devsel onchange=switchDevice()></select>
+      <button class=link onclick=toggleAdd()>+ Device</button>
+      <button class=link onclick=forgetDevice()>Forget</button>
+    </div>
+    <div id=addPanel class="addpanel hide">
+      <p class=sub>Add another Portal on your Wi-Fi: pick a discovered device, then enter the PIN from its <b>Settings &rsaquo; Remote</b> screen.</p>
+      <div id=discovered class=discovered></div>
+      <div id=addPair class=hide>
+        <p class=sub id=addPairName></p>
+        <input id=addpin class=pin inputmode=numeric maxlength=6 placeholder="000000" autocomplete=off>
+        <button class=primary onclick=addPairSubmit()>Pair device</button>
+        <div id=addErr class=err></div>
+      </div>
+    </div>
     <div class=label>Navigation</div>
     <div class=nav>
       <button onclick="key('back')">Back</button>
@@ -131,32 +149,81 @@ object RemoteHtml {
   </div>
 
 <script>
-  var TKEY='immortal_remote_token';
-  function token(){return localStorage.getItem(TKEY);}
+  // Multi-device: a roster of paired Portals {name, base, token} kept on the phone; one is active.
+  var DKEY='immortal_remote_devices', AKEY='immortal_remote_active', pendingPeer=null;
+  function devicesList(){try{return JSON.parse(localStorage.getItem(DKEY)||'[]');}catch(e){return [];}}
+  function saveDevices(l){localStorage.setItem(DKEY,JSON.stringify(l));}
+  function activeIdx(){var i=parseInt(localStorage.getItem(AKEY)||'0',10),l=devicesList();return (i>=0&&i<l.length)?i:0;}
+  function setActive(i){localStorage.setItem(AKEY,String(i));}
+  function active(){return devicesList()[activeIdx()]||null;}
   function show(view){
     document.getElementById('pairView').classList.toggle('hide',view!=='pair');
     document.getElementById('remoteView').classList.toggle('hide',view!=='remote');
   }
   function api(path,opts){
     opts=opts||{};opts.headers=opts.headers||{};
-    if(token())opts.headers['Authorization']='Bearer '+token();
-    return fetch(path,opts).then(function(r){
-      if(r.status===401){localStorage.removeItem(TKEY);show('pair');throw new Error('unauthorized');}
+    var a=active();
+    if(a&&a.token)opts.headers['Authorization']='Bearer '+a.token;
+    return fetch((a?a.base:'')+path,opts).then(function(r){
+      if(r.status===401){ // creds for this device went stale — forget it and fall back
+        var l=devicesList();l.splice(activeIdx(),1);saveDevices(l);setActive(0);
+        if(l.length){renderDevSel();loadApps();loadPresets();}else show('pair');
+        throw new Error('unauthorized');
+      }
       return r.json();
     });
   }
-  function pair(){
+  function pair(){ // pairs THIS Portal (the page's own origin) — the first device
     var pin=document.getElementById('pin').value.trim();
     document.getElementById('pairErr').textContent='';
     fetch('/remote/pair',{method:'POST',body:JSON.stringify({pin:pin})})
       .then(function(r){return r.json();})
       .then(function(d){
-        if(d.ok&&d.token){localStorage.setItem(TKEY,d.token);start(d.name);}
-        else document.getElementById('pairErr').textContent='That code didn\'t work. Check the Portal and try again.';
+        if(d.ok&&d.token){
+          var l=devicesList().filter(function(x){return x.base!==location.origin;});
+          l.unshift({name:d.name||'Portal',base:location.origin,token:d.token});
+          saveDevices(l);setActive(0);startActive();
+        } else document.getElementById('pairErr').textContent='That code didn\'t work. Check the Portal and try again.';
       })
       .catch(function(){document.getElementById('pairErr').textContent='Couldn\'t reach the Portal.';});
   }
-  function unpair(){localStorage.removeItem(TKEY);location.hash='';show('pair');}
+  function renderDevSel(){
+    var sel=document.getElementById('devsel');sel.innerHTML='';
+    devicesList().forEach(function(dv,i){var o=document.createElement('option');o.value=i;o.textContent=dv.name;sel.appendChild(o);});
+    sel.value=activeIdx();
+  }
+  function switchDevice(){setActive(parseInt(document.getElementById('devsel').value,10));document.getElementById('addPanel').classList.add('hide');loadApps();loadPresets();}
+  function forgetDevice(){var l=devicesList();if(!l.length)return;l.splice(activeIdx(),1);saveDevices(l);setActive(0);if(l.length){renderDevSel();loadApps();loadPresets();}else{location.hash='';show('pair');}}
+  function toggleAdd(){var p=document.getElementById('addPanel');p.classList.toggle('hide');document.getElementById('addPair').classList.add('hide');if(!p.classList.contains('hide'))loadDiscovered();}
+  function loadDiscovered(){
+    api('/remote/devices').then(function(d){
+      var c=document.getElementById('discovered');c.innerHTML='';
+      var have={};devicesList().forEach(function(x){have[x.base]=1;});
+      var peers=(d.devices||[]).filter(function(p){return !have['http://'+p.host+':'+p.port];});
+      if(!peers.length){c.innerHTML='<span class=none>No other Portals found yet — make sure they\'re on and on the same Wi-Fi.</span>';return;}
+      peers.forEach(function(p){var b=document.createElement('button');b.textContent=p.name;b.onclick=function(){pickPeer(p);};c.appendChild(b);});
+    }).catch(function(){});
+  }
+  function pickPeer(p){
+    pendingPeer={name:p.name,base:'http://'+p.host+':'+p.port};
+    document.getElementById('addPairName').textContent='Enter the PIN shown on “'+p.name+'” (Settings › Remote).';
+    document.getElementById('addErr').textContent='';document.getElementById('addpin').value='';
+    document.getElementById('addPair').classList.remove('hide');
+  }
+  function addPairSubmit(){
+    if(!pendingPeer)return;
+    var pin=document.getElementById('addpin').value.trim();document.getElementById('addErr').textContent='';
+    fetch(pendingPeer.base+'/remote/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:pin})})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.ok&&d.token){
+          var l=devicesList();l.push({name:d.name||pendingPeer.name,base:pendingPeer.base,token:d.token});
+          saveDevices(l);setActive(l.length-1);renderDevSel();
+          document.getElementById('addPanel').classList.add('hide');pendingPeer=null;loadApps();loadPresets();
+        } else document.getElementById('addErr').textContent='That code didn\'t work.';
+      })
+      .catch(function(){document.getElementById('addErr').textContent='Couldn\'t reach that device.';});
+  }
   function key(action){
     api('/remote/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action})})
       .catch(function(){});
@@ -260,7 +327,7 @@ object RemoteHtml {
       var g=document.getElementById('grid');g.innerHTML='';
       (d.apps||[]).forEach(function(a){
         var b=document.createElement('button');b.className='tile';b.onclick=function(){launch(a.packageName);};
-        var img=document.createElement('img');img.src='/remote/icon?pkg='+encodeURIComponent(a.packageName);img.loading='lazy';
+        var img=document.createElement('img');img.src=(active()?active().base:'')+'/remote/icon?pkg='+encodeURIComponent(a.packageName);img.loading='lazy';
         var s=document.createElement('span');s.textContent=a.label;
         b.appendChild(img);b.appendChild(s);g.appendChild(b);
       });
@@ -293,15 +360,14 @@ object RemoteHtml {
       mode=0;
     });
   }
-  function start(name){
-    if(name)document.getElementById('devName').textContent=name;
-    show('remote');setupPad();loadApps();loadPresets();
+  function startActive(){
+    show('remote');renderDevSel();setupPad();loadApps();loadPresets();
   }
-  // Scan-to-pair: a QR encodes the URL with #pin=NNNNNN, so the page auto-pairs.
+  // Scan-to-pair: a QR encodes the URL with #pin=NNNNNN, so the page auto-pairs this Portal.
   (function(){
     var m=location.hash.match(/pin=(\d{6})/);
     if(m){document.getElementById('pin').value=m[1];pair();}
-    else if(token())start();
+    else if(active())startActive();
     else show('pair');
   })();
 </script>

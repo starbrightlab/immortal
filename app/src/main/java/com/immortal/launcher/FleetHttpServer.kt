@@ -137,6 +137,20 @@ class FleetHttpServer(
           headers: Map<String, String> = emptyMap(),
           writer: (OutputStream) -> Unit,
       ) = Response(status, contentType, headers, null, length, writer)
+
+      /** A 204 CORS preflight reply (empty body) for an OPTIONS request. */
+      fun preflight() =
+          Response(
+              204,
+              "text/plain",
+              mapOf(
+                  "Access-Control-Allow-Methods" to "GET, POST, OPTIONS",
+                  "Access-Control-Allow-Headers" to "Authorization, Content-Type",
+                  "Access-Control-Max-Age" to "600",
+              ),
+              null,
+              0L,
+          ) {}
     }
   }
 
@@ -187,6 +201,14 @@ class FleetHttpServer(
       val head = readHead(input)
       if (head == null) {
         runCatching { writeResponse(out, Response(400, """{"ok":false,"error":"bad_request"}""")) }
+        return
+      }
+      // CORS preflight: the phone remote, served by one Portal, calls other Portals'
+      // agents cross-origin (multi-device). Answer OPTIONS here, before auth, with the
+      // permissive headers — the LAN peer guard above and the bearer token remain the
+      // real gates (CORS is only a browser read-policy, not an auth bypass).
+      if (head.method == "OPTIONS") {
+        runCatching { writeResponse(out, Response.preflight()) }
         return
       }
       val len = head.headers["content-length"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
@@ -283,6 +305,9 @@ class FleetHttpServer(
         buildString {
           append("HTTP/1.1 ${resp.status} ${reason(resp.status)}\r\n")
           append("Content-Type: ${resp.contentType}\r\n")
+          // Allow the cross-origin phone remote (multi-device) to read responses. The LAN
+          // peer guard + bearer token are the real gates; CORS is only a browser read-policy.
+          append("Access-Control-Allow-Origin: *\r\n")
           for ((k, v) in resp.extraHeaders) append("$k: $v\r\n")
           if (resp.jsonBytes != null) append("Content-Length: ${resp.jsonBytes.size}\r\n")
           else if (resp.streamLength >= 0) append("Content-Length: ${resp.streamLength}\r\n")

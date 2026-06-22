@@ -13,6 +13,9 @@ the same always-on [fleet agent](fleet.md) that already manages the device over 
 - **Keyboard** — type on the phone; text lands in the focused field on the Portal (set / append /
   backspace / clear), no on-Portal typing.
 - **App launcher grid** — every launchable app on the Portal, tap to open.
+- **Multiple devices** — one remote drives every Portal on your Wi-Fi. Other Portals are discovered
+  automatically (mDNS); pick one from the device switcher and pair it with its on-screen PIN. The
+  phone keeps a per-device token, so a token never crosses between Portals.
 - **Presets** — user-defined one-tap macros: an ordered list of steps (launch an app, a nav key,
   type text, wait, or **push a screensaver setting**), built and edited right on the remote page.
   e.g. *"Movie night" = Home → launch the app*, or *"Photos = default feed + show now-playing"*.
@@ -34,6 +37,10 @@ On the phone: scan the QR (it opens the remote page and pairs automatically) or 
 address shown and type the PIN. Once paired, the phone keeps a session token and reconnects on
 its own — pairing survives a Portal reboot.
 
+To control more Portals, tap **+ Device** on the remote: it lists the others found on your Wi-Fi
+(mDNS); pick one and enter the PIN from *its* Settings › Remote screen. Switch between paired
+devices from the dropdown; **Forget** drops the current one.
+
 ## Security
 
 - The remote is served by the fleet agent, which only accepts **LAN/loopback** peers.
@@ -42,6 +49,10 @@ its own — pairing survives a Portal reboot.
   the room can pair. (The fleet bearer token also works, so the laptop CLI can drive it.)
 - App icons are served unauthenticated (they aren't secrets), which keeps the token out of image
   URLs. Everything that reads the app list or sends input is authenticated.
+- **Multi-device** keeps each Portal's token on the phone (paired per-device) — tokens are never
+  shared between Portals, so one compromised device can't drive the others. The agent sends
+  permissive CORS headers so one Portal's page can call the others, but the LAN peer guard and the
+  per-device token remain the real gates (CORS is only a browser read-policy).
 
 ## How input works (and its limits)
 
@@ -71,13 +82,6 @@ automatically (via `WRITE_SECURE_SETTINGS`) and which comes back on its own afte
   Android 11+; `MediaProjection` needs a per-session consent dialog), so the remote follows the
   *TV-remote* model: you look at the TV, not the phone.
 
-### Roadmap
-
-Later phases extend the same `/remote/*` routes:
-
-- **Multi-room** — drive any Portal on the fleet from one remote (pick a room; commands proxy to
-  that device).
-
 ## API
 
 All under the agent's port (default `8723`). `/remote/ui` and `/remote/pair` are open on the LAN;
@@ -97,3 +101,4 @@ the rest require `Authorization: Bearer <session-or-fleet-token>`.
 | `POST` | `/remote/swipe` | `{"dx":0.0,"dy":-300.0}` → scroll/swipe from the pointer |
 | `GET`/`POST` | `/remote/presets` | list, or replace with `{"presets":[{id,name,steps[]}]}` |
 | `POST` | `/remote/preset` | `{"id":"…"}` → run a saved preset's steps in order |
+| `GET` | `/remote/devices` | this device's name + mDNS-discovered peers `[{name,host,port}]` |
