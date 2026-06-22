@@ -31,25 +31,14 @@ import org.json.JSONObject
  */
 object FleetScreensaver {
 
-  /** Pure render of the screensaver settings the agent reports back. */
+  /**
+   * Pure render of the screensaver display settings — delegates to the `screensaver` settings
+   * domain ([com.immortal.launcher.settings.SettingsDomains.screensaver]), which owns the flat wire
+   * format declaratively. (`apply` below is not yet routed through the domain — see that domain's
+   * note — so this is the read half of the façade only.)
+   */
   fun toJson(s: ScreensaverConfig.Settings): JSONObject =
-      JSONObject()
-          .put("enabled", s.enabled)
-          .put("source", s.source)
-          .put("folderPath", s.folderPath ?: "")
-          .put("albumUrl", s.albumUrl ?: "")
-          .put("albumRefreshMin", s.albumRefreshMin)
-          .put("fit", s.fit)
-          .put("intervalSec", s.intervalSec)
-          .put("shuffle", s.shuffle)
-          .put("includeVideo", s.includeVideo)
-          .put("batterySaver", s.batterySaver)
-          .put("showNowPlaying", s.showNowPlaying)
-          .put("presenceMode", s.presenceMode.name)
-          .put("idleSleepMin", s.idleSleepMin)
-          .put("overnightEnabled", s.overnightEnabled)
-          .put("overnightStartMin", s.overnightStartMin)
-          .put("overnightEndMin", s.overnightEndMin)
+      com.immortal.launcher.settings.SettingsDomains.screensaver.flatJson(s)
 
   /**
    * The photo-source setup the remote's Setup form reads to pre-fill — the active source type plus

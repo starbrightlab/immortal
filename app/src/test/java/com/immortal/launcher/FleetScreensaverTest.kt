@@ -74,4 +74,79 @@ class FleetScreensaverTest {
     assertNull(FleetScreensaver.coercePresenceMode("garbage"))
     assertNull(FleetScreensaver.coercePresenceMode(null))
   }
+
+  // --- sourcesJson: the photo-source setup the remote's Setup form pre-fills. Pure. ------------
+  // Characterization of the current wire shape — pins the secret/source fields before they move
+  // to a credential GroupSpec, since they had no coverage previously.
+
+  @Test
+  fun sourcesJson_defaultsBlank() {
+    val json = FleetScreensaver.sourcesJson(ScreensaverConfig.Settings())
+    assertEquals("default", json.getString("source"))
+    for (k in
+        listOf(
+            "immichUrl",
+            "immichKey",
+            "smbHost",
+            "smbShare",
+            "smbPath",
+            "smbUser",
+            "smbPass",
+            "davUrl",
+            "davUser",
+            "davPass",
+            "webUrl",
+            "albumUrl")) {
+      assertEquals("blank field $k", "", json.getString(k))
+    }
+  }
+
+  @Test
+  fun sourcesJson_reportsImmichWithSecret() {
+    val s =
+        ScreensaverConfig.Settings(
+            source = ScreensaverConfig.SOURCE_IMMICH,
+            immichUrl = "https://immich.example",
+            immichKey = "secret-key")
+    val json = FleetScreensaver.sourcesJson(s)
+    assertEquals("immich", json.getString("source"))
+    assertEquals("https://immich.example", json.getString("immichUrl"))
+    assertEquals("secret-key", json.getString("immichKey"))
+  }
+
+  @Test
+  fun sourcesJson_reportsSmbWithPassword() {
+    val s =
+        ScreensaverConfig.Settings(
+            source = ScreensaverConfig.SOURCE_SMB,
+            smbHost = "nas.local",
+            smbShare = "photos",
+            smbPass = "hunter2")
+    val json = FleetScreensaver.sourcesJson(s)
+    assertEquals("smb", json.getString("source"))
+    assertEquals("nas.local", json.getString("smbHost"))
+    assertEquals("photos", json.getString("smbShare"))
+    assertEquals("hunter2", json.getString("smbPass"))
+  }
+
+  @Test
+  fun currentSource_mapsActiveSource() {
+    fun src(s: ScreensaverConfig.Settings) = FleetScreensaver.currentSource(s)
+    assertEquals("default", src(ScreensaverConfig.Settings()))
+    assertEquals(
+        "album",
+        src(
+            ScreensaverConfig.Settings(
+                source = ScreensaverConfig.SOURCE_URL, albumUrl = "https://photos.app.goo.gl/x")))
+    assertEquals(
+        "web",
+        src(
+            ScreensaverConfig.Settings(
+                source = ScreensaverConfig.SOURCE_WEBURL, webUrl = "https://kiosk.local")))
+    assertEquals(
+        "dav",
+        src(
+            ScreensaverConfig.Settings(
+                source = ScreensaverConfig.SOURCE_DAV, davUrl = "https://dav.example/photos")))
+  }
 }
