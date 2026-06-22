@@ -13,6 +13,8 @@ import com.immortal.launcher.FleetCalendar
 import com.immortal.launcher.FleetScreensaver
 import com.immortal.launcher.FrameMode
 import com.immortal.launcher.ScreensaverConfig
+import com.immortal.launcher.SettingsGuard
+import com.immortal.launcher.SleepScheduler
 import org.json.JSONArray
 
 /**
@@ -222,6 +224,14 @@ object SettingsDomains {
                       format = ::hhmm,
                       visible = { _, s -> s.overnightEnabled }),
               ),
+          // The screensaver's post-apply side effects, lifted from the route layer (the same
+          // reaffirm + overnight reschedule that `RemoteRoutes.applyConfig` / `FleetRoutes` run).
+          // Fires once per /remote/settings batch; the legacy /screensaver and /remote/sources
+          // routes keep their own reaffirm, so there's no double-fire.
+          onApplied = { c, keys ->
+            SettingsGuard.reaffirmScreensaver(c)
+            if (keys.any { it.startsWith("overnight") }) SleepScheduler.applyOvernightNow(c)
+          },
       )
 
   /** Every registered domain. */

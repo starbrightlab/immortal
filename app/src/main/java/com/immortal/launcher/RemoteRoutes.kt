@@ -10,6 +10,7 @@ package com.immortal.launcher
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import com.immortal.launcher.settings.SettingsRegistry
 import kotlin.concurrent.thread
 import org.json.JSONArray
 import org.json.JSONObject
@@ -54,6 +55,7 @@ class RemoteRoutes(private val context: Context) {
         "/remote/preset" -> authed(req) { runPreset(req) }
         "/remote/devices" -> authed(req) { devices() }
         "/remote/sources" -> authed(req) { sources(req) }
+        "/remote/settings" -> authed(req) { settings(req) }
         else -> json(404, err("not_found"))
       }
 
@@ -240,6 +242,40 @@ class RemoteRoutes(private val context: Context) {
                     .put("applied", JSONArray(applied))
                     .put("sources", FleetScreensaver.sourcesJson(s))
                     .put("calendar", FleetCalendar.toJson(s)))
+          }
+        }
+        else -> json(405, err("method_not_allowed"))
+      }
+
+  /**
+   * Generic settings surface driven by the declarative [SettingsRegistry]. GET returns every
+   * registered domain's schema — controls, current values, constraints, declarative visibility —
+   * so the remote renders it without hardcoding field lists. POST applies a batch to one domain:
+   * `{"domain":"screensaver","values":{"intervalSec":45,"shuffle":true}}`, routed through the same
+   * registry the on-device UI and fleet endpoints use, firing that domain's side effects (e.g. the
+   * screensaver reaffirm + overnight reschedule) once. Photo-source credentials stay on
+   * [sources] — they're read-only here — so this surface is the display + calendar controls.
+   */
+  private fun settings(req: FleetHttpServer.Request): FleetHttpServer.Response =
+      when (req.method) {
+        "GET" -> json(200, ok().put("settings", SettingsRegistry.schemaJson(context)))
+        "POST" -> {
+          val body = parseJson(req.bodyText())
+          val domainId = body?.optString("domain")?.ifBlank { null }
+          when {
+            body == null -> json(400, err("bad_json"))
+            domainId == null -> json(400, err("domain_required"))
+            else -> {
+              val values = body.optJSONObject("values") ?: JSONObject()
+              val applied = SettingsRegistry.apply(context, domainId, values)
+              if (applied == null) json(404, err("unknown_domain"))
+              else
+                  json(
+                      200,
+                      ok()
+                          .put("applied", JSONArray(applied.toList()))
+                          .put("domain", SettingsRegistry.domain(domainId)!!.schemaJson(context)))
+            }
           }
         }
         else -> json(405, err("method_not_allowed"))

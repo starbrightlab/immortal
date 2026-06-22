@@ -124,6 +124,22 @@ object RemoteHtml {
   .addpanel{background:#161618;border:1px solid #2a2a2c;border-radius:14px;padding:14px;margin-bottom:18px}
   .discovered{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
   .discovered button{padding:10px 14px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:10px}
+
+  /* Generic settings (rendered from the /remote/settings schema). */
+  .setsec{color:#9a9a9a;font-size:13px;font-weight:600;margin:18px 2px 4px}
+  .setrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 2px;border-bottom:1px solid #1a1a1c}
+  .setrow.col{flex-direction:column;align-items:stretch;gap:8px}
+  .setrow .t{font-size:15px;color:#fff}
+  .settoggle{padding:8px 18px;font-size:14px;font-weight:600;border-radius:20px;background:#2a2a2c;color:#8a8a8a;min-width:66px}
+  .settoggle.on{background:#2e6be6;color:#fff}
+  .setseg{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .setseg button{padding:8px 12px;font-size:13px;border-radius:10px;background:#2a2a2c;color:#cfcfcf}
+  .setseg button.on{background:#2e6be6;color:#fff}
+  .setstep{display:flex;align-items:center;gap:12px}
+  .setstep button{width:36px;height:36px;border-radius:50%;background:#2a2a2c;color:#fff;font-size:21px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .setstep button:active{background:#2e6be6}
+  .setstep .v{min-width:60px;text-align:center;font-size:14px;color:#fff}
+  .setrow.col input{width:100%;padding:11px;font-size:15px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:10px;color:#fff}
 </style></head><body><div class=wrap>
 
   <div id=pairView>
@@ -235,6 +251,8 @@ object RemoteHtml {
       </div>
     </div>
 
+    <div id=tabSettings class="panel scroll hide"></div>
+
     <div id=tabMedia class="panel scroll hide">
       <div id=npEmpty class=npempty>Nothing playing right now.</div>
       <div id=npCard class="np hide">
@@ -262,6 +280,7 @@ object RemoteHtml {
       <button id=tb_remote class=on onclick="showTab('remote')">Remote</button>
       <button id=tb_apps onclick="showTab('apps')">Apps</button>
       <button id=tb_media onclick="showTab('media')">Media</button>
+      <button id=tb_settings onclick="showTab('settings')">Settings</button>
       <button id=tb_setup onclick="showTab('setup')">Setup</button>
     </div>
   </div>
@@ -349,13 +368,63 @@ object RemoteHtml {
       .catch(function(){document.getElementById('addErr').textContent='Couldn\'t reach that device.';});
   }
   function showTab(name){
-    ['remote','apps','media','setup'].forEach(function(t){
+    ['remote','apps','media','settings','setup'].forEach(function(t){
       document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('hide',t!==name);
       document.getElementById('tb_'+t).classList.toggle('on',t===name);
     });
     if(name==='apps'){loadApps();loadPresets();}
     if(name==='setup'){loadSources();}
+    if(name==='settings'){loadSettings();}
     if(name==='media')startNowPlaying();else stopNowPlaying();
+  }
+  // --- generic settings (rendered from the declarative /remote/settings schema) ---
+  function loadSettings(){
+    var c=document.getElementById('tabSettings');c.innerHTML='<div class=none>Loading…</div>';
+    api('/remote/settings').then(function(d){
+      c.innerHTML='';
+      var doms=(d.settings&&d.settings.domains)||[];
+      if(!doms.length){c.innerHTML='<div class=none>No settings available.</div>';return;}
+      doms.forEach(function(dom){var sec=document.createElement('div');sec.id='dom_'+dom.id;c.appendChild(sec);renderDomain(sec,dom);});
+    }).catch(function(){c.innerHTML='<div class=none>Couldn\'t load settings.</div>';});
+  }
+  function renderDomain(sec,dom){
+    sec.innerHTML='';
+    var h=document.createElement('div');h.className='setsec';h.textContent=dom.title;sec.appendChild(h);
+    (dom.controls||[]).forEach(function(ctl){sec.appendChild(renderControl(dom.id,ctl));});
+  }
+  function renderControl(domId,ctl){
+    var row=document.createElement('div');row.className='setrow';
+    var t=document.createElement('div');t.className='t';t.textContent=ctl.title;
+    if(ctl.type==='string'){
+      row.className='setrow col';row.appendChild(t);
+      var inp=document.createElement('input');inp.value=ctl.value||'';if(ctl.help)inp.placeholder=ctl.help;
+      inp.onchange=function(){setPut(domId,ctl.key,inp.value);};
+      row.appendChild(inp);return row;
+    }
+    row.appendChild(t);
+    if(ctl.type==='bool'){
+      var b=document.createElement('button');b.className='settoggle'+(ctl.value?' on':'');b.textContent=ctl.value?'On':'Off';
+      b.onclick=function(){setPut(domId,ctl.key,!ctl.value);};row.appendChild(b);
+    }else if(ctl.type==='enum'){
+      var seg=document.createElement('div');seg.className='setseg';
+      (ctl.options||[]).forEach(function(o){var b=document.createElement('button');b.textContent=o.label;if(o.value===ctl.value)b.className='on';b.onclick=function(){setPut(domId,ctl.key,o.value);};seg.appendChild(b);});
+      row.appendChild(seg);
+    }else if(ctl.type==='int'){
+      var st=document.createElement('div');st.className='setstep';
+      var minus=document.createElement('button');minus.textContent='−';minus.onclick=function(){setPut(domId,ctl.key,ctl.value-ctl.step);};
+      var v=document.createElement('div');v.className='v';v.textContent=(ctl.display!=null?ctl.display:ctl.value);
+      var plus=document.createElement('button');plus.textContent='+';plus.onclick=function(){setPut(domId,ctl.key,ctl.value+ctl.step);};
+      st.appendChild(minus);st.appendChild(v);st.appendChild(plus);row.appendChild(st);
+    }
+    return row;
+  }
+  // POST one change; re-render the affected domain from the returned schema so declarative
+  // gating (e.g. overnight start/end appearing) and clamped values reflect immediately.
+  function setPut(domId,key,value){
+    var vals={};vals[key]=value;
+    api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:domId,values:vals})})
+      .then(function(d){if(d&&d.domain){var sec=document.getElementById('dom_'+domId);if(sec)renderDomain(sec,d.domain);}})
+      .catch(function(){});
   }
   // --- now playing (media controls) ---
   // Inline SVG (not Unicode ▶/⏸) so the controls render as crisp monochrome glyphs everywhere —
