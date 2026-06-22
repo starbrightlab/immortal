@@ -211,7 +211,19 @@ private fun ScreensaverSettingsScreen() {
           ScreensaverConfig.setIncludeVideo(context, it)
           settings = settings.copy(includeVideo = it)
         }
+        Divider()
+        ToggleRow("Reduce screen burn-in", settings.antiBurnIn) {
+          ScreensaverConfig.setAntiBurnIn(context, it)
+          settings = settings.copy(antiBurnIn = it)
+        }
       }
+      Text(
+          "Gently drifts the clock and widgets by a few pixels to protect always-on screens from " +
+              "burn-in. Subtle by design — turn it off if you notice the motion.",
+          color = Color(0xFF7C7C7C),
+          fontSize = 13.sp,
+          modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
+      )
 
       // When dismissed — where a tap on the frame takes you. Default is the launcher;
       // Home Assistant users typically point this at their dashboard app instead.

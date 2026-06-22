@@ -29,10 +29,11 @@ import kotlin.math.sin
  */
 object AntiBurnIn {
 
-  // Two periods (ms) with no small common multiple, so the x/y loop precesses for a
-  // long time before it ever repeats. Minutes-long, so a glance never catches it move.
-  private const val PERIOD_X_MS = 91_000.0
-  private const val PERIOD_Y_MS = 127_000.0
+  // Two periods (ms), coprime so the x/y loop precesses for a long time before it ever repeats.
+  // Several minutes each: combined with the small radius this keeps the per-second motion far
+  // below what a glance catches (the earlier ~1.5-minute periods read as a slow, visible creep).
+  private const val PERIOD_X_MS = 311_000.0
+  private const val PERIOD_Y_MS = 421_000.0
 
   /** A pixel offset to apply as the overlay's translationX / translationY. */
   data class Shift(val x: Float, val y: Float)

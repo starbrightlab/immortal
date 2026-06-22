@@ -104,6 +104,9 @@ object ScreensaverConfig {
       val batterySaver: Boolean = true,
       // Show the current track + album art on the frame while music is playing.
       val showNowPlaying: Boolean = true,
+      // Anti-burn-in pixel-shift: slowly drift the overlay so static content (the clock) doesn't
+      // brand the panel over days. On by default; can be turned off if the motion is distracting.
+      val antiBurnIn: Boolean = true,
       // Whether to draw a clock face at all. Off = photos only (the now-playing card still follows
       // its own [showNowPlaying] switch). On by default.
       val facesEnabled: Boolean = true,
@@ -211,6 +214,7 @@ object ScreensaverConfig {
             else CAL_SIDE_RIGHT,
         batterySaver = p.getBoolean("battery_saver", true),
         showNowPlaying = p.getBoolean("show_now_playing", true),
+        antiBurnIn = p.getBoolean("anti_burn_in", true),
         facesEnabled = p.getBoolean("faces_enabled", true),
         faceId = p.getString("face_id", "immortal-classic") ?: "immortal-classic",
         faceSizeIndex = p.getInt("face_size_index", 1),
@@ -336,6 +340,9 @@ object ScreensaverConfig {
 
   fun setShowNowPlaying(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("show_now_playing", on).apply()
+
+  fun setAntiBurnIn(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("anti_burn_in", on).apply()
 
   /** Turn the clock face on/off (off = photos only). */
   fun setFacesEnabled(c: Context, on: Boolean) =

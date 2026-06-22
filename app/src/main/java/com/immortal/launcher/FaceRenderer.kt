@@ -57,7 +57,11 @@ class FaceRenderer(
   // [tick] so no pixel stays lit in one spot for long; the overlay is oversized by the
   // same amount (negative margins below) so the drift never bares a strip of the layer
   // beneath at a screen edge — matters most for the full-bleed flip clock.
-  private val burnInMaxPx: Int by lazy { dp(6) }
+  // Small radius: a few px is enough to spread the bright content over time, and keeps the slow
+  // drift well below what the eye catches. (dp(6) earlier was large enough to read as motion.)
+  private val burnInMaxPx: Int by lazy { dp(3) }
+  // Whether the pixel-shift runs at all (user setting); read once per [start].
+  private var antiBurnInOn: Boolean = true
 
   /** The overlay container, added above the photo layer by the host. */
   val view: FrameLayout by lazy {
@@ -104,6 +108,7 @@ class FaceRenderer(
 
   fun start(face: Face) {
     this.face = face
+    antiBurnInOn = ScreensaverConfig.load(context).antiBurnIn
     buildOverlay()
     tick.run()
     refreshWeather.run()
@@ -388,8 +393,11 @@ class FaceRenderer(
           weatherView?.text = weatherText
           weatherView?.visibility = if (hasWeather) View.VISIBLE else View.GONE
           weatherDivider?.visibility = if (hasWeather) View.VISIBLE else View.GONE
-          // Burn-in: drift the whole overlay a few px so no pixel stays lit in place.
-          val drift = AntiBurnIn.shift(now.time, burnInMaxPx.toFloat())
+          // Burn-in: drift the whole overlay a few px so no pixel stays lit in place. Skipped
+          // (overlay held still) when the user turns the pixel-shift off.
+          val drift =
+              if (antiBurnInOn) AntiBurnIn.shift(now.time, burnInMaxPx.toFloat())
+              else AntiBurnIn.Shift(0f, 0f)
           view.translationX = drift.x
           view.translationY = drift.y
           ui.postDelayed(this, 1_000L)
