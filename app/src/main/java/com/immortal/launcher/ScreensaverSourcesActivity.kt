@@ -13,26 +13,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -43,9 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -339,55 +331,6 @@ private fun shortUrl(url: String): String {
   return if (trimmed.length <= 56) trimmed else trimmed.take(53) + "…"
 }
 
-// --- shared row/card composables (same style as the main settings screen) ----
-@Composable
-private fun SectionLabel(text: String) {
-  Text(
-      text.uppercase(),
-      color = Color(0xFF7C7C7C),
-      fontSize = 13.sp,
-      fontWeight = FontWeight.SemiBold,
-      modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-  )
-}
-
-@Composable
-private fun Card(content: @Composable () -> Unit) {
-  Surface(
-      color = Color(0xFF1C1C1E),
-      shape = RoundedCornerShape(18.dp),
-      modifier = Modifier.fillMaxWidth(),
-  ) {
-    Column { content() }
-  }
-}
-
-@Composable
-private fun Divider() {
-  Spacer(Modifier.fillMaxWidth().height(1.dp).background(Color(0x14FFFFFF)))
-}
-
-@Composable
-private fun SelectableRow(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
-  Row(
-      modifier =
-          Modifier.fillMaxWidth().tvFocusableRow { onClick() }
-              .padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
-      verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Column(modifier = Modifier.weight(1f)) {
-      Text(title, color = Color.White, fontSize = 17.sp)
-      Text(
-          subtitle,
-          color = Color(0xFF9A9A9A),
-          fontSize = 13.sp,
-          modifier = Modifier.padding(top = 2.dp),
-      )
-    }
-    RadioButton(selected = selected, onClick = null)
-  }
-}
-
 @Composable
 private fun TextButtonRow(label: String, onClick: () -> Unit) {
   Text(
@@ -396,25 +339,6 @@ private fun TextButtonRow(label: String, onClick: () -> Unit) {
       fontSize = 16.sp,
       modifier = Modifier.fillMaxWidth().tvFocusableRow { onClick() }.padding(18.dp),
   )
-}
-
-@Composable
-private fun ArrowButton(glyph: String, rowFocused: Boolean, onClick: () -> Unit) {
-  Box(
-      modifier =
-          Modifier.size(48.dp)
-              .clip(RoundedCornerShape(12.dp))
-              .focusProperties { canFocus = false }
-              .clickable(onClick = onClick),
-      contentAlignment = Alignment.Center,
-  ) {
-    Text(
-        glyph,
-        color = if (rowFocused) Color.White else Color(0xFFBBBBBB),
-        fontSize = 20.sp,
-        fontWeight = FontWeight.SemiBold,
-    )
-  }
 }
 
 // Non-uniform steps so every LEFT/RIGHT tap lands on a value users think in (15m … 24h).

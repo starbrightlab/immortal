@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -235,9 +234,4 @@ private fun CancelRow(onDone: () -> Unit) {
         modifier = Modifier.padding(vertical = 14.dp).fillMaxWidth(),
     )
   }
-}
-
-@Composable
-private fun Divider() {
-  Spacer(Modifier.fillMaxWidth().size(1.dp).background(Color(0x14FFFFFF)))
 }

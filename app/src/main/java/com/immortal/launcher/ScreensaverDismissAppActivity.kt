@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,7 +35,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -384,33 +382,6 @@ private fun DismissRow(
     // Visual only — the whole row is the focus/click target.
     RadioButton(selected = selected, onClick = null)
   }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-  Text(
-      text.uppercase(),
-      color = Color(0xFF7C7C7C),
-      fontSize = 13.sp,
-      fontWeight = FontWeight.SemiBold,
-      modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-  )
-}
-
-@Composable
-private fun Card(content: @Composable () -> Unit) {
-  Surface(
-      color = Color(0xFF1C1C1E),
-      shape = RoundedCornerShape(18.dp),
-      modifier = Modifier.fillMaxWidth(),
-  ) {
-    Column { content() }
-  }
-}
-
-@Composable
-private fun Divider() {
-  Spacer(Modifier.fillMaxWidth().height(1.dp).background(Color(0x14FFFFFF)))
 }
 
 /**

@@ -15,17 +15,13 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -34,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -45,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -517,81 +511,6 @@ private fun calendarRangeLabel(range: String): String =
       else -> "1 day"
     }
 
-@Composable
-private fun SectionLabel(text: String) {
-  Text(
-      text.uppercase(),
-      color = Color(0xFF7C7C7C),
-      fontSize = 13.sp,
-      fontWeight = FontWeight.SemiBold,
-      modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-  )
-}
-
-@Composable
-private fun ArrowButton(glyph: String, rowFocused: Boolean, onClick: () -> Unit) {
-  Box(
-      modifier =
-          Modifier.size(48.dp)
-              .clip(RoundedCornerShape(12.dp))
-              .focusProperties { canFocus = false }
-              .clickable(onClick = onClick),
-      contentAlignment = Alignment.Center,
-  ) {
-    Text(
-        glyph,
-        color = if (rowFocused) Color.White else Color(0xFFBBBBBB),
-        fontSize = 20.sp,
-        fontWeight = FontWeight.SemiBold,
-    )
-  }
-}
-
-@Composable
-private fun Card(content: @Composable () -> Unit) {
-  Surface(
-      color = Color(0xFF1C1C1E),
-      shape = RoundedCornerShape(18.dp),
-      modifier = Modifier.fillMaxWidth(),
-  ) {
-    Column { content() }
-  }
-}
-
-@Composable
-private fun Divider() {
-  Spacer(Modifier.fillMaxWidth().height(1.dp).background(Color(0x14FFFFFF)))
-}
-
-/** A row that opens a sub-page; shows the current [value] and a chevron. */
-@Composable
-private fun NavRow(title: String, value: String, onClick: () -> Unit) {
-  Row(
-      modifier =
-          Modifier.fillMaxWidth().tvFocusableRow { onClick() }
-              .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 16.dp),
-      verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
-    Text(value, color = Color(0xFF9A9A9A), fontSize = 15.sp)
-    Text("  ›", color = Color(0xFF7C7C7C), fontSize = 20.sp)
-  }
-}
-
-@Composable
-private fun ToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-  Row(
-      modifier =
-          Modifier.fillMaxWidth().tvFocusableRow { onChange(!checked) }
-              .padding(horizontal = 18.dp, vertical = 14.dp),
-      verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
-    // Visual only — the row toggles it (so the remote's center button works).
-    Switch(checked = checked, onCheckedChange = null)
-  }
-}
-
 /**
  * Remote-friendly replacement for a slider: focusable, with LEFT/RIGHT adjusting the
  * value and UP/DOWN passing through so the remote can move off it (a focused Slider
@@ -716,32 +635,4 @@ private fun TimeStepper(label: String, minuteOfDay: Int, onChange: (Int) -> Unit
 private fun formatMinuteOfDay(min: Int): String {
   val m = ((min % 1440) + 1440) % 1440
   return "%02d:%02d".format(m / 60, m % 60)
-}
-
-@Composable
-private fun Segmented(
-    options: List<Pair<String, String>>,
-    selected: String,
-    onSelect: (String) -> Unit,
-) {
-  Row(
-      modifier = Modifier.background(Color(0xFF2A2A2C), RoundedCornerShape(12.dp)).padding(3.dp),
-      horizontalArrangement = Arrangement.spacedBy(2.dp),
-  ) {
-    options.forEach { (label, value) ->
-      val on = value == selected
-      Surface(
-          color = if (on) Color(0xFF2E6BE6) else Color.Transparent,
-          shape = RoundedCornerShape(10.dp),
-          modifier = Modifier.tvFocusable(RoundedCornerShape(10.dp)) { onSelect(value) },
-      ) {
-        Text(
-            label,
-            color = if (on) Color.White else Color(0xFFBBBBBB),
-            fontSize = 15.sp,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-        )
-      }
-    }
-  }
 }
