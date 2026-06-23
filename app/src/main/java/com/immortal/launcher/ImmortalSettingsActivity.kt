@@ -34,7 +34,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,56 +84,20 @@ class ImmortalSettingsActivity : ComponentActivity() {
 
 @Composable
 private fun ImmortalSettingsScreen() {
-  val context = LocalContext.current
-  var showBootApps by remember { mutableStateOf(false) }
-  var showMultiRoom by remember { mutableStateOf(false) }
-  var showMqtt by remember { mutableStateOf(false) }
-  var showHealth by remember { mutableStateOf(false) }
-  var bootSelected by remember { mutableStateOf(BootLaunch.packages(context).toSet()) }
-
-  if (showBootApps) {
-    BootAppsScreen(
-        selected = bootSelected,
-        onToggle = { pkg ->
-          bootSelected = if (pkg in bootSelected) bootSelected - pkg else bootSelected + pkg
-          BootLaunch.setPackages(context, bootSelected.toList())
-        },
-        onBack = { showBootApps = false },
-    )
-    return
-  }
-  if (showMultiRoom) {
-    MultiRoomScreen(onBack = { showMultiRoom = false })
-    return
-  }
-  if (showMqtt) {
-    MqttScreen(onBack = { showMqtt = false })
-    return
-  }
-  if (showHealth) {
-    DeviceHealthScreen(onBack = { showHealth = false })
-    return
-  }
-
-  SettingsMain(
-      bootCount = bootSelected.size,
-      onOpenBootApps = { showBootApps = true },
-      onOpenMultiRoom = { showMultiRoom = true },
-      onOpenMqtt = { showMqtt = true },
-      onOpenHealth = { showHealth = true },
-  )
-}
-
-@Composable
-private fun SettingsMain(
-    bootCount: Int,
-    onOpenBootApps: () -> Unit,
-    onOpenMultiRoom: () -> Unit,
-    onOpenMqtt: () -> Unit,
-    onOpenHealth: () -> Unit,
-) {
+  // The sub-screens (multi-room, MQTT, device health, boot apps) are now their own Activities,
+  // reached by launching them from the nav rows below — one nav model, like the Screensaver screen.
   val context = LocalContext.current
   var settings by remember { mutableStateOf(ImmortalSettings.load(context)) }
+
+  // Re-read on resume so values changed in a sub-screen Activity reflect when we come back.
+  val resumeOwner = LocalLifecycleOwner.current
+  DisposableEffect(resumeOwner) {
+    val obs = LifecycleEventObserver { _, e ->
+      if (e == Lifecycle.Event.ON_RESUME) settings = ImmortalSettings.load(context)
+    }
+    resumeOwner.lifecycle.addObserver(obs)
+    onDispose { resumeOwner.lifecycle.removeObserver(obs) }
+  }
 
   // Remote support: focus the first control on open; Back exits the screen.
   val activity = context as? Activity
@@ -334,18 +302,20 @@ private fun SettingsMain(
         }
       }
 
-      MultiRoomNavRow(onOpen = onOpenMultiRoom)
+      MultiRoomNavRow(onOpen = { context.startActivity(Intent(context, MultiRoomActivity::class.java)) })
 
-      MqttNavRow(onOpen = onOpenMqtt)
+      MqttNavRow(onOpen = { context.startActivity(Intent(context, MqttActivity::class.java)) })
 
       RemoteNavRow()
 
       QuickButtonsSection()
 
       Spacer(Modifier.size(26.dp))
-      BootAppsNavRow(count = bootCount, onOpen = onOpenBootApps)
+      BootAppsNavRow(
+          count = BootLaunch.packages(context).size,
+          onOpen = { context.startActivity(Intent(context, BootAppsActivity::class.java)) })
 
-      DeviceHealthNavRow(onOpen = onOpenHealth)
+      DeviceHealthNavRow(onOpen = { context.startActivity(Intent(context, DeviceHealthActivity::class.java)) })
 
       Text(
           "Changes apply as soon as you go back to the home screen.",
@@ -412,7 +382,7 @@ private fun MultiRoomStep(n: String, text: String) {
 }
 
 @Composable
-private fun MultiRoomScreen(onBack: () -> Unit) {
+internal fun MultiRoomScreen(onBack: () -> Unit) {
   val context = LocalContext.current
   var enabled by remember { mutableStateOf(ImmortalSettings.multiRoomEnabled(context)) }
   var host by remember { mutableStateOf(ImmortalSettings.snapcastHost(context)) }
@@ -787,7 +757,7 @@ private fun RemoteNavRow() {
  * MQTT broker. Off by default; Back returns to the main settings page.
  */
 @Composable
-private fun MqttScreen(onBack: () -> Unit) {
+internal fun MqttScreen(onBack: () -> Unit) {
   val context = LocalContext.current
   var enabled by remember { mutableStateOf(MqttConfig.isEnabled(context)) }
   var host by remember { mutableStateOf(MqttConfig.host(context)) }
@@ -1117,7 +1087,7 @@ private fun DeviceHealthNavRow(onOpen: () -> Unit) {
  * the uninstall path it served is kept as a clearly-warned advanced action at the bottom.
  */
 @Composable
-private fun DeviceHealthScreen(onBack: () -> Unit) {
+internal fun DeviceHealthScreen(onBack: () -> Unit) {
   val context = LocalContext.current
   val checks = remember { DevicePermissions.all(context) }
   val issues = checks.count { !it.granted }
@@ -1317,7 +1287,7 @@ private fun BootAppsNavRow(count: Int, onOpen: () -> Unit) {
  * main settings page (handled by the parent via [onBack]).
  */
 @Composable
-private fun BootAppsScreen(
+internal fun BootAppsScreen(
     selected: Set<String>,
     onToggle: (String) -> Unit,
     onBack: () -> Unit,

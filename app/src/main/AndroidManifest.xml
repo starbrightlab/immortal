@@ -162,6 +162,12 @@
             android:exported="false"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- Immortal-settings sub-screens (reached via a NavSpec from the registry-driven screen). -->
+        <activity android:name=".MultiRoomActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
+        <activity android:name=".MqttActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
+        <activity android:name=".DeviceHealthActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
+        <activity android:name=".BootAppsActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
+
         <!-- Connect a self-hosted Immich server as the screensaver source. -->
         <activity
             android:name=".ImmichConnectActivity"
