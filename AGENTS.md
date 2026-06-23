@@ -74,8 +74,66 @@ The Kotlin package is flat; files are grouped by name prefix:
 - **Smart home (MQTT):** `Mqtt*`
 - **Remote / Portal TV:** `Remote*`, `TvFocus`
 - **Boot / lifecycle:** `ImmortalApp`, `BootReceiver`, `BootLaunch`, `Sleep*`, `ScreenControl`
+- **Settings (the registry — read [Settings infrastructure](#settings-infrastructure) before
+  touching any setting):** `settings/SettingSpec`, `settings/SettingsDomain` + `SettingsDomains`,
+  `settings/SettingsRegistry`, `SettingsRenderer` + `SettingsComponents` (on-device UI), the
+  `*Config` SharedPreferences objects, `FleetScreensaver` / `FleetCalendar` (wire façades)
 
 When in doubt, search by symbol rather than guessing the file.
+
+## Settings infrastructure
+
+Every user-facing setting flows through one **declarative registry** in
+`com.immortal.launcher.settings`. A setting is defined **once** as a `SettingSpec`, and that single
+definition drives three consumers automatically:
+
+1. **Persistence** — the existing `*Config` SharedPreferences objects (the spec binds to their
+   getter/setter; storage is untouched).
+2. **On-device UI** — `SettingsRenderer.SettingsList(domain, …)` renders the specs as Compose rows.
+3. **Phone remote** — the `/remote/settings` schema + the generic PWA renderer in `RemoteHtml`.
+
+The domains live in `SettingsDomains.kt`: `screensaver`, `calendar`, `immortal`, `mqtt`, `quickbar`.
+
+### Adding or changing a setting — the rules
+
+- **Add a `SettingSpec`; never read/write prefs directly from UI or routes.** Put a `BoolSpec` /
+  `IntSpec` / `EnumSpec` / `StringSpec` in the right `SettingsDomain`, bound to the `*Config`
+  getter/setter — it then appears on-device **and** on the remote with no extra code. Touching
+  `SharedPreferences` straight from a Compose screen or an HTTP route is the anti-pattern: it
+  silently skips the remote, the validation, and the side-effect hook.
+- **Constraints belong on the spec** (`IntSpec` min/max/step/wrap, `EnumSpec` options/coerce). The
+  apply boundary **validates and rejects** out-of-range / wrong-typed input, so don't re-clamp in
+  the UI and don't rely on the setter to mask a bad value.
+- **Side effects go in the domain's `onApplied`** (screensaver reaffirm, `MqttService.sync`,
+  status-bar re-apply, …), not at the call site — the on-device and remote paths funnel through it
+  so it can't drift. Apply is `synchronized` per domain.
+- **Gating is declarative:** `visible = { ctx, snapshot -> … }` hides a spec on both surfaces.
+- **A persisted field with no spec fails the build.** `SettingsDomainTest` has per-domain
+  completeness tripwires (e.g. `immortalRegistry_coversEveryPersistedField`) — add the spec, or add
+  the field to the explicit exclusion set, or the test goes red. Deliberate gate.
+
+### Sub-screens (pickers, connect forms, complex editors)
+
+Anything too rich for a generic row — a clock-face picker, a photo-source credential form, a
+world-clock editor — is its **own `Activity`**, reached from a **`NavSpec`** in the domain (it
+renders as a nav row). **Do not** add an in-file `var showX by mutableStateOf(false)` sub-screen
+toggle: that was the old, second navigation model and it has been removed. One nav model — Activities.
+
+### Testing
+
+`SettingsDomainTest` (pure JVM, mockito `Context` — no Robolectric) covers apply / validation /
+`onApplied` / schema per domain. Keep new domains and fields covered by those patterns; on-device
+behaviour is verified manually.
+
+### Known edges
+
+- A domain needs an **immutable `Settings` snapshot** to render through `SettingsList` (with a
+  `Context`-as-snapshot domain the on-device toggle won't recompose). `mqtt` / multi-room keep
+  bespoke on-device screens for live connection status — their specs still drive the remote, and a
+  spec-key pin test guards them from drifting.
+- Photo-source credentials (Immich / SMB / WebDAV) are atomic multi-field groups that live in their
+  own connect Activities + `FleetScreensaver` (the registry models scalars; a `GroupSpec` is their
+  planned home).
 
 ## Fleet management and the `fleetctl` skill
 
