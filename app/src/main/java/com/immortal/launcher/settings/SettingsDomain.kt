@@ -61,12 +61,17 @@ class SettingsDomain<S>(
     return JSONObject().put("id", id).put("title", title).put("controls", controls)
   }
 
-  /** Apply every present key, then fire [onApplied] once. Returns the set of applied keys. */
-  fun apply(c: Context, body: JSONObject): Set<String> {
-    val applied = applyValues(c, body)
-    if (applied.isNotEmpty()) onApplied(c, applied)
-    return applied
-  }
+  /**
+   * Apply every present key, then fire [onApplied] once. Returns the set of applied keys. Serialized
+   * per-domain so two concurrent applies (two remote clients, or remote + on-device) can't interleave
+   * their writes or have the post-apply read-back reflect a different writer's half-applied state.
+   */
+  fun apply(c: Context, body: JSONObject): Set<String> =
+      synchronized(this) {
+        val applied = applyValues(c, body)
+        if (applied.isNotEmpty()) onApplied(c, applied)
+        applied
+      }
 
   /**
    * Apply every present key WITHOUT firing [onApplied]. For callers that already run their own
@@ -74,11 +79,12 @@ class SettingsDomain<S>(
    * themselves) — delegating their value writes here unifies the spec definitions without
    * double-firing the domain's hook. Most callers want [apply].
    */
-  fun applyValues(c: Context, body: JSONObject): Set<String> {
-    val applied = LinkedHashSet<String>()
-    specs.forEach { if (it.applyFrom(c, body)) applied.add(it.key) }
-    return applied
-  }
+  fun applyValues(c: Context, body: JSONObject): Set<String> =
+      synchronized(this) {
+        val applied = LinkedHashSet<String>()
+        specs.forEach { if (it.applyFrom(c, body)) applied.add(it.key) }
+        applied
+      }
 }
 
 /**

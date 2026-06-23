@@ -60,6 +60,30 @@ private fun firstPresent(key: String, aliases: List<String>, body: JSONObject): 
 
 private fun JSONObject.withHelp(help: String?): JSONObject = apply { help?.let { put("help", it) } }
 
+/**
+ * Strict scalar parsing at the HTTP boundary. `JSONObject.optInt`/`optBoolean` quietly coerce a
+ * wrong-typed value to `0`/`false` (so a non-numeric port or a garbage toggle would be written and
+ * reported as "applied"). These return null instead, so [SettingSpec.applyFrom] can reject the write
+ * and leave it out of the applied-key set — making that set a truthful record of what took effect.
+ */
+private fun Any?.asIntOrNull(): Int? =
+    when (this) {
+      is Number -> toInt()
+      is String -> trim().toIntOrNull()
+      else -> null
+    }
+
+private fun Any?.asBooleanOrNull(): Boolean? =
+    when (this) {
+      is Boolean -> this
+      is String -> when (trim().lowercase()) {
+        "true" -> true
+        "false" -> false
+        else -> null
+      }
+      else -> null
+    }
+
 class BoolSpec<S>(
     override val key: String,
     val title: String,
@@ -81,7 +105,8 @@ class BoolSpec<S>(
 
   override fun applyFrom(c: Context, body: JSONObject): Boolean {
     val k = firstPresent(key, aliases, body) ?: return false
-    set(c, body.optBoolean(k))
+    val v = body.opt(k).asBooleanOrNull() ?: return false // reject a non-boolean rather than coerce
+    set(c, v)
     return true
   }
 }
@@ -125,7 +150,13 @@ class IntSpec<S>(
 
   override fun applyFrom(c: Context, body: JSONObject): Boolean {
     val k = firstPresent(key, aliases, body) ?: return false
-    set(c, body.optInt(k)) // the underlying setter clamps/wraps
+    val n = body.opt(k).asIntOrNull() ?: return false // reject a non-integer rather than coerce to 0
+    // Reject an out-of-range value (so the schema's advertised min/max is actually enforced, and the
+    // applied set stays truthful) instead of letting the setter silently clamp it. Wrap fields
+    // (time-of-day) legitimately arrive outside [min,max] from the stepper's -step at 0, so they skip
+    // the range check; the setter still wraps/clamps as the final guard either way.
+    if (!wrap && n !in min..max) return false
+    set(c, n)
     return true
   }
 }

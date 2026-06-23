@@ -94,6 +94,46 @@ class SettingsDomainTest {
   }
 
   @Test
+  fun int_rejectsNonNumericAndOutOfRange_soAppliedSetIsTruthful() {
+    val d =
+        domain(
+            listOf(IntSpec("n", "N", get = { it.n }, set = { _, v -> writes.add("n" to v) }, min = 0, max = 10)))
+    // Wrong type and out-of-range are REJECTED (not coerced to 0 / silently clamped + reported applied).
+    assertTrue("non-numeric rejected", d.apply(ctx, JSONObject().put("n", "abc")).isEmpty())
+    assertTrue("above max rejected", d.apply(ctx, JSONObject().put("n", 99)).isEmpty())
+    assertTrue("below min rejected", d.apply(ctx, JSONObject().put("n", -1)).isEmpty())
+    assertTrue("no write happened for any rejected value", writes.isEmpty())
+    // In-range applies; a numeric string coerces.
+    assertEquals(setOf("n"), d.apply(ctx, JSONObject().put("n", 7)))
+    assertEquals(setOf("n"), d.apply(ctx, JSONObject().put("n", "3")))
+    assertEquals(listOf<Pair<String, Any?>>("n" to 7, "n" to 3), writes)
+  }
+
+  @Test
+  fun int_wrapField_acceptsOutOfRange_forTheStepperWrap() {
+    val seen = mutableListOf<Int>()
+    val d =
+        domain(
+            listOf(
+                IntSpec(
+                    "t", "T", get = { it.n }, set = { _, v -> seen.add(v) }, min = 0, max = 1439, wrap = true)))
+    // A time-of-day (wrap) field legitimately receives the stepper's -step at 0; range check is skipped
+    // and the setter wraps it. (Non-wrap fields would reject this — see the test above.)
+    assertEquals(setOf("t"), d.apply(ctx, JSONObject().put("t", -15)))
+    assertEquals(listOf(-15), seen)
+  }
+
+  @Test
+  fun bool_rejectsNonBoolean() {
+    val d = domain(listOf(BoolSpec("flag", "F", get = { it.flag }, set = { _, v -> writes.add("flag" to v) })))
+    assertTrue(d.apply(ctx, JSONObject().put("flag", "maybe")).isEmpty()) // garbage string → skipped
+    assertTrue(d.apply(ctx, JSONObject().put("flag", 3)).isEmpty()) // number → skipped
+    assertTrue(writes.isEmpty())
+    assertEquals(setOf("flag"), d.apply(ctx, JSONObject().put("flag", true)))
+    assertEquals(setOf("flag"), d.apply(ctx, JSONObject().put("flag", "false"))) // "true"/"false" accepted
+  }
+
+  @Test
   fun string_applyWhenGuardSkipsBlank() {
     val d =
         domain(
