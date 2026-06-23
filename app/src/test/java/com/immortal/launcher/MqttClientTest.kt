@@ -8,10 +8,13 @@
 package com.immortal.launcher
 
 import java.io.DataInputStream
+import java.io.OutputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -84,6 +87,86 @@ class MqttClientTest {
       val c = clientTo(server)
       try {
         assertFalse(c.connect(keepAliveSec = 30, connectTimeoutMs = 2000))
+      } finally {
+        c.close()
+      }
+    }
+  }
+
+  /**
+   * Drive a CONNACK + a single QoS-0 PUBLISH whose first-byte [publishFirstByte] carries
+   * the bits we want to verify (in particular bit 0, the retain flag). The body is a small
+   * fixed topic + payload — enough for [MqttClient.readPacket] to consume cleanly.
+   */
+  private fun fakeBrokerWithPublish(publishFirstByte: Int): ServerSocket {
+    val server = ServerSocket()
+    server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0))
+    Thread {
+          runCatching {
+            server.accept().use { sock ->
+              val inp = DataInputStream(sock.getInputStream())
+              // Consume the CONNECT.
+              inp.readByte()
+              var len = 0
+              var shift = 0
+              while (true) {
+                val b = inp.readByte().toInt() and 0xff
+                len = len or ((b and 0x7f) shl shift)
+                if (b and 0x80 == 0) break
+                shift += 7
+              }
+              repeat(len) { inp.readByte() }
+              val out: OutputStream = sock.getOutputStream()
+              // CONNACK.
+              out.write(byteArrayOf(0x20, 0x02, 0x00, 0x00))
+              // PUBLISH: first-byte = type | flags; remaining length = topic_len_be (2) +
+              // topic bytes (2: "ab") + payload ("xy", 2) = 6.
+              out.write(byteArrayOf(publishFirstByte.toByte(), 6, 0, 2, 'a'.code.toByte(), 'b'.code.toByte(), 'x'.code.toByte(), 'y'.code.toByte()))
+              out.flush()
+              // Hold the socket open briefly so the client can read before EOF.
+              Thread.sleep(200)
+            }
+          }
+        }
+        .apply { isDaemon = true }
+        .start()
+    return server
+  }
+
+  @Test
+  fun readPacket_extractsRetainBit_set() {
+    // 0x31 = PUBLISH (0x30) | retain (0x01).
+    fakeBrokerWithPublish(publishFirstByte = 0x31).use { server ->
+      val c = clientTo(server)
+      try {
+        assertTrue(c.connect(keepAliveSec = 30, connectTimeoutMs = 2000))
+        val pkt = c.readPacket()
+        assertNotNull(pkt)
+        assertEquals(0x30, pkt!!.type)
+        // Retain bit lives at flags & 0x01 — exactly what MqttPublisher's connect loop
+        // inspects to drop retained set-topic messages.
+        assertEquals(1, pkt.flags and 0x01)
+      } finally {
+        c.close()
+      }
+    }
+  }
+
+  @Test
+  fun readPacket_extractsRetainBit_unset() {
+    // 0x30 = PUBLISH with retain=0.
+    fakeBrokerWithPublish(publishFirstByte = 0x30).use { server ->
+      val c = clientTo(server)
+      try {
+        assertTrue(c.connect(keepAliveSec = 30, connectTimeoutMs = 2000))
+        val pkt = c.readPacket()
+        assertNotNull(pkt)
+        assertEquals(0x30, pkt!!.type)
+        assertEquals(0, pkt.flags and 0x01)
+        // Topic + payload should still parse correctly.
+        val (topic, payload) = c.parsePublish(pkt)
+        assertEquals("ab", topic)
+        assertEquals("xy", String(payload, Charsets.UTF_8))
       } finally {
         c.close()
       }

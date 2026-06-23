@@ -30,6 +30,7 @@ class BarWatchService : AccessibilityService() {
     QuickBar.attach(this) // host the cluster as a TYPE_ACCESSIBILITY_OVERLAY (renders on the bar)
     RemoteInput.register(this) // let the phone-remote routes drive input through us
     RemoteCursor.attach(this) // host the remote touchpad's on-TV pointer overlay
+    NotificationOverlay.attach(this) // host MQTT-notify toasts (see MqttPublisher.handleNotify)
     updateBar()
   }
 
@@ -41,6 +42,7 @@ class BarWatchService : AccessibilityService() {
     QuickBar.detach()
     RemoteInput.unregister()
     RemoteCursor.detach()
+    NotificationOverlay.detach()
     return super.onUnbind(intent)
   }
 

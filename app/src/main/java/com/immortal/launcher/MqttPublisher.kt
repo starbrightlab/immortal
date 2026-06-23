@@ -169,7 +169,16 @@ class MqttPublisher(private val appContext: Context) {
               val pkt = c.readPacket() ?: break
               if (pkt.type == 0x30) {
                 val (t, p) = c.parsePublish(pkt)
-                handleCommand(t, String(p, Charsets.UTF_8))
+                // Drop retained set-topic deliveries — both the broker's protocol-mandated
+                // replay on (re)subscribe AND any future producer publish with retain=true.
+                // Command topics should never be retained; if one is, dropping it avoids
+                // replaying stale doorbells on every reconnect.
+                val retained = (pkt.flags and 0x01) != 0
+                if (retained) {
+                  Log.i(TAG, "ignoring retained set-topic message: $t")
+                } else {
+                  handleCommand(t, String(p, Charsets.UTF_8))
+                }
               }
             }
           }
@@ -252,6 +261,7 @@ class MqttPublisher(private val appContext: Context) {
           "media_play_pause" -> NowPlayingHub.playPause()
           "media_next" -> NowPlayingHub.next()
           "media_previous" -> NowPlayingHub.previous()
+          "notify" -> handleNotify(payload)
           else -> Log.w(TAG, "unknown command $obj")
         }
       }
@@ -284,6 +294,36 @@ class MqttPublisher(private val appContext: Context) {
     }
     // Echo the last target so the text entity shows what it was set to.
     client?.publish("$base/open/state", t, retain = true)
+  }
+
+  /**
+   * Render a notify payload (toast + optional sound). Schema: [NotifyPayload]; behavior
+   * rules: `docs/design/mqtt-notifications.md`. The handler is forgiving — malformed JSON
+   * is a silent no-op; partial payloads use defaults.
+   */
+  private fun handleNotify(raw: String) {
+    val spec = NotifyPayload.parse(raw) ?: return // empty/malformed/no-op
+    if (spec.hasVisual) {
+      // wake_screen defaults to true. Always call wake when requested — idempotent if the
+      // device is already interactive, dismisses the photo dream if it's in front (PowerManager
+      // reports isInteractive=true while dreaming, so a screen-on check alone misses it; and
+      // PresenceHub.current.screen only reflects THIS process's dream service, which doesn't
+      // help if a sibling package owns the active dream). 3s auto-release wake lock, no harm.
+      if (spec.wakeScreen) ScreenControl.wake(appContext)
+      val tap: (() -> Unit)? = spec.onTap?.let { target -> { openTarget(target) } }
+      NotificationOverlay.show(spec, tap)
+    }
+    if (!spec.sound.isNullOrBlank()) {
+      val nm =
+          appContext.getSystemService(Context.NOTIFICATION_SERVICE)
+              as? android.app.NotificationManager
+      val dndOff =
+          nm == null ||
+              nm.currentInterruptionFilter ==
+                  android.app.NotificationManager.INTERRUPTION_FILTER_ALL
+      if (dndOff) SoundPlayer.play(appContext, spec.sound, spec.volume)
+      else Log.i(TAG, "DND active; suppressing notify sound")
+    }
   }
 
   // --- state (device → broker) ------------------------------------------------
@@ -396,6 +436,7 @@ class MqttPublisher(private val appContext: Context) {
 
     button(c, "go_home", "Home", icon = "mdi:home")
     textEntity(c, "open", "Open", icon = "mdi:open-in-app")
+    notifyEntity(c, "notify", "Notify")
     button(c, "identify", "Identify", icon = "mdi:bullhorn")
     sensor(c, "ip", "IP address", icon = "mdi:ip-network", diagnostic = true)
   }
@@ -416,6 +457,7 @@ class MqttPublisher(private val appContext: Context) {
           "button" to "media_previous",
           "button" to "go_home",
           "text" to "open",
+          "notify" to "notify",
           "button" to "identify",
           "sensor" to "ip",
           "button" to "screen_off", // legacy (pre-1.41)
@@ -521,6 +563,22 @@ class MqttPublisher(private val appContext: Context) {
             .put("entity_category", "config")
             .put("icon", icon)
     publishConfig(c, "text", obj, cfg)
+  }
+
+  /**
+   * The MQTT `notify` discovery component (HA 2024.7+ `NotifyEntity`). HA exposes the
+   * entity as a target for the `notify.send_message` action; only `message` reaches the
+   * `command_template`, so Track 1 ships `{"message": "..."}` to the device. Rich payloads
+   * use Track 2 (raw `mqtt.publish` to `<base>/notify/set`). See
+   * `docs/design/mqtt-notifications.md` § *Home Assistant integration*.
+   */
+  private fun notifyEntity(c: MqttClient, obj: String, name: String) {
+    val cfg =
+        base(obj, name)
+            .put("command_topic", "$base/$obj/set")
+            .put("command_template", "{\"message\": {{ value|tojson }}}")
+            .put("availability_topic", "$base/availability")
+    publishConfig(c, "notify", obj, cfg)
   }
 
   /** Publish (or, when [cfg] is null, clear) a retained discovery config. */
