@@ -234,7 +234,7 @@ class RemoteRoutes(private val context: Context) {
             if (body.has("calendarUrl")) {
               applied += FleetCalendar.apply(context, JSONObject().put("url", body.optString("calendarUrl")))
             }
-            SettingsGuard.reaffirmScreensaver(context)
+            SettingsGuard.afterScreensaverApply(context, applied)
             val s = ScreensaverConfig.load(context)
             json(
                 200,
@@ -326,8 +326,7 @@ class RemoteRoutes(private val context: Context) {
     when (target) {
       "screensaver" -> {
         val applied = FleetScreensaver.apply(context, b)
-        SettingsGuard.reaffirmScreensaver(context)
-        if (applied.any { it.startsWith("overnight") }) SleepScheduler.applyOvernightNow(context)
+        SettingsGuard.afterScreensaverApply(context, applied)
       }
       "calendar" -> FleetCalendar.apply(context, b)
     }

@@ -78,6 +78,18 @@ object SettingsGuard {
   }
 
   /**
+   * The standard post-apply effects for a screensaver settings change: re-assert ownership and, if
+   * any overnight-window key changed, reschedule the sleep alarms. Centralised so every write path
+   * (the registry's `onApplied`, the fleet `/screensaver` route, `/remote/sources`, preset config)
+   * runs the identical thing — previously `/remote/sources` reaffirmed but skipped the overnight
+   * reschedule, so an overnight change pushed through it never re-armed the alarms.
+   */
+  fun afterScreensaverApply(context: Context, appliedKeys: Collection<String>) {
+    reaffirmScreensaver(context)
+    if (appliedKeys.any { it.startsWith("overnight") }) SleepScheduler.applyOvernightNow(context)
+  }
+
+  /**
    * Re-enables ADB after boot. The vendor init script
    * (`init.common.usb.rc`) kills adbd on every boot for omni_prod-user
    * builds when `ro.boot.force_enable_usb_adb=0`. Writing `adb_enabled=1`

@@ -276,9 +276,7 @@ class FleetRoutes(private val context: Context) {
           if (body == null) resp(400, err("bad_json"))
           else {
             val applied = FleetScreensaver.apply(context, body)
-            SettingsGuard.reaffirmScreensaver(context)
-            // Overnight alarms are armed eagerly so a window change takes effect now.
-            if (applied.any { it.startsWith("overnight") }) SleepScheduler.applyOvernightNow(context)
+            SettingsGuard.afterScreensaverApply(context, applied)
             resp(
                 200,
                 ok()

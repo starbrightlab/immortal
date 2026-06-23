@@ -117,4 +117,8 @@ dependencies {
   // stub used in unit tests otherwise throws "not mocked").
   testImplementation(libs.junit)
   testImplementation("org.json:json:20240303")
+  // Pure-JVM mock of Context so the registry's apply/onApplied path is unit-testable without
+  // Robolectric (no instrumented android-all for compileSdk 36 / AGP 9 yet). The Context is only
+  // passed through to setters, so a mock that's never dereferenced is enough.
+  testImplementation("org.mockito:mockito-core:5.11.0")
 }

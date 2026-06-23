@@ -21,7 +21,6 @@ import com.immortal.launcher.QuickBar
 import com.immortal.launcher.QuickBarConfig
 import com.immortal.launcher.ScreensaverConfig
 import com.immortal.launcher.SettingsGuard
-import com.immortal.launcher.SleepScheduler
 import org.json.JSONArray
 
 /**
@@ -251,10 +250,7 @@ object SettingsDomains {
           // reaffirm + overnight reschedule that `RemoteRoutes.applyConfig` / `FleetRoutes` run).
           // Fires once per /remote/settings batch; the legacy /screensaver and /remote/sources
           // routes keep their own reaffirm, so there's no double-fire.
-          onApplied = { c, keys ->
-            SettingsGuard.reaffirmScreensaver(c)
-            if (keys.any { it.startsWith("overnight") }) SleepScheduler.applyOvernightNow(c)
-          },
+          onApplied = { c, keys -> SettingsGuard.afterScreensaverApply(c, keys) },
       )
 
   /**

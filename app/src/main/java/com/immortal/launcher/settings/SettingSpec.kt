@@ -199,13 +199,19 @@ class StringSpec<S>(
           .put("type", "string")
           .put("title", title)
           .withHelp(help)
-          .put("value", get(s))
+          // Never expose a stored secret's cleartext in the schema — advertise only whether one is
+          // set (`hasValue`), so a client can show a masked field and leave it untouched unless the
+          // user types a new value.
+          .put("value", if (secret) "" else get(s))
           .put("secret", secret)
+          .apply { if (secret) put("hasValue", get(s).isNotBlank()) }
           .put("entry", entry.wire())
 
   override fun applyFrom(c: Context, body: JSONObject): Boolean {
     val k = firstPresent(key, aliases, body) ?: return false
     val v = body.optString(k)
+    // A blank submit for a secret means "leave it unchanged" (the field is masked, not cleared).
+    if (secret && v.isBlank()) return false
     if (!applyWhen(v)) return false
     set(c, v)
     return true
