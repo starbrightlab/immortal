@@ -69,6 +69,7 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
   // null = not connected yet (show the form); non-null = connected, show the album picker.
   var albums by remember { mutableStateOf<List<ImmichSource.Album>?>(null) }
   var selectedAlbumId by remember { mutableStateOf(existing.immichAlbumId) }
+  val (_, initialFocus) = rememberInitialFocus()
 
   BackHandler { onDone() }
 
@@ -128,7 +129,7 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
             onValueChange = { url = it },
             placeholder = { Text("http://192.168.1.50:2283", color = Color(0xFF777777)) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            modifier = initialFocus.fillMaxWidth().heightIn(min = 56.dp),
             shape = RoundedCornerShape(14.dp),
         )
         Spacer(Modifier.heightIn(min = 12.dp))

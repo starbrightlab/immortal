@@ -70,6 +70,7 @@ private fun CalendarUrlEntryScreen(
   val context = LocalContext.current
   val existing = remember { ScreensaverConfig.load(context).calendarUrl.orEmpty() }
   var url by remember { mutableStateOf(existing) }
+  val (_, initialFocus) = rememberInitialFocus()
 
   val trimmed = url.trim()
   val supported = trimmed.isNotEmpty() && CalendarFeed.isSupported(trimmed)
@@ -129,7 +130,7 @@ private fun CalendarUrlEntryScreen(
           color = if (supported) Color(0xFF2E6BE6) else Color(0xFF2A2A2C),
           shape = RoundedCornerShape(16.dp),
           modifier =
-              Modifier.fillMaxWidth().tvFocusable(RoundedCornerShape(16.dp), focusScale = 1f) {
+              Modifier.fillMaxWidth().then(initialFocus).tvFocusable(RoundedCornerShape(16.dp), focusScale = 1f) {
                 if (supported) onSave(trimmed)
               },
       ) {

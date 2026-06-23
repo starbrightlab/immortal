@@ -936,6 +936,7 @@ internal fun DeviceHealthScreen(onBack: () -> Unit) {
   val checks = remember { DevicePermissions.all(context) }
   val issues = checks.count { !it.granted }
   var adminActive by remember { mutableStateOf(ScreenControl.isAdminActive(context)) }
+  var confirmingDisable by remember { mutableStateOf(false) }
 
   Column(
       modifier =
@@ -1032,13 +1033,22 @@ internal fun DeviceHealthScreen(onBack: () -> Unit) {
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp),
         )
         Text(
-            "Disable screen-off admin",
+            if (confirmingDisable) "Tap again to confirm — this stops automatic screen-off"
+            else "Disable screen-off admin",
             color = Color(0xFFE0908A),
             fontSize = 15.sp,
+            fontWeight = if (confirmingDisable) FontWeight.SemiBold else FontWeight.Normal,
             modifier =
                 Modifier.tvFocusable(RoundedCornerShape(8.dp)) {
-                      ScreenControl.deactivateAdmin(context)
-                      adminActive = ScreenControl.isAdminActive(context)
+                      // Two-tap arm: a single stray remote press shouldn't tear down device admin
+                      // (which silently breaks screensaver sleep + the HA screen-off control).
+                      if (confirmingDisable) {
+                        ScreenControl.deactivateAdmin(context)
+                        adminActive = ScreenControl.isAdminActive(context)
+                        confirmingDisable = false
+                      } else {
+                        confirmingDisable = true
+                      }
                     }
                     .padding(start = 4.dp, top = 2.dp, bottom = 4.dp),
         )
