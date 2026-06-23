@@ -63,9 +63,20 @@ class SettingsDomain<S>(
 
   /** Apply every present key, then fire [onApplied] once. Returns the set of applied keys. */
   fun apply(c: Context, body: JSONObject): Set<String> {
+    val applied = applyValues(c, body)
+    if (applied.isNotEmpty()) onApplied(c, applied)
+    return applied
+  }
+
+  /**
+   * Apply every present key WITHOUT firing [onApplied]. For callers that already run their own
+   * side effects (e.g. `FleetScreensaver.apply`, whose route handlers call `afterScreensaverApply`
+   * themselves) — delegating their value writes here unifies the spec definitions without
+   * double-firing the domain's hook. Most callers want [apply].
+   */
+  fun applyValues(c: Context, body: JSONObject): Set<String> {
     val applied = LinkedHashSet<String>()
     specs.forEach { if (it.applyFrom(c, body)) applied.add(it.key) }
-    if (applied.isNotEmpty()) onApplied(c, applied)
     return applied
   }
 }

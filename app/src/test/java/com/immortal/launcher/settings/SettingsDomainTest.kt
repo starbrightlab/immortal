@@ -3,6 +3,7 @@ package com.immortal.launcher.settings
 import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.json.JSONObject
@@ -200,6 +201,58 @@ class SettingsDomainTest {
       val specKeys = dom.specs.map { it.key }.toSet()
       val orphaned = dom.sections.keys - specKeys
       assertTrue("domain '${dom.id}' has section keys with no matching spec: $orphaned", orphaned.isEmpty())
+    }
+  }
+
+  @Test
+  fun onDeviceRenderedDomains_haveNoUnrenderableInlineStrings() {
+    // SettingsRenderer.SettingControl renders NOTHING for an Entry.Inline StringSpec (there's no
+    // inline free-text entry on a D-pad screen — those use a dedicated Entry.Nav Activity). So an
+    // inline string in a generically-rendered domain would silently show as a blank row only on the
+    // (manual-only) device. Mirror the exclude sets the two on-device screens pass to SettingsList
+    // and assert every spec they DO render is renderable. If these exclude sets change, update here.
+    val rendered =
+        listOf(
+            SettingsDomains.screensaver to setOf("enabled"),
+            SettingsDomains.calendar to emptySet(),
+            SettingsDomains.immortal to setOf("multiRoomEnabled", "snapcastHost", "maUsername", "maPassword"),
+        )
+    rendered.forEach { (dom, exclude) ->
+      val blank =
+          dom.specs
+              .filter { it.key !in exclude }
+              .filterIsInstance<StringSpec<*>>()
+              .filter { it.entry is Entry.Inline }
+              .map { it.key }
+      assertTrue(
+          "domain '${dom.id}' renders Entry.Inline StringSpec(s) on-device that show nothing: $blank",
+          blank.isEmpty())
+    }
+  }
+
+  @Test
+  fun contextSnapshotDomains_specKeysArePinned() {
+    // mqtt & quickbar use Context as the snapshot — they have no aggregate `Settings` data class, so
+    // the reflection completeness tripwires above can't enumerate their fields. Pin the spec-key set
+    // instead: adding a new MqttConfig/QuickBarConfig setting now forces a conscious update here (and
+    // a spec), rather than the field silently shipping with no remote/registry exposure.
+    assertEquals(
+        setOf("enabled", "host", "port", "username", "password", "useTls", "validateCert"),
+        SettingsDomains.mqtt.specs.map { it.key }.toSet())
+    assertEquals(setOf("enabled", "alwaysShow"), SettingsDomains.quickbar.specs.map { it.key }.toSet())
+  }
+
+  @Test
+  fun immortalEnums_rejectValuesOutsideTheirOptions() {
+    // Guards the strict coercers: the Immortal display enums write the raw string straight to prefs
+    // (no normalising setter), so without a coercer a remote push of an unrecognised value would
+    // persist garbage into a constrained field. Each must accept its options and skip anything else.
+    listOf("weatherUnit", "tileSize", "weatherWidget", "clockFormat").forEach { key ->
+      val spec = SettingsDomains.immortal.specs.first { it.key == key } as EnumSpec<*>
+      spec.options.forEach { (value, _) ->
+        assertEquals("enum '$key' must accept its own option '$value'", value, spec.coerce(value))
+      }
+      assertNull("enum '$key' must skip an unrecognised value", spec.coerce("not-a-real-value"))
     }
   }
 }

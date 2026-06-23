@@ -133,6 +133,15 @@ object SettingsDomains {
 
   private fun hhmm(min: Int): String = "%02d:%02d".format(min / 60, min % 60)
 
+  /**
+   * A strict [EnumSpec] coercer: accept the value only if it's one of [allowed], else skip the write.
+   * For enums whose setter does NOT normalise its input (e.g. the Immortal display enums write the
+   * raw string straight to prefs), so a remote push of an unrecognised value can't persist garbage
+   * into a constrained field. Enums whose setter normalises (calendar range/side) keep the default
+   * pass-through coercer.
+   */
+  private fun oneOf(vararg allowed: String): (String) -> String? = { v -> v.takeIf { it in allowed } }
+
   /** Short label for the active photo source, shown on the "Photo source" nav row. */
   private fun sourceLabel(s: ScreensaverConfig.Settings): String =
       when {
@@ -210,7 +219,12 @@ object SettingsDomains {
                       min = 15,
                       max = 24 * 60,
                       step = 15,
-                      format = { "$it min" }),
+                      format = { "$it min" },
+                      help = "How often to re-fetch the photo list from a network album source.",
+                      // Only meaningful for a network album (Immich/URL/SMB/WebDAV/web feed); the
+                      // built-in feed and a local folder don't poll a remote listing, so on-device
+                      // this row only appears for those sources (it was remote-only before).
+                      visible = { _, s -> !s.usesFolder && s.source != ScreensaverConfig.SOURCE_DEFAULT }),
                   EnumSpec(
                       "fit",
                       "Fit",
@@ -247,7 +261,8 @@ object SettingsDomains {
                       "showNowPlaying",
                       "Show now playing",
                       get = { it.showNowPlaying },
-                      set = ScreensaverConfig::setShowNowPlaying),
+                      set = ScreensaverConfig::setShowNowPlaying,
+                      help = "Overlay the current track and cover art on the photo frame while music is playing."),
                   BoolSpec(
                       "antiBurnIn",
                       "Reduce screen burn-in",
@@ -359,6 +374,7 @@ object SettingsDomains {
                               ImmortalSettings.UNIT_AUTO to "Auto",
                               ImmortalSettings.UNIT_F to "Fahrenheit",
                               ImmortalSettings.UNIT_C to "Celsius"),
+                      coerce = oneOf(ImmortalSettings.UNIT_AUTO, ImmortalSettings.UNIT_F, ImmortalSettings.UNIT_C),
                       help = "Auto follows your Portal's language & region setting."),
                   EnumSpec(
                       "tileSize",
@@ -370,6 +386,7 @@ object SettingsDomains {
                               ImmortalSettings.SIZE_STANDARD to "Standard",
                               ImmortalSettings.SIZE_LARGE to "Large",
                               ImmortalSettings.SIZE_XL to "XL"),
+                      coerce = oneOf(ImmortalSettings.SIZE_STANDARD, ImmortalSettings.SIZE_LARGE, ImmortalSettings.SIZE_XL),
                       help = "Large is closer to the stock Portal launcher."),
                   EnumSpec(
                       "weatherWidget",
@@ -381,6 +398,7 @@ object SettingsDomains {
                               ImmortalSettings.WIDGET_OFF to "Off",
                               ImmortalSettings.WIDGET_HOURLY to "Hourly",
                               ImmortalSettings.WIDGET_DAILY to "Daily"),
+                      coerce = oneOf(ImmortalSettings.WIDGET_OFF, ImmortalSettings.WIDGET_HOURLY, ImmortalSettings.WIDGET_DAILY),
                       help = "Show a forecast below your apps. Off by default."),
                   EnumSpec(
                       "clockFormat",
@@ -392,6 +410,7 @@ object SettingsDomains {
                               ImmortalSettings.CLOCK_AUTO to "Auto",
                               ImmortalSettings.CLOCK_12 to "12-hour",
                               ImmortalSettings.CLOCK_24 to "24-hour"),
+                      coerce = oneOf(ImmortalSettings.CLOCK_AUTO, ImmortalSettings.CLOCK_12, ImmortalSettings.CLOCK_24),
                       help =
                           "Applies to the home screen, screensaver and forecast. Auto follows your Portal's system setting."),
                   BoolSpec(
@@ -458,6 +477,13 @@ object SettingsDomains {
    * (this config has no aggregate `Settings`); the broker fields gate on the master toggle, and
    * cert validation on TLS. [SettingsDomain.explicitApply] = batch so a future on-device renderer
    * doesn't reconnect the broker per keystroke; each apply resyncs the service once.
+   *
+   * WARNING — Context-as-snapshot: because the snapshot is the Context (live reads), it never
+   * "changes" on apply, so rendering this domain through the on-device [SettingsList] would NOT
+   * recompose after a toggle (the value updates on disk but Compose sees no state change). It's
+   * served on-device by the bespoke `MqttScreen` (which holds its own `mutableStateOf`); only the
+   * remote renders it generically. Give it a real snapshot `Settings` before pointing `SettingsList`
+   * at it.
    */
   val mqtt: SettingsDomain<Context> =
       SettingsDomain(
@@ -520,7 +546,12 @@ object SettingsDomains {
           onApplied = { c, _ -> MqttService.sync(c) },
       )
 
-  /** The floating quick-button cluster ([QuickBarConfig]); Context as snapshot. */
+  /**
+   * The floating quick-button cluster ([QuickBarConfig]); Context as snapshot. Same Context-snapshot
+   * caveat as [mqtt]: served on-device by the bespoke `QuickButtonsSection` (own `mutableStateOf`),
+   * not the generic [SettingsList], which wouldn't recompose after a toggle here. The remote renders
+   * it generically (a POST returns a fresh schema, so no live recompose is needed there).
+   */
   val quickbar: SettingsDomain<Context> =
       SettingsDomain(
           id = "quickbar",

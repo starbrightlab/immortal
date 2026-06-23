@@ -96,13 +96,20 @@ object FleetScreensaver {
   fun apply(context: Context, body: JSONObject): List<String> {
     val applied = ArrayList<String>()
 
-    if (body.has("enabled")) {
-      ScreensaverConfig.setEnabled(context, body.optBoolean("enabled"))
-      applied.add("enabled")
-    }
-    // Source: "default" resets to the built-in feed; folder/url are driven by their
-    // value keys below (which also flip the source), so an explicit folder/url here
-    // is a no-op unless its path/url is supplied.
+    // Plain display controls + `enabled` are delegated to the screensaver domain, so they're
+    // defined ONCE — the same specs that back /remote/settings and the on-device screen. This is
+    // what stops a new display setting from being added to one write path but forgotten in another
+    // (exactly how `antiBurnIn` used to silently no-op on this path). We apply VALUES ONLY here:
+    // this method's callers (FleetRoutes /screensaver, RemoteRoutes /remote/sources, preset config)
+    // run `SettingsGuard.afterScreensaverApply` themselves, so firing the domain's onApplied too
+    // would double the reaffirm/overnight reschedule.
+    applied.addAll(com.immortal.launcher.settings.SettingsDomains.screensaver.applyValues(context, body))
+
+    // The source + credentialed photo sources live outside the domain: they're atomic multi-field
+    // writes that flip the active source together, which the scalar specs can't express. Each only
+    // applies when its required fields are present, so a partial push (or a different source's
+    // fields) never accidentally switches the source. Same ScreensaverConfig setters the on-Portal
+    // connect screens use.
     if (body.has("source") && body.optString("source") == ScreensaverConfig.SOURCE_DEFAULT) {
       ScreensaverConfig.useDefault(context)
       applied.add("source")
@@ -121,10 +128,6 @@ object FleetScreensaver {
         applied.add("albumUrl")
       }
     }
-    // Credentialed photo sources (the remote's Setup form / fleet push). Each is atomic — it only
-    // applies when its required fields are present — so a partial push or a different source's
-    // fields don't accidentally switch the source. Mirrors the same ScreensaverConfig setters the
-    // on-Portal connect screens use.
     run {
       val url = body.optString("immichUrl")
       val key = body.optString("immichKey")
@@ -155,58 +158,6 @@ object FleetScreensaver {
         ScreensaverConfig.setWebUrl(context, url)
         applied.add("webUrl")
       }
-    }
-    if (body.has("albumRefreshMin")) {
-      ScreensaverConfig.setAlbumRefreshMin(context, body.optInt("albumRefreshMin"))
-      applied.add("albumRefreshMin")
-    }
-    coerceFit(if (body.has("fit")) body.optString("fit") else null)?.let {
-      ScreensaverConfig.setFit(context, it)
-      applied.add("fit")
-    }
-    if (body.has("intervalSec")) {
-      ScreensaverConfig.setInterval(context, body.optInt("intervalSec"))
-      applied.add("intervalSec")
-    }
-    if (body.has("shuffle")) {
-      ScreensaverConfig.setShuffle(context, body.optBoolean("shuffle"))
-      applied.add("shuffle")
-    }
-    if (body.has("includeVideo")) {
-      ScreensaverConfig.setIncludeVideo(context, body.optBoolean("includeVideo"))
-      applied.add("includeVideo")
-    }
-    if (body.has("batterySaver")) {
-      ScreensaverConfig.setBatterySaver(context, body.optBoolean("batterySaver"))
-      applied.add("batterySaver")
-    }
-    if (body.has("showNowPlaying")) {
-      ScreensaverConfig.setShowNowPlaying(context, body.optBoolean("showNowPlaying"))
-      applied.add("showNowPlaying")
-    }
-    if (body.has("presenceMode")) {
-      // Ignore an unrecognised mode rather than defaulting (which would silently flip
-      // the setting on a typo); a valid value is applied.
-      coercePresenceMode(body.optString("presenceMode"))?.let {
-        ScreensaverConfig.setPresenceMode(context, it)
-        applied.add("presenceMode")
-      }
-    }
-    if (body.has("idleSleepMin")) {
-      ScreensaverConfig.setIdleSleepMin(context, body.optInt("idleSleepMin"))
-      applied.add("idleSleepMin")
-    }
-    if (body.has("overnightEnabled")) {
-      ScreensaverConfig.setOvernightEnabled(context, body.optBoolean("overnightEnabled"))
-      applied.add("overnightEnabled")
-    }
-    if (body.has("overnightStartMin")) {
-      ScreensaverConfig.setOvernightStartMin(context, body.optInt("overnightStartMin"))
-      applied.add("overnightStartMin")
-    }
-    if (body.has("overnightEndMin")) {
-      ScreensaverConfig.setOvernightEndMin(context, body.optInt("overnightEndMin"))
-      applied.add("overnightEndMin")
     }
     return applied
   }
