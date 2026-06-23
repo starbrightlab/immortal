@@ -465,66 +465,16 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
 @Composable
 private fun QuickButtonsSection() {
   val context = LocalContext.current
-  var enabled by remember { mutableStateOf(QuickBarConfig.isEnabled(context)) }
-  var always by remember { mutableStateOf(QuickBarConfig.alwaysShow(context)) }
+  var settings by remember { mutableStateOf(QuickBarConfig.load(context)) }
 
   Spacer(Modifier.size(26.dp))
   SectionLabel("Quick buttons")
-  Card {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Column(modifier = Modifier.weight(1f)) {
-        Text("Top-bar app switcher", color = Color.White, fontSize = 17.sp)
-        Text(
-            "A centered button at the top that opens your recent apps to switch between them.",
-            color = Color(0xFF9A9A9A),
-            fontSize = 13.sp,
-            modifier = Modifier.padding(top = 2.dp),
-        )
-      }
-      Segmented(
-          options = listOf("Off" to "off", "On" to "on"),
-          selected = if (enabled) "on" else "off",
-          onSelect = {
-            val on = it == "on"
-            enabled = on
-            QuickBarConfig.setEnabled(context, on)
-            // The accessibility service is baseline-enabled (reconcile is a no-op here); the
-            // cluster's visibility is gated on this setting, so just refresh the overlay.
-            SettingsGuard.reconcileBarWatch(context)
-            QuickBar.applyConfig()
-          },
-      )
-    }
-    if (enabled) {
-      Divider()
-      Row(
-          modifier = Modifier.fillMaxWidth().padding(18.dp),
-          verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Column(modifier = Modifier.weight(1f)) {
-          Text("When to show", color = Color.White, fontSize = 17.sp)
-          Text(
-              "Swipe down from the top to reveal the bar (and the buttons), or keep them always on.",
-              color = Color(0xFF9A9A9A),
-              fontSize = 13.sp,
-              modifier = Modifier.padding(top = 2.dp),
-          )
-        }
-        Segmented(
-            options = listOf("With bar" to "bar", "Always" to "always"),
-            selected = if (always) "always" else "bar",
-            onSelect = {
-              val a = it == "always"
-              always = a
-              QuickBarConfig.setAlwaysShow(context, a)
-              QuickBar.applyConfig()
-            },
-        )
-      }
-    }
+  // Rendered from the `quickbar` registry domain (the same specs the phone remote uses), so the
+  // toggle and its gated "Always show" can't drift from the remote's version. Apply routes through
+  // the domain so its onApplied (reconcile + overlay refresh) fires here too.
+  SettingsList(SettingsDomains.quickbar, settings) { k, v ->
+    SettingsDomains.quickbar.apply(context, JSONObject().put(k, v))
+    settings = QuickBarConfig.load(context)
   }
   Text(
       "Needs the accessibility-based top-bar watch enabled during setup. The switcher shows your " +

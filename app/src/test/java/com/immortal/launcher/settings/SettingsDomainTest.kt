@@ -271,15 +271,26 @@ class SettingsDomainTest {
   }
 
   @Test
-  fun contextSnapshotDomains_specKeysArePinned() {
-    // mqtt & quickbar use Context as the snapshot — they have no aggregate `Settings` data class, so
-    // the reflection completeness tripwires above can't enumerate their fields. Pin the spec-key set
-    // instead: adding a new MqttConfig/QuickBarConfig setting now forces a conscious update here (and
-    // a spec), rather than the field silently shipping with no remote/registry exposure.
+  fun mqttRegistry_specKeysArePinned() {
+    // mqtt still uses Context as the snapshot — no aggregate `Settings` data class for the reflection
+    // tripwire to enumerate. Pin the spec-key set: a new MqttConfig setting forces a conscious update
+    // here (and a spec) rather than silently shipping with no remote/registry exposure.
     assertEquals(
         setOf("enabled", "host", "port", "username", "password", "useTls", "validateCert"),
         SettingsDomains.mqtt.specs.map { it.key }.toSet())
-    assertEquals(setOf("enabled", "alwaysShow"), SettingsDomains.quickbar.specs.map { it.key }.toSet())
+  }
+
+  @Test
+  fun quickbarRegistry_coversEveryPersistedField() {
+    // quickbar now has a real QuickBarConfig.Settings snapshot (so it renders through SettingsList on
+    // both surfaces) — give it the same reflection tripwire as screensaver/immortal.
+    val fields =
+        com.immortal.launcher.QuickBarConfig.Settings::class.java.declaredFields
+            .filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) }
+            .map { it.name }
+            .toSet()
+    val specKeys = SettingsDomains.quickbar.specs.map { it.key }.toSet()
+    assertEquals(fields, specKeys)
   }
 
   @Test

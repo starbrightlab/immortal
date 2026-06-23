@@ -543,34 +543,47 @@ object SettingsDomains {
                   "password" to "Broker",
                   "useTls" to "Security",
                   "validateCert" to "Security"),
-          onApplied = { c, _ -> MqttService.sync(c) },
+          onApplied = { c, keys ->
+            // TLS<->port convenience hop, lifted out of the bespoke on-device screen so the phone
+            // remote gets it too (it didn't before — a real drift): flipping TLS moves the port to
+            // the conventional default IF the user left it on the other mode's default.
+            if ("useTls" in keys) {
+              val tls = MqttConfig.useTls(c)
+              val port = MqttConfig.port(c)
+              if (tls && port == MqttConfig.DEFAULT_PORT) MqttConfig.setPort(c, MqttConfig.DEFAULT_TLS_PORT)
+              else if (!tls && port == MqttConfig.DEFAULT_TLS_PORT) MqttConfig.setPort(c, MqttConfig.DEFAULT_PORT)
+            }
+            MqttService.sync(c)
+          },
       )
 
   /**
-   * The floating quick-button cluster ([QuickBarConfig]); Context as snapshot. Same Context-snapshot
-   * caveat as [mqtt]: served on-device by the bespoke `QuickButtonsSection` (own `mutableStateOf`),
-   * not the generic [SettingsList], which wouldn't recompose after a toggle here. The remote renders
-   * it generically (a POST returns a fresh schema, so no live recompose is needed there).
+   * The floating quick-button cluster ([QuickBarConfig]). Backed by an immutable
+   * [QuickBarConfig.Settings] snapshot, so both the phone remote AND the on-device `QuickButtonsSection`
+   * render it through the generic pipeline ([SettingsList]) — one definition, no bespoke duplicate.
    */
-  val quickbar: SettingsDomain<Context> =
+  val quickbar: SettingsDomain<QuickBarConfig.Settings> =
       SettingsDomain(
           id = "quickbar",
           title = "Quick buttons",
-          load = { it },
+          load = QuickBarConfig::load,
           specs =
               listOf(
                   BoolSpec(
                       "enabled",
                       "App-switcher button",
-                      get = { QuickBarConfig.isEnabled(it) },
-                      set = QuickBarConfig::setEnabled),
+                      get = { it.enabled },
+                      set = QuickBarConfig::setEnabled,
+                      help = "A centered button at the top that opens your recent apps to switch between them."),
                   BoolSpec(
                       "alwaysShow",
                       "Always show",
-                      get = { QuickBarConfig.alwaysShow(it) },
+                      get = { it.alwaysShow },
                       set = QuickBarConfig::setAlwaysShow,
-                      visible = { c, _ -> QuickBarConfig.isEnabled(c) }),
+                      help = "On: always visible. Off: only while the system top bar is revealed.",
+                      visible = { _, s -> s.enabled }),
               ),
+          defaults = { QuickBarConfig.Settings() },
           onApplied = { c, _ ->
             SettingsGuard.reconcileBarWatch(c)
             QuickBar.applyConfig()
