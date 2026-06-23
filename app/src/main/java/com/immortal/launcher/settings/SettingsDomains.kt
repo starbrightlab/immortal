@@ -10,9 +10,16 @@ package com.immortal.launcher.settings
 import android.content.Context
 import com.immortal.launcher.CalendarFeed
 import com.immortal.launcher.CalendarUrlEntryActivity
+import com.immortal.launcher.DreamPolicy
+import com.immortal.launcher.FaceCatalog
+import com.immortal.launcher.FacePickerActivity
 import com.immortal.launcher.FleetCalendar
 import com.immortal.launcher.FleetScreensaver
 import com.immortal.launcher.FrameMode
+import com.immortal.launcher.PhotoFramePreviewActivity
+import com.immortal.launcher.ScreensaverDismiss
+import com.immortal.launcher.ScreensaverDismissAppActivity
+import com.immortal.launcher.ScreensaverSourcesActivity
 import com.immortal.launcher.ImmortalSettings
 import com.immortal.launcher.MqttConfig
 import com.immortal.launcher.MqttService
@@ -62,13 +69,17 @@ object SettingsDomains {
                       get = { it.calendarEnabled },
                       set = ScreensaverConfig::setCalendarEnabled,
                       aliases = listOf("enabled"),
+                      visible = { _, s -> s.hasCalendarLink },
                   ),
                   StringSpec(
                       key = "url",
-                      title = "Calendar feed (.ics)",
+                      title = "Calendar feed",
                       get = { it.calendarUrl ?: "" },
                       set = ScreensaverConfig::setCalendarUrl,
                       entry = Entry.Nav(CalendarUrlEntryActivity::class.java),
+                      help =
+                          "A public iCalendar (.ics) link - a Google \"secret iCal\" address or an Apple " +
+                              "iCloud public-calendar link. Shows your upcoming events on the frame.",
                   ),
                   EnumSpec(
                       key = "range",
@@ -76,6 +87,7 @@ object SettingsDomains {
                       get = { it.calendarRange },
                       set = ScreensaverConfig::setCalendarRange,
                       options = FleetCalendar.RANGES.map { it to rangeLabel(it) },
+                      visible = { _, s -> s.usesCalendar },
                   ),
                   IntSpec(
                       key = "size",
@@ -86,6 +98,7 @@ object SettingsDomains {
                       max = 2,
                       step = 1,
                       format = { CAL_SIZE_LABELS.getOrElse(it) { _ -> it.toString() } },
+                      visible = { _, s -> s.usesCalendar },
                   ),
                   EnumSpec(
                       key = "side",
@@ -96,6 +109,7 @@ object SettingsDomains {
                           listOf(
                               ScreensaverConfig.CAL_SIDE_LEFT to "Left",
                               ScreensaverConfig.CAL_SIDE_RIGHT to "Right"),
+                      visible = { _, s -> s.usesCalendar },
                   ),
                   // Read-only derived views (flat-payload-only — they round-trip the legacy format).
                   DerivedSpec(key = "enabled", get = { it.usesCalendar }),
@@ -119,6 +133,18 @@ object SettingsDomains {
 
   private fun hhmm(min: Int): String = "%02d:%02d".format(min / 60, min % 60)
 
+  /** Short label for the active photo source, shown on the "Photo source" nav row. */
+  private fun sourceLabel(s: ScreensaverConfig.Settings): String =
+      when {
+        s.usesImmich -> "Immich"
+        s.usesSmb -> "Network share"
+        s.usesDav -> "WebDAV"
+        s.usesWebUrl -> "Web page"
+        s.usesUrl -> "Shared album"
+        s.usesFolder -> "Local folder"
+        else -> "Immortal photos"
+      }
+
   /**
    * The photo-frame display settings — the slice the legacy `FleetScreensaver.toJson` reports.
    * Mirrors that flat wire format exactly (16 keys). The 13 plain display controls are writable
@@ -138,7 +164,41 @@ object SettingsDomains {
           load = ScreensaverConfig::load,
           specs =
               listOf(
-                  BoolSpec("enabled", "Photo frame", get = { it.enabled }, set = ScreensaverConfig::setEnabled),
+                  BoolSpec(
+                      "enabled",
+                      "Show the photo-frame screensaver",
+                      get = { it.enabled },
+                      set = ScreensaverConfig::setEnabled,
+                      help =
+                          "Turn this off to let your Portal's screen sleep on its own timer (or run " +
+                              "your own screensaver). Immortal won't switch it back on."),
+                  NavSpec(
+                      "clockFace",
+                      "Clock face",
+                      value = { _, s -> FaceCatalog.entryFor(s.faceId).name },
+                      activity = FacePickerActivity::class.java,
+                      help =
+                          "Choose how the time looks - the classic corner clock, a big centred clock, " +
+                              "or the full-screen flip clock.",
+                      visible = { _, s -> s.enabled }),
+                  NavSpec(
+                      "photoSource",
+                      "Photo source",
+                      value = { _, s -> sourceLabel(s) },
+                      activity = ScreensaverSourcesActivity::class.java,
+                      help =
+                          "Where your photos come from - the built-in feed, your own folder or a shared " +
+                              "album, or a self-hosted source like Immich or a NAS.",
+                      visible = { _, s -> s.enabled }),
+                  NavSpec(
+                      "dismissTarget",
+                      "Open when you tap to exit",
+                      value = { c, _ -> ScreensaverDismiss.chosenLabel(c)?.let { "Opens $it" } ?: "Immortal launcher" },
+                      activity = ScreensaverDismissAppActivity::class.java,
+                      help =
+                          "Tapping the screensaver wakes the Portal. By default that brings you home to " +
+                              "Immortal - or pick an app (like Home Assistant) to drop straight into.",
+                      visible = { _, s -> s.enabled }),
                   DerivedSpec("source", get = { it.source }),
                   DerivedSpec("folderPath", get = { it.folderPath ?: "" }),
                   DerivedSpec("albumUrl", get = { it.albumUrl ?: "" }),
@@ -176,9 +236,13 @@ object SettingsDomains {
                       set = ScreensaverConfig::setIncludeVideo),
                   BoolSpec(
                       "batterySaver",
-                      "Battery saver",
+                      "Sleep on battery when nobody's around",
                       get = { it.batterySaver },
-                      set = ScreensaverConfig::setBatterySaver),
+                      set = ScreensaverConfig::setBatterySaver,
+                      help =
+                          "Unplugged, keep showing photos while someone's nearby and sleep when the room " +
+                              "empties (saves the battery). Off: the frame stays on, on battery too.",
+                      visible = { c, _ -> DreamPolicy.hasBattery(c) }),
                   BoolSpec(
                       "showNowPlaying",
                       "Show now playing",
@@ -198,7 +262,10 @@ object SettingsDomains {
                           listOf(
                               FrameMode.ALWAYS_ON.name to "Always on",
                               FrameMode.PRESENCE.name to "Follow presence"),
-                      coerce = { FleetScreensaver.coercePresenceMode(it)?.name }),
+                      coerce = { FleetScreensaver.coercePresenceMode(it)?.name },
+                      help =
+                          "Follow presence: photos while someone's around, screen off (and multi-room " +
+                              "music paused) when the room empties. Always on: a permanent frame on mains power."),
                   IntSpec(
                       "idleSleepMin",
                       "Idle screen-off",
@@ -207,12 +274,16 @@ object SettingsDomains {
                       min = 0,
                       max = 120,
                       step = 5,
-                      format = { if (it <= 0) "Off" else "$it min" }),
+                      format = { if (it <= 0) "Off" else "$it min" },
+                      help =
+                          "After the screensaver shows this long with no touch, the screen turns off; " +
+                              "tap to wake. A simple timer - it can't tell whether someone's in the room."),
                   BoolSpec(
                       "overnightEnabled",
                       "Overnight screen-off",
                       get = { it.overnightEnabled },
-                      set = ScreensaverConfig::setOvernightEnabled),
+                      set = ScreensaverConfig::setOvernightEnabled,
+                      help = "Keep the screen off (or show a dim night clock) between two times every night."),
                   IntSpec(
                       "overnightStartMin",
                       "Off from",

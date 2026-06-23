@@ -9,6 +9,9 @@ package com.immortal.launcher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,18 +21,28 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -170,5 +183,51 @@ internal fun Segmented(
         )
       }
     }
+  }
+}
+
+/**
+ * Remote-friendly stepper (replaces the per-screen IntervalStepper/MinuteStepper/TimeStepper):
+ * focusable, LEFT/RIGHT adjust the value and UP/DOWN pass through so the remote can move off it (a
+ * focused Slider traps all four directions). On touch it's still adjustable via the on-screen arrows.
+ */
+@Composable
+internal fun Stepper(label: String, valueText: String, widthMin: Dp = 64.dp, onMinus: () -> Unit, onPlus: () -> Unit) {
+  val src = remember { MutableInteractionSource() }
+  val focused by src.collectIsFocusedAsState()
+  Row(
+      modifier =
+          Modifier.fillMaxWidth()
+              .onKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown)
+                    when (e.key) {
+                      Key.DirectionLeft -> {
+                        onMinus()
+                        true
+                      }
+                      Key.DirectionRight -> {
+                        onPlus()
+                        true
+                      }
+                      else -> false
+                    }
+                else false
+              }
+              .focusable(interactionSource = src)
+              .background(if (focused) Color(0x402E6BE6) else Color.Transparent)
+              .padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(label, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+    ArrowButton("◀", focused) { onMinus() } // left-pointing triangle
+    Text(
+        valueText,
+        color = if (focused) Color.White else Color(0xFFDDDDDD),
+        fontSize = 17.sp,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.widthIn(min = widthMin),
+    )
+    ArrowButton("▶", focused) { onPlus() } // right-pointing triangle
   }
 }
