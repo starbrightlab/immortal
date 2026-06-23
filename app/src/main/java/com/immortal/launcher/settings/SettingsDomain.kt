@@ -29,6 +29,9 @@ class SettingsDomain<S>(
     val specs: List<SettingSpec<S>>,
     /** Optional `controlKey -> sub-group label`, so a renderer can break a long list into sections. */
     val sections: Map<String, String> = emptyMap(),
+    /** Optional factory for a fresh, all-defaults snapshot — lets the schema advertise each
+     *  control's `default` so a client can offer "reset to defaults". */
+    val defaults: (() -> S)? = null,
     /** When true, the on-device renderer batches edits behind an explicit Apply (e.g. MQTT). */
     val explicitApply: Boolean = false,
     val onApplied: (Context, Set<String>) -> Unit = { _, _ -> },
@@ -45,11 +48,13 @@ class SettingsDomain<S>(
   /** The self-describing schema (visible controls + their metadata/values) for a generic renderer. */
   fun schemaJson(c: Context): JSONObject {
     val s = load(c)
+    val defJson = defaults?.let { flatJson(it()) }
     val controls = JSONArray()
     specs.forEach { spec ->
       if (spec.visibleWhen(c, s))
           spec.metaJson(c, s)?.let { meta ->
             sections[spec.key]?.let { meta.put("section", it) }
+            if (defJson != null && defJson.has(spec.key)) meta.put("default", defJson.get(spec.key))
             controls.put(meta)
           }
     }

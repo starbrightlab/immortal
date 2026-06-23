@@ -126,8 +126,12 @@ object RemoteHtml {
   .discovered button{padding:10px 14px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:10px}
 
   /* Generic settings (rendered from the /remote/settings schema). */
-  .setsec{color:#9a9a9a;font-size:13px;font-weight:600;margin:18px 2px 4px}
+  .setsec{display:flex;align-items:baseline;justify-content:space-between;color:#9a9a9a;font-size:13px;font-weight:600;margin:18px 2px 4px}
   .setsubsec{color:#7c7c7c;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin:14px 2px 2px}
+  .resetlink{background:none;color:#8ab4f8;font-size:12px;font-weight:600}
+  .profbtn{font-size:13px;padding:6px 12px;border-radius:10px;background:#2a2a2c;color:#cfcfcf}
+  .profbtn.del{color:#e0908a}
+  .profsave{margin-top:12px;font-size:14px;padding:12px;width:100%;border-radius:12px;background:#1c1c1e;color:#fff}
   .scopebar{display:flex;align-items:center;gap:8px;margin:0 2px 6px;flex-wrap:wrap}
   .scopebar .lbl{font-size:13px;color:#9a9a9a}
   .scopebar button{font-size:12px;padding:6px 12px;border-radius:14px;background:#2a2a2c;color:#cfcfcf}
@@ -387,6 +391,7 @@ object RemoteHtml {
   // --- generic settings (rendered from the declarative /remote/settings schema) ---
   // Apply scope: 'this' = the active Portal only; 'all' = every paired Portal (fleet broadcast).
   var setScope='this';
+  var lastSchema=null; // most recent /remote/settings response, for capturing profiles
   function setScopeTo(s){setScope=s;loadSettings();}
   function renderScopeBar(){
     var n=devicesList().length;
@@ -402,6 +407,7 @@ object RemoteHtml {
   function loadSettings(){
     var c=document.getElementById('settingsList');c.innerHTML='<div class=none>Loading…</div>';
     api('/remote/settings').then(function(d){
+      lastSchema=d;
       c.innerHTML='';
       var sb=renderScopeBar();if(sb)c.appendChild(sb);
       // Photo source is the screensaver's one credentialed setting — a nav row into its editor.
@@ -412,13 +418,20 @@ object RemoteHtml {
       var doms=(d.settings&&d.settings.domains)||[];
       if(!doms.length){c.appendChild(Object.assign(document.createElement('div'),{className:'none',textContent:'No settings available.'}));return;}
       doms.forEach(function(dom){var sec=document.createElement('div');sec.id='dom_'+dom.id;c.appendChild(sec);renderDomain(sec,dom);});
+      c.appendChild(renderProfiles());
     }).catch(function(){c.innerHTML='<div class=none>Couldn\'t load settings.</div>';});
   }
   function openSrcPanel(){document.getElementById('settingsList').classList.add('hide');document.getElementById('srcPanel').classList.remove('hide');loadSources();}
   function closeSrcPanel(){var p=document.getElementById('srcPanel');if(p)p.classList.add('hide');var l=document.getElementById('settingsList');if(l)l.classList.remove('hide');}
   function renderDomain(sec,dom){
     sec.innerHTML='';
-    var h=document.createElement('div');h.className='setsec';h.textContent=dom.title;sec.appendChild(h);
+    var h=document.createElement('div');h.className='setsec';
+    var ti=document.createElement('span');ti.textContent=dom.title;h.appendChild(ti);
+    if((dom.controls||[]).some(function(c){return c['default']!==undefined;})){
+      var rl=document.createElement('button');rl.className='resetlink';rl.textContent='Reset';
+      rl.onclick=function(){resetDomain(dom);};h.appendChild(rl);
+    }
+    sec.appendChild(h);
     // Group controls by their schema-declared section (first-appearance order); ungrouped first.
     var groups=[],idx={};
     (dom.controls||[]).forEach(function(ctl){
@@ -475,6 +488,50 @@ object RemoteHtml {
     api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
       .then(function(d){if(d&&d.domain){var sec=document.getElementById('dom_'+domId);if(sec)renderDomain(sec,d.domain);}})
       .catch(function(){});
+  }
+  function resetDomain(dom){
+    var vals={};
+    (dom.controls||[]).forEach(function(c){if(c['default']!==undefined)vals[c.key]=c['default'];});
+    api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:dom.id,values:vals})})
+      .then(function(d){if(d&&d.domain){var sec=document.getElementById('dom_'+dom.id);if(sec)renderDomain(sec,d.domain);}}).catch(function(){});
+  }
+  // --- profiles: named snapshots of every setting, kept on the phone (localStorage) ---
+  function profilesGet(){try{return JSON.parse(localStorage.getItem('immortal_remote_profiles')||'{}');}catch(e){return {};}}
+  function profilesSet(p){localStorage.setItem('immortal_remote_profiles',JSON.stringify(p));}
+  function captureProfile(){
+    var snap={};
+    ((lastSchema&&lastSchema.settings&&lastSchema.settings.domains)||[]).forEach(function(dom){
+      var v={};(dom.controls||[]).forEach(function(c){if(c.type!=='info')v[c.key]=c.value;});snap[dom.id]=v;
+    });
+    return snap;
+  }
+  function saveProfile(){
+    var name=(prompt('Name this settings profile')||'').trim();if(!name)return;
+    var p=profilesGet();p[name]=captureProfile();profilesSet(p);loadSettings();
+  }
+  function applyProfile(name){
+    var prof=profilesGet()[name];if(!prof)return;
+    Object.keys(prof).forEach(function(domId){
+      var body=JSON.stringify({domain:domId,values:prof[domId]});
+      if(setScope==='all'){var act=active();devicesList().forEach(function(dv){if(act&&dv.base===act.base)return;fetch(dv.base+'/remote/settings',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+dv.token},body:body}).catch(function(){});});}
+      api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body}).catch(function(){});
+    });
+    setTimeout(loadSettings,300);
+  }
+  function deleteProfile(name){var p=profilesGet();delete p[name];profilesSet(p);loadSettings();}
+  function renderProfiles(){
+    var wrap=document.createElement('div');
+    var h=document.createElement('div');h.className='setsec';var hs=document.createElement('span');hs.textContent='Profiles';h.appendChild(hs);wrap.appendChild(h);
+    Object.keys(profilesGet()).forEach(function(n){
+      var row=document.createElement('div');row.className='setrow';
+      var t=document.createElement('div');t.className='t';t.textContent=n;row.appendChild(t);
+      var btns=document.createElement('div');btns.style.display='flex';btns.style.gap='8px';
+      var ap=document.createElement('button');ap.className='profbtn';ap.textContent='Apply';ap.onclick=function(){applyProfile(n);};
+      var dl=document.createElement('button');dl.className='profbtn del';dl.textContent='Delete';dl.onclick=function(){deleteProfile(n);};
+      btns.appendChild(ap);btns.appendChild(dl);row.appendChild(btns);wrap.appendChild(row);
+    });
+    var save=document.createElement('button');save.className='profsave';save.textContent='Save current settings as a profile…';save.onclick=saveProfile;wrap.appendChild(save);
+    return wrap;
   }
   // --- now playing (media controls) ---
   // Inline SVG (not Unicode ▶/⏸) so the controls render as crisp monochrome glyphs everywhere —

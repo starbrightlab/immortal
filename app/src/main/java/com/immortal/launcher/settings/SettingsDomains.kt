@@ -115,6 +115,7 @@ object SettingsDomains {
                       }),
                   DerivedSpec(key = "ranges", get = { JSONArray(FleetCalendar.RANGES) }),
               ),
+          defaults = { ScreensaverConfig.Settings() },
       )
 
   private fun hhmm(min: Int): String = "%02d:%02d".format(min / 60, min % 60)
@@ -245,6 +246,7 @@ object SettingsDomains {
                   "overnightEnabled" to "Power & sleep",
                   "overnightStartMin" to "Power & sleep",
                   "overnightEndMin" to "Power & sleep"),
+          defaults = { ScreensaverConfig.Settings() },
           // The screensaver's post-apply side effects, lifted from the route layer (the same
           // reaffirm + overnight reschedule that `RemoteRoutes.applyConfig` / `FleetRoutes` run).
           // Fires once per /remote/settings batch; the legacy /screensaver and /remote/sources
@@ -354,6 +356,7 @@ object SettingsDomains {
                   "snapcastHost" to "Audio",
                   "maUsername" to "Audio",
                   "maPassword" to "Audio"),
+          defaults = { ImmortalSettings.Settings() },
           onApplied = { c, keys ->
             if ("hideStatusBar" in keys) SettingsGuard.applyStatusBar(c)
             if (keys.any { it in setOf("multiRoomEnabled", "snapcastHost", "maUsername", "maPassword") })
