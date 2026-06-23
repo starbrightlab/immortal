@@ -358,7 +358,8 @@ object SettingsDomains {
                           listOf(
                               ImmortalSettings.UNIT_AUTO to "Auto",
                               ImmortalSettings.UNIT_F to "Fahrenheit",
-                              ImmortalSettings.UNIT_C to "Celsius")),
+                              ImmortalSettings.UNIT_C to "Celsius"),
+                      help = "Auto follows your Portal's language & region setting."),
                   EnumSpec(
                       "tileSize",
                       "App tile size",
@@ -368,7 +369,8 @@ object SettingsDomains {
                           listOf(
                               ImmortalSettings.SIZE_STANDARD to "Standard",
                               ImmortalSettings.SIZE_LARGE to "Large",
-                              ImmortalSettings.SIZE_XL to "XL")),
+                              ImmortalSettings.SIZE_XL to "XL"),
+                      help = "Large is closer to the stock Portal launcher."),
                   EnumSpec(
                       "weatherWidget",
                       "Weather widget",
@@ -378,7 +380,8 @@ object SettingsDomains {
                           listOf(
                               ImmortalSettings.WIDGET_OFF to "Off",
                               ImmortalSettings.WIDGET_HOURLY to "Hourly",
-                              ImmortalSettings.WIDGET_DAILY to "Daily")),
+                              ImmortalSettings.WIDGET_DAILY to "Daily"),
+                      help = "Show a forecast below your apps. Off by default."),
                   EnumSpec(
                       "clockFormat",
                       "Clock",
@@ -388,17 +391,23 @@ object SettingsDomains {
                           listOf(
                               ImmortalSettings.CLOCK_AUTO to "Auto",
                               ImmortalSettings.CLOCK_12 to "12-hour",
-                              ImmortalSettings.CLOCK_24 to "24-hour")),
+                              ImmortalSettings.CLOCK_24 to "24-hour"),
+                      help =
+                          "Applies to the home screen, screensaver and forecast. Auto follows your Portal's system setting."),
                   BoolSpec(
                       "showMiniPlayer",
-                      "Mini player",
+                      "Now-playing mini-player",
                       get = { it.showMiniPlayer },
-                      set = ImmortalSettings::setShowMiniPlayer),
+                      set = ImmortalSettings::setShowMiniPlayer,
+                      help =
+                          "Show the current track, cover art and controls in the header while music is playing."),
                   BoolSpec(
                       "hideStatusBar",
                       "Hide status bar",
                       get = { it.hideStatusBar },
-                      set = ImmortalSettings::setHideStatusBar),
+                      set = ImmortalSettings::setHideStatusBar,
+                      help =
+                          "Hidden by default for a cleaner full-screen look. Swipe down from the top to reveal it briefly."),
                   BoolSpec(
                       "multiRoomEnabled",
                       "Multi-room audio",
@@ -426,12 +435,12 @@ object SettingsDomains {
               ),
           sections =
               mapOf(
-                  "weatherUnit" to "Display",
-                  "tileSize" to "Display",
-                  "weatherWidget" to "Display",
-                  "clockFormat" to "Display",
-                  "showMiniPlayer" to "Display",
-                  "hideStatusBar" to "Display",
+                  "weatherUnit" to "Weather",
+                  "weatherWidget" to "Weather",
+                  "tileSize" to "Home screen",
+                  "showMiniPlayer" to "Home screen",
+                  "hideStatusBar" to "Home screen",
+                  "clockFormat" to "Clock",
                   "multiRoomEnabled" to "Audio",
                   "snapcastHost" to "Audio",
                   "maUsername" to "Audio",

@@ -65,10 +65,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import com.immortal.launcher.settings.SettingsDomains
 import com.immortal.launcher.ui.theme.SampleAppTheme
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 /**
  * Immortal's own settings (weather unit, home-screen tile size), reached from the
@@ -104,6 +106,13 @@ private fun ImmortalSettingsScreen() {
   val firstFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
+  // Every change routes through the registry's apply (so the domain's onApplied side effects —
+  // status-bar re-apply, multi-room resync — fire on the on-device path too), then we re-read.
+  fun apply(key: String, value: Any) {
+    SettingsDomains.immortal.apply(context, JSONObject().put(key, value))
+    settings = ImmortalSettings.load(context)
+  }
+
   Column(
       modifier =
           Modifier.fillMaxSize()
@@ -127,179 +136,14 @@ private fun ImmortalSettingsScreen() {
       )
       Spacer(Modifier.size(26.dp))
 
-      SectionLabel("Weather")
-      Card {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text("Temperature", color = Color.White, fontSize = 17.sp)
-            Text(
-                "Auto follows your Portal's language & region setting.",
-                color = Color(0xFF9A9A9A),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-          }
-          Segmented(
-              options =
-                  listOf(
-                      "Auto" to ImmortalSettings.UNIT_AUTO,
-                      "°F" to ImmortalSettings.UNIT_F,
-                      "°C" to ImmortalSettings.UNIT_C,
-                  ),
-              selected = settings.weatherUnit,
-              onSelect = {
-                ImmortalSettings.setWeatherUnit(context, it)
-                settings = settings.copy(weatherUnit = it)
-              },
-          )
-        }
-        Divider()
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text("Home-screen forecast", color = Color.White, fontSize = 17.sp)
-            Text(
-                "Show a forecast below your apps. Off by default.",
-                color = Color(0xFF9A9A9A),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-          }
-          Segmented(
-              options =
-                  listOf(
-                      "Off" to ImmortalSettings.WIDGET_OFF,
-                      "Hourly" to ImmortalSettings.WIDGET_HOURLY,
-                      "7-day" to ImmortalSettings.WIDGET_DAILY,
-                  ),
-              selected = settings.weatherWidget,
-              onSelect = {
-                ImmortalSettings.setWeatherWidget(context, it)
-                settings = settings.copy(weatherWidget = it)
-              },
-          )
-        }
-      }
-
-      Spacer(Modifier.size(26.dp))
-
-      SectionLabel("Home screen")
-      Card {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text("App icon size", color = Color.White, fontSize = 17.sp)
-            Text(
-                "Large is closer to the stock Portal launcher.",
-                color = Color(0xFF9A9A9A),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-          }
-          Segmented(
-              options =
-                  listOf(
-                      "Standard" to ImmortalSettings.SIZE_STANDARD,
-                      "Large" to ImmortalSettings.SIZE_LARGE,
-                      "Extra large" to ImmortalSettings.SIZE_XL,
-                  ),
-              selected = settings.tileSize,
-              onSelect = {
-                ImmortalSettings.setTileSize(context, it)
-                settings = settings.copy(tileSize = it)
-              },
-          )
-        }
-        Divider()
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text("Now-playing mini-player", color = Color.White, fontSize = 17.sp)
-            Text(
-                "Show the current track, cover art and controls in the header while music is playing.",
-                color = Color(0xFF9A9A9A),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-          }
-          Segmented(
-              options = listOf("Off" to "off", "On" to "on"),
-              selected = if (settings.showMiniPlayer) "on" else "off",
-              onSelect = {
-                val on = it == "on"
-                ImmortalSettings.setShowMiniPlayer(context, on)
-                settings = settings.copy(showMiniPlayer = on)
-              },
-          )
-        }
-        Divider()
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text("Status bar", color = Color.White, fontSize = 17.sp)
-            Text(
-                "Hidden by default for a cleaner full-screen look. Swipe down from the top " +
-                    "to reveal it briefly.",
-                color = Color(0xFF9A9A9A),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-          }
-          Segmented(
-              options = listOf("Show" to "show", "Hide" to "hide"),
-              selected = if (settings.hideStatusBar) "hide" else "show",
-              onSelect = {
-                val hide = it == "hide"
-                ImmortalSettings.setHideStatusBar(context, hide)
-                settings = settings.copy(hideStatusBar = hide)
-                SettingsGuard.applyStatusBar(context)
-              },
-          )
-        }
-      }
-
-      Spacer(Modifier.size(26.dp))
-
-      SectionLabel("Clock")
-      Card {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text("Time format", color = Color.White, fontSize = 17.sp)
-            Text(
-                "Applies to the home screen, screensaver, and forecast. Auto follows your Portal's system setting.",
-                color = Color(0xFF9A9A9A),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-          }
-          Segmented(
-              options =
-                  listOf(
-                      "Auto" to ImmortalSettings.CLOCK_AUTO,
-                      "12h" to ImmortalSettings.CLOCK_12,
-                      "24h" to ImmortalSettings.CLOCK_24,
-                  ),
-              selected = settings.clockFormat,
-              onSelect = {
-                ImmortalSettings.setClockFormat(context, it)
-                settings = settings.copy(clockFormat = it)
-              },
-          )
-        }
+      // Top-level controls render from the `immortal` domain (the same registry that drives the
+      // remote). The multi-room fields are excluded here — they live behind the Multi-room sub-screen.
+      SettingsList(
+          SettingsDomains.immortal,
+          settings,
+          exclude = setOf("multiRoomEnabled", "snapcastHost", "maUsername", "maPassword"),
+      ) { k, v ->
+        apply(k, v)
       }
 
       MultiRoomNavRow(onOpen = { context.startActivity(Intent(context, MultiRoomActivity::class.java)) })

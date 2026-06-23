@@ -176,6 +176,25 @@ class SettingsDomainTest {
   }
 
   @Test
+  fun immortalRegistry_coversEveryPersistedField_orExplicitlyAccountsForIt() {
+    // The on-device Immortal screen now renders its top-level controls from this domain, so a new
+    // ImmortalSettings.Settings field that nobody adds a spec for would silently never appear. Every
+    // field is currently bound by a value spec (the multi-room ones gate on the master toggle), so
+    // managedElsewhere is empty — a new field must get a spec or be listed here, a deliberate gate.
+    val fields =
+        com.immortal.launcher.ImmortalSettings.Settings::class.java.declaredFields
+            .filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) }
+            .map { it.name }
+            .toSet()
+    val specKeys = SettingsDomains.immortal.specs.map { it.key }.toSet()
+    val managedElsewhere = emptySet<String>()
+    val uncovered = fields - specKeys - managedElsewhere
+    assertTrue(
+        "ImmortalSettings.Settings has persisted fields neither in the registry nor accounted for: $uncovered",
+        uncovered.isEmpty())
+  }
+
+  @Test
   fun allDomains_sectionKeysMatchRealSpecs() {
     SettingsRegistry.domains.forEach { dom ->
       val specKeys = dom.specs.map { it.key }.toSet()
