@@ -127,6 +127,7 @@ object RemoteHtml {
 
   /* Generic settings (rendered from the /remote/settings schema). */
   .setsec{color:#9a9a9a;font-size:13px;font-weight:600;margin:18px 2px 4px}
+  .setsubsec{color:#7c7c7c;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin:14px 2px 2px}
   .setrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 2px;border-bottom:1px solid #1a1a1c}
   .setrow.col{flex-direction:column;align-items:stretch;gap:8px}
   .setrow .t{font-size:15px;color:#fff}
@@ -390,7 +391,17 @@ object RemoteHtml {
   function renderDomain(sec,dom){
     sec.innerHTML='';
     var h=document.createElement('div');h.className='setsec';h.textContent=dom.title;sec.appendChild(h);
-    (dom.controls||[]).forEach(function(ctl){sec.appendChild(renderControl(dom.id,ctl));});
+    // Group controls by their schema-declared section (first-appearance order); ungrouped first.
+    var groups=[],idx={};
+    (dom.controls||[]).forEach(function(ctl){
+      var k=ctl.section||'';
+      if(!(k in idx)){idx[k]=groups.length;groups.push({name:ctl.section||null,items:[]});}
+      groups[idx[k]].items.push(ctl);
+    });
+    groups.forEach(function(g){
+      if(g.name){var sl=document.createElement('div');sl.className='setsubsec';sl.textContent=g.name;sec.appendChild(sl);}
+      g.items.forEach(function(ctl){sec.appendChild(renderControl(dom.id,ctl));});
+    });
   }
   function renderControl(domId,ctl){
     var row=document.createElement('div');row.className='setrow';

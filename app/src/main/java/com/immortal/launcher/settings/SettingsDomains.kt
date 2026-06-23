@@ -231,6 +231,20 @@ object SettingsDomains {
                       format = ::hhmm,
                       visible = { _, s -> s.overnightEnabled }),
               ),
+          sections =
+              mapOf(
+                  "albumRefreshMin" to "Display",
+                  "fit" to "Display",
+                  "intervalSec" to "Display",
+                  "shuffle" to "Display",
+                  "includeVideo" to "Display",
+                  "showNowPlaying" to "Display",
+                  "batterySaver" to "Power & sleep",
+                  "presenceMode" to "Power & sleep",
+                  "idleSleepMin" to "Power & sleep",
+                  "overnightEnabled" to "Power & sleep",
+                  "overnightStartMin" to "Power & sleep",
+                  "overnightEndMin" to "Power & sleep"),
           // The screensaver's post-apply side effects, lifted from the route layer (the same
           // reaffirm + overnight reschedule that `RemoteRoutes.applyConfig` / `FleetRoutes` run).
           // Fires once per /remote/settings batch; the legacy /screensaver and /remote/sources
@@ -328,6 +342,18 @@ object SettingsDomains {
                       secret = true,
                       visible = { _, s -> s.multiRoomEnabled }),
               ),
+          sections =
+              mapOf(
+                  "weatherUnit" to "Display",
+                  "tileSize" to "Display",
+                  "weatherWidget" to "Display",
+                  "clockFormat" to "Display",
+                  "showMiniPlayer" to "Display",
+                  "hideStatusBar" to "Display",
+                  "multiRoomEnabled" to "Audio",
+                  "snapcastHost" to "Audio",
+                  "maUsername" to "Audio",
+                  "maPassword" to "Audio"),
           onApplied = { c, keys ->
             if ("hideStatusBar" in keys) SettingsGuard.applyStatusBar(c)
             if (keys.any { it in setOf("multiRoomEnabled", "snapcastHost", "maUsername", "maPassword") })
@@ -391,6 +417,14 @@ object SettingsDomains {
                       set = MqttConfig::setValidateCert,
                       visible = { c, _ -> MqttConfig.isEnabled(c) && MqttConfig.useTls(c) }),
               ),
+          sections =
+              mapOf(
+                  "host" to "Broker",
+                  "port" to "Broker",
+                  "username" to "Broker",
+                  "password" to "Broker",
+                  "useTls" to "Security",
+                  "validateCert" to "Security"),
           onApplied = { c, _ -> MqttService.sync(c) },
       )
 
