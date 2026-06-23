@@ -236,27 +236,30 @@ object RemoteHtml {
           <div id=addErr class=err></div>
         </div>
       </div>
-      <div class=label>Screensaver &amp; calendar</div>
-      <div class=editor>
-        <label class=pick><input type=radio name=src value=default onclick="showSrc('default')"> Default photo feed</label>
-        <label class=pick><input type=radio name=src value=immich onclick="showSrc('immich')"> Immich server</label>
-        <label class=pick><input type=radio name=src value=smb onclick="showSrc('smb')"> Network share (NAS)</label>
-        <label class=pick><input type=radio name=src value=dav onclick="showSrc('dav')"> WebDAV folder</label>
-        <label class=pick><input type=radio name=src value=web onclick="showSrc('web')"> Web page</label>
-        <label class=pick><input type=radio name=src value=album onclick="showSrc('album')"> Shared album link</label>
-        <div class=srcf id=f_immich><input id=immichUrl placeholder="Immich URL (http://192.168.x.x:2283)"><input id=immichKey placeholder="API key"></div>
-        <div class=srcf id=f_smb><input id=smbHost placeholder="Host or IP"><input id=smbShare placeholder="Share name"><input id=smbPath placeholder="Folder path (optional)"><input id=smbUser placeholder="Username (optional)"><input id=smbPass type=password placeholder="Password (optional)"></div>
-        <div class=srcf id=f_dav><input id=davUrl placeholder="WebDAV URL"><input id=davUser placeholder="Username (optional)"><input id=davPass type=password placeholder="Password (optional)"></div>
-        <div class=srcf id=f_web><input id=webUrl placeholder="Web page URL"></div>
-        <div class=srcf id=f_album><input id=albumUrl placeholder="iCloud or Google Photos share link"></div>
-        <h3>Calendar feed (optional)</h3>
-        <input id=calUrl placeholder="Public ICS link (Google or Apple)">
-        <button class=primary onclick=saveSources()>Save</button>
-        <div id=srcErr class=err></div>
-      </div>
     </div>
 
-    <div id=tabSettings class="panel scroll hide"></div>
+    <div id=tabSettings class="panel scroll hide">
+      <div id=settingsList></div>
+      <div id=srcPanel class=hide>
+        <button class=link onclick=closeSrcPanel()>&lsaquo; Back to settings</button>
+        <div class=label>Photo source</div>
+        <div class=editor>
+          <label class=pick><input type=radio name=src value=default onclick="showSrc('default')"> Default photo feed</label>
+          <label class=pick><input type=radio name=src value=immich onclick="showSrc('immich')"> Immich server</label>
+          <label class=pick><input type=radio name=src value=smb onclick="showSrc('smb')"> Network share (NAS)</label>
+          <label class=pick><input type=radio name=src value=dav onclick="showSrc('dav')"> WebDAV folder</label>
+          <label class=pick><input type=radio name=src value=web onclick="showSrc('web')"> Web page</label>
+          <label class=pick><input type=radio name=src value=album onclick="showSrc('album')"> Shared album link</label>
+          <div class=srcf id=f_immich><input id=immichUrl placeholder="Immich URL (http://192.168.x.x:2283)"><input id=immichKey placeholder="API key"></div>
+          <div class=srcf id=f_smb><input id=smbHost placeholder="Host or IP"><input id=smbShare placeholder="Share name"><input id=smbPath placeholder="Folder path (optional)"><input id=smbUser placeholder="Username (optional)"><input id=smbPass type=password placeholder="Password (optional)"></div>
+          <div class=srcf id=f_dav><input id=davUrl placeholder="WebDAV URL"><input id=davUser placeholder="Username (optional)"><input id=davPass type=password placeholder="Password (optional)"></div>
+          <div class=srcf id=f_web><input id=webUrl placeholder="Web page URL"></div>
+          <div class=srcf id=f_album><input id=albumUrl placeholder="iCloud or Google Photos share link"></div>
+          <button class=primary onclick=saveSources()>Save</button>
+          <div id=srcErr class=err></div>
+        </div>
+      </div>
+    </div>
 
     <div id=tabMedia class="panel scroll hide">
       <div id=npEmpty class=npempty>Nothing playing right now.</div>
@@ -286,7 +289,7 @@ object RemoteHtml {
       <button id=tb_apps onclick="showTab('apps')">Apps</button>
       <button id=tb_media onclick="showTab('media')">Media</button>
       <button id=tb_settings onclick="showTab('settings')">Settings</button>
-      <button id=tb_setup onclick="showTab('setup')">Setup</button>
+      <button id=tb_setup onclick="showTab('setup')">Devices</button>
     </div>
   </div>
 
@@ -378,8 +381,7 @@ object RemoteHtml {
       document.getElementById('tb_'+t).classList.toggle('on',t===name);
     });
     if(name==='apps'){loadApps();loadPresets();}
-    if(name==='setup'){loadSources();}
-    if(name==='settings'){loadSettings();}
+    if(name==='settings'){closeSrcPanel();loadSettings();}
     if(name==='media')startNowPlaying();else stopNowPlaying();
   }
   // --- generic settings (rendered from the declarative /remote/settings schema) ---
@@ -398,15 +400,22 @@ object RemoteHtml {
     return bar;
   }
   function loadSettings(){
-    var c=document.getElementById('tabSettings');c.innerHTML='<div class=none>Loading…</div>';
+    var c=document.getElementById('settingsList');c.innerHTML='<div class=none>Loading…</div>';
     api('/remote/settings').then(function(d){
       c.innerHTML='';
       var sb=renderScopeBar();if(sb)c.appendChild(sb);
+      // Photo source is the screensaver's one credentialed setting — a nav row into its editor.
+      var pr=document.createElement('div');pr.className='setrow';pr.style.cursor='pointer';
+      pr.onclick=openSrcPanel;
+      pr.innerHTML='<div class=t>Photo source</div><div style="color:#7c7c7c;font-size:18px">&rsaquo;</div>';
+      c.appendChild(pr);
       var doms=(d.settings&&d.settings.domains)||[];
       if(!doms.length){c.appendChild(Object.assign(document.createElement('div'),{className:'none',textContent:'No settings available.'}));return;}
       doms.forEach(function(dom){var sec=document.createElement('div');sec.id='dom_'+dom.id;c.appendChild(sec);renderDomain(sec,dom);});
     }).catch(function(){c.innerHTML='<div class=none>Couldn\'t load settings.</div>';});
   }
+  function openSrcPanel(){document.getElementById('settingsList').classList.add('hide');document.getElementById('srcPanel').classList.remove('hide');loadSources();}
+  function closeSrcPanel(){var p=document.getElementById('srcPanel');if(p)p.classList.add('hide');var l=document.getElementById('settingsList');if(l)l.classList.remove('hide');}
   function renderDomain(sec,dom){
     sec.innerHTML='';
     var h=document.createElement('div');h.className='setsec';h.textContent=dom.title;sec.appendChild(h);
@@ -626,14 +635,12 @@ object RemoteHtml {
       setVal('smbHost',s.smbHost);setVal('smbShare',s.smbShare);setVal('smbPath',s.smbPath);setVal('smbUser',s.smbUser);setVal('smbPass',s.smbPass);
       setVal('davUrl',s.davUrl);setVal('davUser',s.davUser);setVal('davPass',s.davPass);
       setVal('webUrl',s.webUrl);setVal('albumUrl',s.albumUrl);
-      setVal('calUrl',(d.calendar&&d.calendar.url)||'');
       showSrc(src);
     }).catch(function(){});
   }
   function saveSources(){
     var src=(document.querySelector('input[name=src]:checked')||{}).value||'default';
     var body={source:src};
-    var cal=gv('calUrl');if(cal)body.calendarUrl=cal; // only send when set, so a blank field can't wipe an existing feed
     if(src==='immich'){body.immichUrl=gv('immichUrl');body.immichKey=gv('immichKey');}
     else if(src==='smb'){body.smbHost=gv('smbHost');body.smbShare=gv('smbShare');body.smbPath=gv('smbPath');body.smbUser=gv('smbUser');body.smbPass=gv('smbPass');}
     else if(src==='dav'){body.davUrl=gv('davUrl');body.davUser=gv('davUser');body.davPass=gv('davPass');}
