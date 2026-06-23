@@ -445,7 +445,7 @@ object RemoteHtml {
     });
   }
   function renderControl(domId,ctl){
-    var row=document.createElement('div');row.className='setrow';
+    var row=document.createElement('div');row.className='setrow';row.id='c_'+domId+'_'+ctl.key;
     var t=document.createElement('div');t.className='t';t.textContent=ctl.title;
     if(ctl.type==='string'||(ctl.type==='int'&&ctl.asText)){
       row.className='setrow col';row.appendChild(t);
@@ -454,7 +454,11 @@ object RemoteHtml {
       else if(ctl.help)inp.placeholder=ctl.help;
       if(ctl.type==='int')inp.inputMode='numeric';
       inp.onchange=function(){var v=ctl.type==='int'?parseInt(inp.value,10):inp.value;if(ctl.type==='int'&&isNaN(v))return;setPut(domId,ctl.key,v);};
-      row.appendChild(inp);return row;
+      row.appendChild(inp);
+      // Secret fields keep their stored value when submitted blank — say so persistently (the
+      // placeholder vanishes the moment the field is focused or filled).
+      if(ctl.secret&&ctl.hasValue){var cap=document.createElement('div');cap.style.cssText='color:#7c7c7c;font-size:12px;margin-top:4px';cap.textContent='A value is set — leave blank to keep it.';row.appendChild(cap);}
+      return row;
     }
     row.appendChild(t);
     if(ctl.type==='bool'){
@@ -466,36 +470,71 @@ object RemoteHtml {
       row.appendChild(seg);
     }else if(ctl.type==='int'){
       var st=document.createElement('div');st.className='setstep';
-      var minus=document.createElement('button');minus.textContent='−';minus.onclick=function(){setPut(domId,ctl.key,ctl.value-ctl.step);};
+      // Respect the schema's bounds: disable −/+ at min/max (wrap fields never disable).
+      var atMin=(!ctl.wrap&&ctl.min!=null&&ctl.value<=ctl.min),atMax=(!ctl.wrap&&ctl.max!=null&&ctl.value>=ctl.max);
+      var minus=document.createElement('button');minus.textContent='−';minus.disabled=atMin;minus.style.opacity=atMin?'0.35':'';
+      minus.onclick=function(){if(!atMin)setPut(domId,ctl.key,ctl.value-ctl.step);};
       var v=document.createElement('div');v.className='v';v.textContent=(ctl.display!=null?ctl.display:ctl.value);
-      var plus=document.createElement('button');plus.textContent='+';plus.onclick=function(){setPut(domId,ctl.key,ctl.value+ctl.step);};
+      var plus=document.createElement('button');plus.textContent='+';plus.disabled=atMax;plus.style.opacity=atMax?'0.35':'';
+      plus.onclick=function(){if(!atMax)setPut(domId,ctl.key,ctl.value+ctl.step);};
       st.appendChild(minus);st.appendChild(v);st.appendChild(plus);row.appendChild(st);
     }
     return row;
   }
-  // POST one change; re-render the affected domain from the returned schema so declarative
-  // gating (e.g. overnight start/end appearing) and clamped values reflect immediately.
+  // Transient toast for write success/failure (the settings POSTs used to swallow every error).
+  function flash(msg,isErr){
+    var el=document.getElementById('flashMsg');
+    if(!el){el=document.createElement('div');el.id='flashMsg';el.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;max-width:90%;text-align:center;transition:opacity .35s';document.body.appendChild(el);}
+    el.style.background=isErr?'#5a2330':'#243a24';el.style.color=isErr?'#f2c2c2':'#bfe6bf';
+    el.textContent=msg;el.style.opacity='1';clearTimeout(el._t);el._t=setTimeout(function(){el.style.opacity='0';},2600);
+  }
+  function schemaDomain(domId){var ds=(lastSchema&&lastSchema.settings&&lastSchema.settings.domains)||[];for(var i=0;i<ds.length;i++)if(ds[i].id===domId)return ds[i];return null;}
+  function setSchemaDomain(domId,dom){var ds=(lastSchema&&lastSchema.settings&&lastSchema.settings.domains)||[];for(var i=0;i<ds.length;i++)if(ds[i].id===domId){ds[i]=dom;return;}}
+  function ctlKeys(dom){return ((dom&&dom.controls)||[]).map(function(c){return c.key;}).join(',');}
+  // Apply a fresh domain schema WITHOUT tearing down the whole section: replace only each control's
+  // own row (so scroll position, a half-typed neighbour, and the control you're editing all survive).
+  // Only fall back to a full rebuild when declarative gating changed the set of visible controls.
+  // True iff a text field inside this control is being edited right now — the only thing a re-render
+  // would destroy (a focused toggle/stepper has no uncommitted state, so it's safe to replace).
+  function editingInside(el){var a=document.activeElement;return !!(el&&a&&el.contains(a)&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'));}
+  function applyDomainUpdate(domId,newDom){
+    var sec=document.getElementById('dom_'+domId);if(!sec)return;
+    var oldKeys=ctlKeys(schemaDomain(domId));setSchemaDomain(domId,newDom);
+    if(oldKeys!==ctlKeys(newDom)){renderDomain(sec,newDom);return;}
+    (newDom.controls||[]).forEach(function(ctl){
+      var old=document.getElementById('c_'+domId+'_'+ctl.key);
+      if(old&&!editingInside(old))old.replaceWith(renderControl(domId,ctl));
+    });
+  }
+  // Fleet broadcast to the other paired Portals; reports how many actually took (was silent before).
+  function broadcast(body){
+    var act=active(),peers=devicesList().filter(function(dv){return !(act&&dv.base===act.base);});
+    if(!peers.length)return;
+    Promise.allSettled(peers.map(function(dv){
+      return fetch(dv.base+'/remote/settings',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+dv.token},body:body}).then(function(r){if(!r.ok)throw 0;});
+    })).then(function(rs){
+      var ok=rs.filter(function(r){return r.status==='fulfilled';}).length;
+      flash('Applied to '+(ok+1)+' of '+(peers.length+1)+' Portals',ok<peers.length);
+    });
+  }
+  // POST one change; patch the affected control in place from the returned schema (so declarative
+  // gating and clamped values still reflect immediately, but without the full-section flicker).
   function setPut(domId,key,value){
     var vals={};vals[key]=value;
     var body=JSON.stringify({domain:domId,values:vals});
-    // Fleet broadcast: push the same change to the other paired Portals (fire-and-forget); the
-    // active one is handled by api() below, which also re-renders from its response.
-    if(setScope==='all'){
-      var act=active();
-      devicesList().forEach(function(dv){
-        if(act&&dv.base===act.base)return;
-        fetch(dv.base+'/remote/settings',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+dv.token},body:body}).catch(function(){});
-      });
-    }
+    if(setScope==='all')broadcast(body);
     api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
-      .then(function(d){if(d&&d.domain){var sec=document.getElementById('dom_'+domId);if(sec)renderDomain(sec,d.domain);}})
-      .catch(function(){});
+      .then(function(d){if(d&&d.domain)applyDomainUpdate(domId,d.domain);})
+      .catch(function(){flash('Couldn’t apply — is the Portal reachable?',true);});
   }
   function resetDomain(dom){
     var vals={};
     (dom.controls||[]).forEach(function(c){if(c['default']!==undefined)vals[c.key]=c['default'];});
-    api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:dom.id,values:vals})})
-      .then(function(d){if(d&&d.domain){var sec=document.getElementById('dom_'+dom.id);if(sec)renderDomain(sec,d.domain);}}).catch(function(){});
+    var body=JSON.stringify({domain:dom.id,values:vals});
+    if(setScope==='all')broadcast(body);
+    api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
+      .then(function(d){if(d&&d.domain){applyDomainUpdate(dom.id,d.domain);flash('Reset to defaults',false);}})
+      .catch(function(){flash('Couldn’t reset — is the Portal reachable?',true);});
   }
   // --- profiles: named snapshots of every setting, kept on the phone (localStorage) ---
   function profilesGet(){try{return JSON.parse(localStorage.getItem('immortal_remote_profiles')||'{}');}catch(e){return {};}}
@@ -509,18 +548,23 @@ object RemoteHtml {
   }
   function saveProfile(){
     var name=(prompt('Name this settings profile')||'').trim();if(!name)return;
-    var p=profilesGet();p[name]=captureProfile();profilesSet(p);loadSettings();
+    var p=profilesGet();
+    if(p[name]&&!confirm('Replace the existing profile “'+name+'”?'))return;
+    p[name]=captureProfile();profilesSet(p);flash('Saved profile “'+name+'”',false);loadSettings();
   }
   function applyProfile(name){
     var prof=profilesGet()[name];if(!prof)return;
+    var act=active(),peers=(setScope==='all')?devicesList().filter(function(dv){return !(act&&dv.base===act.base);}):[];
+    if(peers.length&&!confirm('Apply profile “'+name+'” to all '+(peers.length+1)+' Portals?'))return;
     Object.keys(prof).forEach(function(domId){
       var body=JSON.stringify({domain:domId,values:prof[domId]});
-      if(setScope==='all'){var act=active();devicesList().forEach(function(dv){if(act&&dv.base===act.base)return;fetch(dv.base+'/remote/settings',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+dv.token},body:body}).catch(function(){});});}
+      peers.forEach(function(dv){fetch(dv.base+'/remote/settings',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+dv.token},body:body}).catch(function(){});});
       api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body}).catch(function(){});
     });
+    flash('Applied profile “'+name+'”'+(peers.length?(' to '+(peers.length+1)+' Portals'):''),false);
     setTimeout(loadSettings,300);
   }
-  function deleteProfile(name){var p=profilesGet();delete p[name];profilesSet(p);loadSettings();}
+  function deleteProfile(name){if(!confirm('Delete the profile “'+name+'”?'))return;var p=profilesGet();delete p[name];profilesSet(p);loadSettings();}
   function renderProfiles(){
     var wrap=document.createElement('div');
     var h=document.createElement('div');h.className='setsec';var hs=document.createElement('span');hs.textContent='Profiles';h.appendChild(hs);wrap.appendChild(h);
