@@ -148,6 +148,34 @@ class SettingsDomainTest {
   }
 
   @Test
+  fun screensaverRegistry_coversEveryPersistedField_orExplicitlyAccountsForIt() {
+    // Instance fields only — drops Compose's synthetic static `$stable` and any Companion.
+    val fields =
+        com.immortal.launcher.ScreensaverConfig.Settings::class.java.declaredFields
+            .filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) }
+            .map { it.name }
+            .toSet()
+    val specKeys = (SettingsDomains.screensaver.specs + SettingsDomains.calendar.specs).map { it.key }.toSet()
+    // Fields not bound by a direct value spec, and why: photo-source credentials + the clock-face
+    // and dismiss-target pickers are managed by their own Activities (reached via a NavSpec); the
+    // calendar fields are owned by the calendar domain under different wire keys (widgetOn/url/
+    // range/size/side). New persisted settings must get a spec or be added here — a deliberate gate.
+    val managedElsewhere =
+        setOf(
+            "immichUrl", "immichKey", "immichAlbumId", "immichAlbumName",
+            "smbHost", "smbShare", "smbPath", "smbUser", "smbPass",
+            "davUrl", "davUser", "davPass", "webUrl",
+            "facesEnabled", "faceId", "faceSizeIndex",
+            "dismissAppComponent", "dismissHaDashboard",
+            "calendarUrl", "calendarEnabled", "calendarRange", "calendarSize", "calendarSide",
+        )
+    val uncovered = fields - specKeys - managedElsewhere
+    assertTrue(
+        "ScreensaverConfig.Settings has persisted fields neither in the registry nor accounted for: $uncovered",
+        uncovered.isEmpty())
+  }
+
+  @Test
   fun allDomains_sectionKeysMatchRealSpecs() {
     SettingsRegistry.domains.forEach { dom ->
       val specKeys = dom.specs.map { it.key }.toSet()

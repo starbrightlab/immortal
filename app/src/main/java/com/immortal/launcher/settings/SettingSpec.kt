@@ -249,3 +249,29 @@ class DerivedSpec<S>(
 
   override fun applyFrom(c: Context, body: JSONObject): Boolean = false
 }
+
+/**
+ * A nav-out row for the on-device renderer: shows a current-value label and launches a bespoke
+ * Activity (the clock-face picker, the photo-source connect forms, the dismiss-target picker). It
+ * owns no stored value of its own — the target screen writes the underlying settings — so it adds
+ * nothing to the flat wire payload and is absent from the remote schema (`metaJson` is null; the
+ * remote has its own surfaces for these). Consumed by the on-device generic renderer only.
+ */
+class NavSpec<S>(
+    override val key: String,
+    val title: String,
+    /** Current-value label for the row. Takes Context too (some labels resolve a component name). */
+    val value: (Context, S) -> String,
+    /** The Activity the row launches. */
+    val activity: Class<*>,
+    val help: String? = null,
+    val visible: (Context, S) -> Boolean = { _, _ -> true },
+) : SettingSpec<S> {
+  override fun visibleWhen(c: Context, s: S) = visible(c, s)
+
+  override fun putValue(out: JSONObject, s: S) {} // navigates to a screen; no value of its own
+
+  override fun metaJson(c: Context, s: S): JSONObject? = null // on-device renderer only
+
+  override fun applyFrom(c: Context, body: JSONObject): Boolean = false
+}

@@ -184,6 +184,11 @@ object SettingsDomains {
                       "Show now playing",
                       get = { it.showNowPlaying },
                       set = ScreensaverConfig::setShowNowPlaying),
+                  BoolSpec(
+                      "antiBurnIn",
+                      "Reduce screen burn-in",
+                      get = { it.antiBurnIn },
+                      set = ScreensaverConfig::setAntiBurnIn),
                   EnumSpec(
                       "presenceMode",
                       "Power",
@@ -230,6 +235,12 @@ object SettingsDomains {
                       wrap = true,
                       format = ::hhmm,
                       visible = { _, s -> s.overnightEnabled }),
+                  BoolSpec(
+                      "overnightNightClock",
+                      "Show a dim night clock",
+                      get = { it.overnightNightClock },
+                      set = ScreensaverConfig::setOvernightNightClock,
+                      visible = { _, s -> s.overnightEnabled }),
               ),
           sections =
               mapOf(
@@ -239,12 +250,14 @@ object SettingsDomains {
                   "shuffle" to "Display",
                   "includeVideo" to "Display",
                   "showNowPlaying" to "Display",
+                  "antiBurnIn" to "Display",
                   "batterySaver" to "Power & sleep",
                   "presenceMode" to "Power & sleep",
                   "idleSleepMin" to "Power & sleep",
                   "overnightEnabled" to "Power & sleep",
                   "overnightStartMin" to "Power & sleep",
-                  "overnightEndMin" to "Power & sleep"),
+                  "overnightEndMin" to "Power & sleep",
+                  "overnightNightClock" to "Power & sleep"),
           defaults = { ScreensaverConfig.Settings() },
           // The screensaver's post-apply side effects, lifted from the route layer (the same
           // reaffirm + overnight reschedule that `RemoteRoutes.applyConfig` / `FleetRoutes` run).
