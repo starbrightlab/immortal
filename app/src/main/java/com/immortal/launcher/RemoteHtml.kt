@@ -128,6 +128,10 @@ object RemoteHtml {
   /* Generic settings (rendered from the /remote/settings schema). */
   .setsec{color:#9a9a9a;font-size:13px;font-weight:600;margin:18px 2px 4px}
   .setsubsec{color:#7c7c7c;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin:14px 2px 2px}
+  .scopebar{display:flex;align-items:center;gap:8px;margin:0 2px 6px;flex-wrap:wrap}
+  .scopebar .lbl{font-size:13px;color:#9a9a9a}
+  .scopebar button{font-size:12px;padding:6px 12px;border-radius:14px;background:#2a2a2c;color:#cfcfcf}
+  .scopebar button.on{background:#2e6be6;color:#fff}
   .setrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 2px;border-bottom:1px solid #1a1a1c}
   .setrow.col{flex-direction:column;align-items:stretch;gap:8px}
   .setrow .t{font-size:15px;color:#fff}
@@ -379,12 +383,27 @@ object RemoteHtml {
     if(name==='media')startNowPlaying();else stopNowPlaying();
   }
   // --- generic settings (rendered from the declarative /remote/settings schema) ---
+  // Apply scope: 'this' = the active Portal only; 'all' = every paired Portal (fleet broadcast).
+  var setScope='this';
+  function setScopeTo(s){setScope=s;loadSettings();}
+  function renderScopeBar(){
+    var n=devicesList().length;
+    if(n<2)return null; // only meaningful with more than one paired Portal
+    var bar=document.createElement('div');bar.className='scopebar';
+    var l=document.createElement('span');l.className='lbl';l.textContent='Apply to';bar.appendChild(l);
+    [['this','This Portal'],['all','All '+n+' Portals']].forEach(function(o){
+      var b=document.createElement('button');b.textContent=o[1];if(setScope===o[0])b.className='on';
+      b.onclick=function(){setScopeTo(o[0]);};bar.appendChild(b);
+    });
+    return bar;
+  }
   function loadSettings(){
     var c=document.getElementById('tabSettings');c.innerHTML='<div class=none>Loading…</div>';
     api('/remote/settings').then(function(d){
       c.innerHTML='';
+      var sb=renderScopeBar();if(sb)c.appendChild(sb);
       var doms=(d.settings&&d.settings.domains)||[];
-      if(!doms.length){c.innerHTML='<div class=none>No settings available.</div>';return;}
+      if(!doms.length){c.appendChild(Object.assign(document.createElement('div'),{className:'none',textContent:'No settings available.'}));return;}
       doms.forEach(function(dom){var sec=document.createElement('div');sec.id='dom_'+dom.id;c.appendChild(sec);renderDomain(sec,dom);});
     }).catch(function(){c.innerHTML='<div class=none>Couldn\'t load settings.</div>';});
   }
@@ -434,7 +453,17 @@ object RemoteHtml {
   // gating (e.g. overnight start/end appearing) and clamped values reflect immediately.
   function setPut(domId,key,value){
     var vals={};vals[key]=value;
-    api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:domId,values:vals})})
+    var body=JSON.stringify({domain:domId,values:vals});
+    // Fleet broadcast: push the same change to the other paired Portals (fire-and-forget); the
+    // active one is handled by api() below, which also re-renders from its response.
+    if(setScope==='all'){
+      var act=active();
+      devicesList().forEach(function(dv){
+        if(act&&dv.base===act.base)return;
+        fetch(dv.base+'/remote/settings',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+dv.token},body:body}).catch(function(){});
+      });
+    }
+    api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
       .then(function(d){if(d&&d.domain){var sec=document.getElementById('dom_'+domId);if(sec)renderDomain(sec,d.domain);}})
       .catch(function(){});
   }
