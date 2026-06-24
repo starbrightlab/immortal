@@ -989,6 +989,7 @@ private fun LauncherScreen(
                           dimmed = isDragged,
                           modifier = boundsMod.alpha(if (isDragged) 0f else 1f),
                           onClick = { onLaunch(app.component) },
+                          onDelete = { onUninstall(app.component.packageName) },
                       )
                     }
                   }
