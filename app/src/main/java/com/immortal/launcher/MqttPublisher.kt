@@ -275,8 +275,21 @@ class MqttPublisher(private val appContext: Context) {
    * Reuses [ScreensaverDismiss]'s HA helpers so the behaviour matches the screensaver picker.
    */
   private fun openTarget(payload: String) {
+    if (!routeTarget(payload)) return
+    // Echo the last target so the text entity shows what it was set to. Only the "Open"
+    // entity echoes; notify taps route via routeTarget() directly so a doorbell tap doesn't
+    // rewrite this entity's retained state.
+    client?.publish("$base/open/state", payload.trim(), retain = true)
+  }
+
+  /**
+   * Dispatch a target string without touching any entity state. Same grammar as [openTarget]
+   * (full URL, installed package name, or bare HA dashboard path). Returns true when a target
+   * was launched, false for a blank or unroutable input (e.g. no HA app installed for a path).
+   */
+  private fun routeTarget(payload: String): Boolean {
     val t = payload.trim()
-    if (t.isBlank()) return
+    if (t.isBlank()) return false
     val pm = appContext.packageManager
     when {
       t.startsWith("http://") || t.startsWith("https://") || t.startsWith("homeassistant://") ->
@@ -285,15 +298,14 @@ class MqttPublisher(private val appContext: Context) {
       pm.getLaunchIntentForPackage(t) != null ->
           appContext.startActivity(pm.getLaunchIntentForPackage(t)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
       else -> {
-        val pkg = ScreensaverDismiss.installedHaPackage(appContext) ?: return
+        val pkg = ScreensaverDismiss.installedHaPackage(appContext) ?: return false
         appContext.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(ScreensaverDismiss.haDeepLink(t)))
                 .setPackage(pkg)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
       }
     }
-    // Echo the last target so the text entity shows what it was set to.
-    client?.publish("$base/open/state", t, retain = true)
+    return true
   }
 
   /**
@@ -310,7 +322,7 @@ class MqttPublisher(private val appContext: Context) {
       // PresenceHub.current.screen only reflects THIS process's dream service, which doesn't
       // help if a sibling package owns the active dream). 3s auto-release wake lock, no harm.
       if (spec.wakeScreen) ScreenControl.wake(appContext)
-      val tap: (() -> Unit)? = spec.onTap?.let { target -> { openTarget(target) } }
+      val tap: (() -> Unit)? = spec.onTap?.let { target -> { routeTarget(target) } }
       NotificationOverlay.show(spec, tap)
     }
     if (!spec.sound.isNullOrBlank()) {

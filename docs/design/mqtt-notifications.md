@@ -233,7 +233,7 @@ data:
       "image": "http://homeassistant.local:8123/api/camera_proxy/camera.front_door",
       "sound": "http://nas.local/doorbell.mp3",
       "on_tap": "lovelace/security",
-      "duration": 8000
+      "duration": 8
     }
 ```
 

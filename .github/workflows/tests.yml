@@ -19,6 +19,11 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Pin to platform-tools only. The action's default package set includes the
+          # obsolete `tools` package, whose archive now fails to download ("Error on
+          # ZipFile unknown archive") and breaks setup. `tools` isn't needed for unit tests.
+          packages: platform-tools
 
       - name: Install compile SDK
         run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null || true

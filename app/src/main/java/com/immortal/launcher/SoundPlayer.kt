@@ -21,9 +21,10 @@ import android.util.Log
 /**
  * One-shot `MediaPlayer` wrapper for MQTT-notify chimes (see `MqttPublisher.handleNotify`).
  *
- * Routes to the notification stream — `USAGE_NOTIFICATION` + `CONTENT_TYPE_SONIFICATION`
- * via [AudioAttributes], **not** `STREAM_MUSIC` — so a doorbell isn't capped by Spotify's
- * current volume and we don't duck our own chime. Requests transient-may-duck focus so any
+ * Routes to the alarm stream — `USAGE_ALARM` + `CONTENT_TYPE_SONIFICATION` via
+ * [AudioAttributes], **not** `STREAM_MUSIC` or `STREAM_NOTIFICATION` — so a doorbell isn't
+ * capped by Spotify's current volume (on Portal, notification and music share one slider;
+ * only alarm is independent — see [startInternal]). Requests transient-may-duck focus so any
  * `STREAM_MUSIC` playback (Snapcast, cast, Spotify) ducks for the chime's duration and
  * restores after.
  *
@@ -40,7 +41,7 @@ object SoundPlayer {
   @Volatile private var stashedContext: Context? = null
 
   /**
-   * Play [source] (http(s) URL or local URI) at [volume] (0.0–1.0 of the notification-stream
+   * Play [source] (http(s) URL or local URI) at [volume] (0.0–1.0 of the alarm-stream
    * max, bounded by the user's system slider). Releases any in-flight player first. Returns
    * immediately; preparation and playback happen on `MediaPlayer`'s own thread.
    */
@@ -79,9 +80,14 @@ object SoundPlayer {
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
 
-    // Transient-may-duck on STREAM_NOTIFICATION: STREAM_MUSIC ducks for our chime and
-    // resumes when we abandon focus. If a call holds STREAM_VOICE_CALL focus, this request
-    // is denied — we silently don't play, which is the documented in-call behavior.
+    // Abandon any focus held by a just-replaced chime before requesting again. Without this,
+    // a second notify overwrites `focusRequest` with the new request and leaks the old one —
+    // it's never abandoned, so STREAM_MUSIC stays ducked after the chime ends.
+    abandonFocus(am)
+
+    // Transient-may-duck: STREAM_MUSIC ducks for our (alarm-stream) chime and resumes when we
+    // abandon focus. If a call holds STREAM_VOICE_CALL focus, this request is denied — we
+    // silently don't play, which is the documented in-call behavior.
     val granted = requestFocus(am, attrs)
     if (!granted) {
       // Common when a Messenger/WhatsApp call is active; documented behavior.
