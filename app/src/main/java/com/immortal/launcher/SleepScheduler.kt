@@ -165,6 +165,61 @@ object SleepScheduler {
       else if (start < end) now in start until end
       else now >= start || now < end // wraps midnight
 
+  /** What a would-be photo-frame redream should do when it happens inside the overnight window. */
+  internal enum class OvernightRedream {
+    /** Not in the window (or night-clock mode): let the normal frame relaunch proceed. */
+    RELAUNCH,
+    /** The user deliberately woke the device (a session is live): leave the screen alone. */
+    LEAVE,
+    /** Dark window, no live session: re-blank directly, without launching an Activity. */
+    REBLANK,
+  }
+
+  /**
+   * Pure (unit-tested) decision for [handleRedreamDuringOvernight]. A stray dream stop inside the
+   * dark window must not relaunch [PhotoFramePreviewActivity]: launching an Activity wakes the
+   * screen, and the activity then immediately blanks it again — a brief flash every time a
+   * sibling/system dream cycles overnight (issue #73). Night-clock mode still relaunches, because
+   * there the frame *is* the dimmed clock the window is meant to show.
+   */
+  internal fun classifyOvernightRedream(
+      inWindow: Boolean,
+      nightSessionActive: Boolean,
+      nightClock: Boolean,
+  ): OvernightRedream =
+      when {
+        !inWindow -> OvernightRedream.RELAUNCH
+        nightSessionActive -> OvernightRedream.LEAVE
+        nightClock -> OvernightRedream.RELAUNCH
+        else -> OvernightRedream.REBLANK
+      }
+
+  /**
+   * Called from [DreamPolicy.onDreamingStopped] before it would relaunch the photo frame. Returns
+   * true if the overnight window owns the screen and the caller must NOT relaunch (we either left a
+   * live session alone, or re-blanked the dark window in place). Returns false to allow the normal
+   * relaunch (outside the window, or night-clock mode where the relaunch renders the clock).
+   */
+  fun handleRedreamDuringOvernight(context: Context): Boolean {
+    val decision =
+        classifyOvernightRedream(
+            inWindow = isOvernightNow(context),
+            nightSessionActive = nightSessionActive,
+            nightClock = ScreensaverConfig.load(context).overnightNightClock,
+        )
+    return when (decision) {
+      OvernightRedream.RELAUNCH -> false
+      OvernightRedream.LEAVE -> true
+      OvernightRedream.REBLANK -> {
+        // Keep the system Dream suppressed for the window, then blank without an Activity launch
+        // (no flash). Mirrors enterOvernightRest's dark path minus the screen-on round-trip.
+        SettingsGuard.setSystemScreensaverEnabled(context, false)
+        ScreenControl.sleep(context)
+        true
+      }
+    }
+  }
+
   /** (Re)schedule the daily start/end alarms, or clear them if disabled. */
   fun scheduleOvernight(context: Context) {
     val cfg = ScreensaverConfig.load(context)

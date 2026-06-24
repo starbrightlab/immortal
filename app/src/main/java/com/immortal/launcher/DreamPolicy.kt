@@ -127,6 +127,10 @@ object DreamPolicy {
     // companion). SUPPRESSED (a Calls handoff) leaves presence untouched.
     PresenceHub.onDreamStopped(context, verdict)
     if (verdict != DreamStopVerdict.REDREAM) return
+    // Inside the overnight window the SleepScheduler owns the screen. In dark mode, relaunching the
+    // frame would wake the screen just to blank it again — a flash every time a stray sibling/system
+    // dream cycles overnight (issue #73). Let the scheduler re-blank in place instead.
+    if (SleepScheduler.handleRedreamDuringOvernight(context)) return
     runCatching {
       context.startActivity(
           Intent(context, PhotoFramePreviewActivity::class.java)
