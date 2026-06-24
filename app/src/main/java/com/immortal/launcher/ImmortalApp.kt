@@ -22,6 +22,10 @@ import android.content.IntentFilter
 class ImmortalApp : Application() {
   override fun onCreate() {
     super.onCreate()
+    // Arm first, before any other init: as the home app, an uncaught crash makes Android drop our
+    // default-home role (→ "Select Home app" chooser). This relaunches us straight back so the
+    // user never sees it. Installed up front so a crash during the rest of onCreate is covered too.
+    CrashGuard.install(this)
     // The shared presence source of truth: owns DREAMING_STARTED / SCREEN_OFF / POWER and
     // exposes one PresenceState for the screensaver (in-process) and the Snapcast companion
     // (broadcast). DREAMING_STOPPED stays here because it also drives the frame relaunch, and

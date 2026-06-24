@@ -291,7 +291,7 @@ class PhotoFrameController(
             if (paths.isNotEmpty()) {
               smbSource = src
               remoteUrls = if (source.shuffle) paths.shuffled() else paths
-              remoteFetch = { p -> src.openStream(p)?.use { BitmapFactory.decodeStream(it) } }
+              remoteFetch = { p -> src.openStream(p)?.use { decodeBoundedStream(it) } }
               remoteMode = true
               remoteIndex = -1
               remoteFailStreak = 0
@@ -673,6 +673,43 @@ class PhotoFrameController(
   }
 
   /**
+   * Downsample any photo to a safe size before it ever reaches the [ImageView].
+   *
+   * A full-resolution camera original is enormous once decoded: a ~39MP shot becomes a ~157MB
+   * ARGB_8888 bitmap, which is larger than the hardware Canvas can draw (~100MB). The draw then
+   * throws "trying to draw too large bitmap" on the main thread and crashes the whole launcher —
+   * and because Android responds to a *home app* crashing by clearing its preferred-activity (HOME)
+   * association, the very next Home press pops the "Select Home app" chooser. Bounding the longest
+   * edge to [MAX_EDGE] here (the same two-pass trick used by [Thumbnails]/[MediaArt]) keeps every
+   * source — folder, SMB, Immich, WebDAV, bundled — well under the cap, so it can't happen.
+   *
+   * The bound never upscales (small images decode untouched) and uses a power-of-two
+   * [BitmapFactory.Options.inSampleSize], the only value the decoder honours efficiently.
+   */
+  private fun sampleSizeFor(w: Int, h: Int): Int {
+    val longest = maxOf(w, h)
+    return if (longest > MAX_EDGE) Integer.highestOneBit(longest / MAX_EDGE) else 1
+  }
+
+  private fun decodeBoundedFile(path: String): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    val opts =
+        BitmapFactory.Options().apply { inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight) }
+    return BitmapFactory.decodeFile(path, opts)
+  }
+
+  /** Stream variant: buffers to bytes so the bounds pass can run before the real decode. */
+  private fun decodeBoundedStream(input: java.io.InputStream): Bitmap? {
+    val bytes = input.readBytes()
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    val opts =
+        BitmapFactory.Options().apply { inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight) }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+  }
+
+  /**
    * Decode a local image and apply its EXIF orientation. Phone cameras save the
    * raw sensor buffer and record the intended rotation in an EXIF tag rather than
    * baking it into the pixels, so [BitmapFactory.decodeFile] alone shows portrait
@@ -684,7 +721,7 @@ class PhotoFrameController(
    * being skipped.
    */
   private fun decodeCorrected(path: String): Bitmap? {
-    val bmp = BitmapFactory.decodeFile(path) ?: return null
+    val bmp = decodeBoundedFile(path) ?: return null
     val orientation =
         runCatching {
               ExifInterface(path)
@@ -1091,7 +1128,7 @@ class PhotoFrameController(
     val name = bundledNames[bundledIdx % bundledNames.size]
     bundledIdx++
     return runCatching {
-          context.assets.open("$FALLBACK_DIR/$name").use { BitmapFactory.decodeStream(it) }
+          context.assets.open("$FALLBACK_DIR/$name").use { decodeBoundedStream(it) }
         }
         .getOrNull()
   }
@@ -1112,7 +1149,7 @@ class PhotoFrameController(
     c.instanceFollowRedirects = true
     c.setRequestProperty("User-Agent", USER_AGENT)
     headers.forEach { (k, v) -> c.setRequestProperty(k, v) }
-    return c.inputStream.use { BitmapFactory.decodeStream(it) }
+    return c.inputStream.use { decodeBoundedStream(it) }
   }
 
   private val MATCH = FrameLayout.LayoutParams.MATCH_PARENT
@@ -1127,6 +1164,12 @@ class PhotoFrameController(
 
   private companion object {
     const val TAG = "ImmortalPhotoFrame"
+    // Cap on the longest edge of any decoded photo. Full-res camera originals (tens of MP) decode
+    // to bitmaps larger than the hardware Canvas can draw (~100MB), which crashes the launcher and
+    // makes Android drop its default-home role. The largest Portal panel is 1920px; 2560 leaves
+    // Ken-Burns overscan headroom (2560²·4 ≈ 26MB) while staying far under the cap. See
+    // [decodeBoundedFile]/[decodeBoundedStream].
+    const val MAX_EDGE = 2560
     // Bundled fallback photos live under app/src/main/assets/<FALLBACK_DIR>/.
     const val FALLBACK_DIR = "photoframe_fallback"
     // How long to skip a web source after it fails, so a dead host (e.g. a Picsum
