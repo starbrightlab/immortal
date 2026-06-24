@@ -18,6 +18,10 @@ The publisher reuses the state Immortal already holds and surfaces it to Home As
   [provisioning](../provisioning.md)) — wake or sleep a Portal's display as part of an automation.
 - **Open** a URL, an installed package, or a Home Assistant dashboard path on the Portal — the
   same string grammar the screensaver picker accepts.
+- **Screensaver** — show the photo frame on demand (a `Screensaver` button entity). This is the
+  same photo-frame surface the launcher's header button opens; `Home` dismisses it. Note it's the
+  in-app photo frame, not the system dream, so the `Screen state` sensor stays `interactive` while
+  it's showing.
 - **Notifications** — push a toast (with optional image, sound, and a tap target) from any
   Home Assistant automation. See below.
 

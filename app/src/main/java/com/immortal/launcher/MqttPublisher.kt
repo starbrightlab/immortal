@@ -262,6 +262,16 @@ class MqttPublisher(private val appContext: Context) {
           "media_next" -> NowPlayingHub.next()
           "media_previous" -> NowPlayingHub.previous()
           "notify" -> handleNotify(payload)
+          // Show the photo frame on demand — the same surface the launcher's header
+          // screensaver button launches (HomeActivity.onStartScreensaver). This is the
+          // in-app photo frame as a foreground Activity, not the system dream, so it stays
+          // consistent with the header button: screen/state remains "interactive", and the
+          // go_home command dismisses it. We don't try to start the system dream (no public
+          // API; Somnambulator/IDreamManager reflection is device-fragile on Portal).
+          "screensaver" ->
+              appContext.startActivity(
+                  Intent(appContext, PhotoFramePreviewActivity::class.java)
+                      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
           else -> Log.w(TAG, "unknown command $obj")
         }
       }
@@ -447,6 +457,7 @@ class MqttPublisher(private val appContext: Context) {
     button(c, "media_previous", "Previous track", icon = "mdi:skip-previous")
 
     button(c, "go_home", "Home", icon = "mdi:home")
+    button(c, "screensaver", "Screensaver", icon = "mdi:image-multiple")
     textEntity(c, "open", "Open", icon = "mdi:open-in-app")
     notifyEntity(c, "notify", "Notify")
     button(c, "identify", "Identify", icon = "mdi:bullhorn")
@@ -468,6 +479,7 @@ class MqttPublisher(private val appContext: Context) {
           "button" to "media_next",
           "button" to "media_previous",
           "button" to "go_home",
+          "button" to "screensaver",
           "text" to "open",
           "notify" to "notify",
           "button" to "identify",
