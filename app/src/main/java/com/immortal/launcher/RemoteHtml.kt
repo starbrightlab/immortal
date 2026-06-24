@@ -121,6 +121,9 @@ object RemoteHtml {
   .tile img{width:48px;height:48px;border-radius:12px;background:#1c1c1e}
   .tile span{font-size:12px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .devrow{display:flex;gap:16px;margin-bottom:8px}
+  .renamerow{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+  .renamerow input{flex:1;min-width:0;padding:13px;font-size:16px;background:#0e0e10;border:1px solid #3a3a3c;border-radius:12px;color:#fff}
+  .renamerow .primary{width:auto;padding:13px 18px;font-size:15px;white-space:nowrap}
   .addpanel{background:#161618;border:1px solid #2a2a2c;border-radius:14px;padding:14px;margin-bottom:18px}
   .discovered{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
   .discovered button{padding:10px 14px;font-size:14px;background:#1c1c1e;color:#fff;border-radius:10px}
@@ -226,6 +229,11 @@ object RemoteHtml {
 
     <div id=tabSetup class="panel scroll hide">
       <div class=label>Devices</div>
+      <div class=renamerow>
+        <input id=devname maxlength=48 placeholder="Device name" autocomplete=off>
+        <button class=primary onclick=saveRename()>Save name</button>
+      </div>
+      <div id=renameMsg class=sub></div>
       <div class=devrow>
         <button class=link onclick=toggleAdd()>+ Add device</button>
         <button class=link onclick=forgetDevice()>Forget this device</button>
@@ -386,7 +394,28 @@ object RemoteHtml {
     });
     if(name==='apps'){loadApps();loadPresets();}
     if(name==='settings'){closeSrcPanel();loadSettings();}
+    if(name==='setup')loadRename();
     if(name==='media')startNowPlaying();else stopNowPlaying();
+  }
+  // Prefill the rename field with the active Portal's current name (the source of truth on-device).
+  function loadRename(){
+    var inp=document.getElementById('devname');var msg=document.getElementById('renameMsg');msg.textContent='';
+    api('/remote/devices').then(function(d){inp.value=d.self||'';}).catch(function(){});
+  }
+  // Save the active Portal's name via the declarative fleet settings domain, then refresh the
+  // local roster label so the switcher isn't stale. Server re-validates (trim, 1..48).
+  function saveRename(){
+    var inp=document.getElementById('devname');var msg=document.getElementById('renameMsg');
+    var v=(inp.value||'').trim();
+    if(v.length<1||v.length>48){msg.textContent='Name must be 1 to 48 characters.';return;}
+    msg.textContent='Saving…';
+    api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'fleet',values:{name:v}})})
+      .then(function(d){
+        if(!(d&&d.ok&&(d.applied||[]).indexOf('name')>=0)){msg.textContent='Couldn\'t save the name.';return;}
+        var l=devicesList(),i=activeIdx();if(l[i]){l[i].name=v;saveDevices(l);}
+        renderDevSel();inp.value=v;msg.textContent='Saved.';
+      })
+      .catch(function(){msg.textContent='Couldn\'t reach that device.';});
   }
   // --- generic settings (rendered from the declarative /remote/settings schema) ---
   // Apply scope: 'this' = the active Portal only; 'all' = every paired Portal (fleet broadcast).
@@ -522,7 +551,8 @@ object RemoteHtml {
   function setPut(domId,key,value){
     var vals={};vals[key]=value;
     var body=JSON.stringify({domain:domId,values:vals});
-    if(setScope==='all')broadcast(body);
+    // The device name is per-device — never broadcast it, or every Portal ends up identically named.
+    if(setScope==='all'&&domId!=='fleet')broadcast(body);
     api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
       .then(function(d){if(d&&d.domain)applyDomainUpdate(domId,d.domain);})
       .catch(function(){flash('Couldn’t apply — is the Portal reachable?',true);});
@@ -531,7 +561,7 @@ object RemoteHtml {
     var vals={};
     (dom.controls||[]).forEach(function(c){if(c['default']!==undefined)vals[c.key]=c['default'];});
     var body=JSON.stringify({domain:dom.id,values:vals});
-    if(setScope==='all')broadcast(body);
+    if(setScope==='all'&&dom.id!=='fleet')broadcast(body);
     api('/remote/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:body})
       .then(function(d){if(d&&d.domain){applyDomainUpdate(dom.id,d.domain);flash('Reset to defaults',false);}})
       .catch(function(){flash('Couldn’t reset — is the Portal reachable?',true);});
