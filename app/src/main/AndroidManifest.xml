@@ -203,6 +203,13 @@
             android:excludeFromRecents="true"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- "Cameras": RTSP/network camera viewer (VideoView, native RTSP). -->
+        <activity
+            android:name=".CameraViewerActivity"
+            android:exported="false"
+            android:label="Cameras"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- "Welcome": welcome-back overlay greetings / colors / sizes / TTS. -->
         <activity
             android:name=".WelcomeSettingsActivity"
