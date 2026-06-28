@@ -193,6 +193,23 @@
             android:label="Sounds"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- "Sunrise alarm": gradual wake-light schedule + days. -->
+        <activity
+            android:name=".SunriseSettingsActivity"
+            android:exported="false"
+            android:label="Sunrise alarm"
+            android:theme="@style/Theme.SampleApp" />
+
+        <!-- Full-screen sunrise wake light, launched by SunriseReceiver at the alarm
+             time; shows over the lock screen and turns the screen on. -->
+        <activity
+            android:name=".WakeLightActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- "Clock": digital clock screensaver style / color / layout settings. -->
         <activity
             android:name=".ClockSettingsActivity"
@@ -365,6 +382,11 @@
         <!-- Internal alarm for the ambient chime / spoken-time / golden-hour cues. -->
         <receiver
             android:name=".ChimeReceiver"
+            android:exported="false" />
+
+        <!-- Internal alarm for the sunrise wake light (launches WakeLightActivity). -->
+        <receiver
+            android:name=".SunriseReceiver"
             android:exported="false" />
 
         <!-- Device admin (force-lock only): lets Immortal turn the screen off for the

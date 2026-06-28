@@ -66,6 +66,9 @@ class ImmortalApp : Application() {
     // Arm the ambient chime / spoken-time / golden-hour alarms per the user's config.
     ChimeScheduler.reschedule(this)
 
+    // Arm the next sunrise wake-light alarm per the user's config.
+    SunriseScheduler.reschedule(this)
+
     // Bring up the WiFi fleet agent if provisioning enabled it (no-op otherwise).
     FleetAgentService.ensureRunning(this)
 

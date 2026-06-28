@@ -10,6 +10,8 @@ package com.immortal.launcher.settings
 import android.content.Context
 import com.immortal.launcher.CalendarFeed
 import com.immortal.launcher.CalendarUrlEntryActivity
+import com.immortal.launcher.SunriseConfig
+import com.immortal.launcher.SunriseScheduler
 import com.immortal.launcher.ChimeConfig
 import com.immortal.launcher.ChimeScheduler
 import com.immortal.launcher.DigitalClockConfig
@@ -859,6 +861,75 @@ object SettingsDomains {
       )
 
   /**
+   * Sunrise alarm / wake light ([SunriseConfig]). At the set time on the chosen days, the screen
+   * brightens gradually, optionally finishing with a chime. The scalar fields (enabled, hour,
+   * minute, ramp minutes, chime) are registry specs; the `days` Set<Int> (which days of the week)
+   * is managed by the bespoke day-picker in [SunriseSettingsActivity] — the registry models scalars,
+   * not sets. Rescheduling ([SunriseScheduler.reschedule]) goes in [onApplied], fired once per batch.
+   */
+  val sunrise: SettingsDomain<SunriseConfig.Config> =
+      SettingsDomain(
+          id = "sunrise",
+          title = "Sunrise alarm",
+          load = SunriseConfig::load,
+          specs =
+              listOf(
+                  BoolSpec(
+                      "enabled",
+                      "Sunrise alarm",
+                      get = { it.enabled },
+                      set = SunriseConfig::setEnabled,
+                      help = "Wake to a gradual screen-brightening ramp, optionally finishing with a chime."),
+                  IntSpec(
+                      "hour",
+                      "Hour",
+                      get = { it.hour },
+                      set = SunriseConfig::setHour,
+                      min = 0,
+                      max = 23,
+                      step = 1,
+                      format = { "%02d:00".format(it) },
+                      visible = { _, s -> s.enabled }),
+                  IntSpec(
+                      "minute",
+                      "Minute",
+                      get = { it.minute },
+                      set = SunriseConfig::setMinute,
+                      min = 0,
+                      max = 59,
+                      step = 5,
+                      format = { ":%02d".format(it) },
+                      visible = { _, s -> s.enabled }),
+                  IntSpec(
+                      "rampMinutes",
+                      "Ramp minutes",
+                      get = { it.rampMinutes },
+                      set = SunriseConfig::setRampMinutes,
+                      min = 1,
+                      max = 60,
+                      step = 5,
+                      format = { "$it min" },
+                      help = "How long the screen takes to brighten from ember to full daylight.",
+                      visible = { _, s -> s.enabled }),
+                  BoolSpec(
+                      "chime",
+                      "Chime at end",
+                      get = { it.chime },
+                      set = SunriseConfig::setChime,
+                      help = "Finish the ramp with a soft chime crescendo.",
+                      visible = { _, s -> s.enabled }),
+              ),
+          sections =
+              mapOf(
+                  "hour" to "Time",
+                  "minute" to "Time",
+                  "rampMinutes" to "Ramp",
+                  "chime" to "Ramp"),
+          defaults = { SunriseConfig.Config(false, 7, 0, 20, true, setOf(2, 3, 4, 5, 6)) },
+          onApplied = { c, _ -> SunriseScheduler.reschedule(c) },
+      )
+
+  /**
    * The digital clock screensaver ([DigitalClockConfig]). When enabled, it replaces the photo-frame
    * dream with a large customisable clock (style, color, font, size, layout, background, glow, date,
    * seconds). The enum setters write the raw string straight to prefs (no normalising), so each
@@ -1082,5 +1153,5 @@ object SettingsDomains {
       )
 
   val all: List<SettingsDomain<*>> =
-      listOf(screensaver, calendar, immortal, mqtt, quickbar, fleet, chime, digitalclock, welcome)
+      listOf(screensaver, calendar, immortal, mqtt, quickbar, fleet, chime, digitalclock, welcome, sunrise)
 }

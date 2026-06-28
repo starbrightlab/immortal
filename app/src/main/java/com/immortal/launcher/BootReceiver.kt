@@ -23,6 +23,8 @@ class BootReceiver : BroadcastReceiver() {
       SleepScheduler.applyOvernightNow(context)
       // Likewise re-arm the ambient chime alarms.
       ChimeScheduler.reschedule(context)
+      // Re-arm the sunrise wake-light alarm.
+      SunriseScheduler.reschedule(context)
       // Re-open the WiFi fleet channel after the reboot (the whole point of an
       // in-app agent: it comes back without USB, unlike adb-over-WiFi here).
       FleetAgentService.ensureRunning(context)
