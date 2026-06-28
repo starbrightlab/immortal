@@ -27,8 +27,12 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Ambient dashboard: show upcoming events from the device calendar (CalendarHelper). -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
-    <!-- Voice notes: AudioNote records short memos via the handset mic. Requested at
-         runtime; recording is a no-op until granted. -->
+    <!-- LAN intercom / "ping the other room": broadcast audio over the local network. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Voice notes: AudioNote records short memos via the handset mic; also used by the
+         LAN intercom. Requested at runtime; recording is a no-op until granted. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Fleet Agent: a foreground service so WiFi device management survives a
          reboot on these non-root Portals (where adb-over-WiFi can't). -->
@@ -244,6 +248,13 @@
             android:exported="false"
             android:screenOrientation="landscape"
             android:label="Bedtime story"
+            android:theme="@style/Theme.SampleApp" />
+
+        <!-- "Intercom": LAN one-way intercom / baby monitor (LanAudio). -->
+        <activity
+            android:name=".IntercomActivity"
+            android:exported="false"
+            android:label="Intercom"
             android:theme="@style/Theme.SampleApp" />
 
         <!-- Connect a self-hosted Immich server as the screensaver source. -->
