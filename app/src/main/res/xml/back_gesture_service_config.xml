@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Configuration for ImmortalBackGestureService.
+     This service only dispatches the global BACK action; it never inspects
+     on-screen content. So it asks for the minimum:
+       - flagDefault: basic event delivery only.
+       - canPerformGestures: kept so the service can perform the global action.
+       - canRetrieveWindowContent="false": it does not read window content.
+       - no accessibilityEventTypes: onAccessibilityEvent is a no-op; the
+         service is driven by a broadcast, not by accessibility events.
+     Accessibility shortcut:
+       - The service is advertised in Android Settings → Accessibility and
+         exposes the global BACK action via performGlobalAction(). -->
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/back_gesture_service_description"
+    android:notificationTimeout="100"
+    android:settingsActivity="com.immortal.launcher.ImmortalSettingsActivity" />

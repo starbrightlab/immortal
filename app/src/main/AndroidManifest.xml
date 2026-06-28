@@ -45,6 +45,8 @@
          the agent from Android 10's background-activity-start restriction. Granted
          by provisioning; harmless if not held (the agent reports install mode). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- System-wide back-swipe gesture overlay runs as a special-use foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Lets the fleet agent's /logcat endpoint read system-wide logs. READ_LOGS is
          signature|privileged|development; the "development" flag means provisioning
          can grant it via `pm grant`. Without it the agent sees only its own logs. -->
@@ -457,6 +459,32 @@
                 <action android:name="android.service.dreams.DreamService" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+        </service>
+
+        <!-- System-wide "Go back" accessibility service. Enabled once in Accessibility
+             settings; lets Immortal perform a global BACK from the swipe overlay. -->
+        <service
+            android:name=".ImmortalBackGestureService"
+            android:exported="true"
+            android:label="@string/back_gesture_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/back_gesture_service_config" />
+        </service>
+
+        <!-- Foreground service that draws a thin right-edge strip and detects leftward
+             swipes to trigger BACK. Requires SYSTEM_ALERT_WINDOW. -->
+        <service
+            android:name=".SystemBackGestureService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="System-wide back-swipe gesture overlay" />
         </service>
     </application>
 
