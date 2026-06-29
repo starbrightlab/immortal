@@ -186,6 +186,14 @@
         <activity android:name=".WorldClockActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
         <activity android:name=".BootAppsActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
 
+        <!-- Countdown chips (birthdays, trips, holidays), opened from the Countdowns
+             tile in the launcher's Settings folder. -->
+        <activity
+            android:name=".CountdownSettingsActivity"
+            android:exported="false"
+            android:label="Countdowns"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- "Sounds": hourly chime / spoken time / golden-hour tone / ping volume + quiet hours. -->
         <activity
             android:name=".ChimeSettingsActivity"
@@ -385,6 +393,11 @@
         <!-- Internal alarms for the idle and overnight screen-off features. -->
         <receiver
             android:name=".SleepReceiver"
+            android:exported="false" />
+
+        <!-- Internal alarms for the kitchen multi-timers (ring when each elapses). -->
+        <receiver
+            android:name=".TimerReceiver"
             android:exported="false" />
 
         <!-- Timer "time's up" alarm: an exact AlarmManager alarm fires here when a
