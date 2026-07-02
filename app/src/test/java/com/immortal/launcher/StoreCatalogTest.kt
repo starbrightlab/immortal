@@ -163,6 +163,87 @@ class StoreCatalogTest {
   }
 
   @Test
+  fun latestVersionCode_urlSourceWithVersionUrl_resolvesLive() {
+    // A self-published app points versionUrl at its own version.json; the store
+    // reads the current versionCode live, so the catalog never needs a per-release
+    // bump. The URL fetched is exactly the declared versionUrl.
+    val app =
+        CatalogApp(
+            name = "Portal Overlays",
+            packageName = "com.portal.overlays",
+            source = "url",
+            fdroidId = null,
+            apkUrl = "https://x/releases/latest/download/PortalOverlays.apk",
+            versionCode = null,
+            versionUrl = "https://raw.example/version.json",
+            description = "",
+            category = "Portal Originals",
+        )
+    val latest =
+        StoreCatalog.latestVersionCode(app) { url ->
+          assertEquals("https://raw.example/version.json", url)
+          """{"versionCode": 42, "versionName": "1.9", "apkUrl": "https://x/y.apk"}"""
+        }
+    assertEquals(42L, latest)
+  }
+
+  @Test
+  fun latestVersionCode_versionCodePinWinsOverVersionUrl_noNetwork() {
+    // An explicit pin freezes the version and must short-circuit before any fetch.
+    val app =
+        CatalogApp(
+            name = "Portal Overlays",
+            packageName = "com.portal.overlays",
+            source = "url",
+            fdroidId = null,
+            apkUrl = "https://x/app.apk",
+            versionCode = 12L,
+            versionUrl = "https://raw.example/version.json",
+            description = "",
+            category = "Portal Originals",
+        )
+    val latest =
+        StoreCatalog.latestVersionCode(app) { error("pin must win before any versionUrl fetch") }
+    assertEquals(12L, latest)
+  }
+
+  @Test
+  fun latestVersionCode_versionUrlUnreachable_isUncheckable() {
+    // If the manifest can't be fetched/parsed we return null (skip) rather than
+    // spuriously offering — same safe fallback as a url app with no metadata.
+    val app =
+        CatalogApp(
+            name = "Portal Overlays",
+            packageName = "com.portal.overlays",
+            source = "url",
+            fdroidId = null,
+            apkUrl = "https://x/app.apk",
+            versionCode = null,
+            versionUrl = "https://raw.example/version.json",
+            description = "",
+            category = "Portal Originals",
+        )
+    assertNull(StoreCatalog.latestVersionCode(app) { throw java.io.IOException("offline") })
+  }
+
+  @Test
+  fun parse_readsVersionUrl() {
+    val json =
+        """
+        {"schemaVersion":2,"categories":[
+          {"name":"Originals","apps":[
+            {"name":"PO","packageName":"com.portal.overlays","source":"url",
+             "apkUrl":"https://x/app.apk","versionUrl":"https://raw.example/version.json",
+             "description":"HUD."}
+          ]}
+        ]}
+        """.trimIndent()
+    val po = StoreCatalog.parse(json).single()
+    assertEquals("https://raw.example/version.json", po.versionUrl)
+    assertNull(po.versionCode)
+  }
+
+  @Test
   fun latestVersionCode_fdroidWithoutPin_readsSuggestedVersionFromApi() {
     val app =
         CatalogApp(

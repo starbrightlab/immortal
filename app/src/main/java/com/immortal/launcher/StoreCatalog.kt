@@ -25,6 +25,7 @@ data class CatalogApp(
     val fdroidId: String?,
     val apkUrl: String?,
     val versionCode: Long?, // optional pin (e.g. the arm64 build of a multi-ABI app)
+    val versionUrl: String? = null, // optional: a JSON URL to live-resolve the latest versionCode (url source)
     val description: String,
     val category: String,
     val minSdk: Int? = null,
@@ -105,6 +106,7 @@ object StoreCatalog {
                 fdroidId = a.optString("fdroidId").ifBlank { null },
                 apkUrl = a.optString("apkUrl").ifBlank { null },
                 versionCode = if (a.has("versionCode")) a.getLong("versionCode") else null,
+                versionUrl = a.optString("versionUrl").ifBlank { null },
                 description = a.optString("description", ""),
                 category = catName,
                 minSdk = if (a.has("minSdk")) a.getInt("minSdk") else null,
@@ -170,19 +172,26 @@ object StoreCatalog {
 
   /**
    * The newest versionCode available for [app], or null if it can't be determined.
-   *
-   * A catalog `versionCode` is authoritative for ANY source: the ABI pin for a
-   * multi-ABI F-Droid build, OR the declared latest for a direct-URL app — bump
-   * it in the catalog whenever you publish a new APK (for tag-pinned apkUrls,
-   * bump the apkUrl tag to match). F-Droid entries with no pin resolve the
-   * suggested build live from the F-Droid API so they never go stale. A
-   * direct-URL entry with no versionCode carries no version metadata, so it can't
+   * Resolution order, first hit wins:
+   *  1. a catalog `versionCode` — an explicit pin, authoritative for ANY source
+   *     (the ABI pin for a multi-ABI F-Droid build, or a frozen version for a
+   *     direct-URL app). Bump it in the catalog whenever you publish a new APK.
+   *  2. a `versionUrl` — a JSON document (e.g. the app's own `version.json`) with a
+   *     `versionCode` field, fetched live. This lets a self-published direct-URL
+   *     app stay current with NO catalog edit per release, the same way F-Droid
+   *     entries do: point `apkUrl` at a stable `releases/latest/download/...` URL
+   *     and `versionUrl` at the manifest the release process already updates.
+   *  3. for `fdroid` sources with neither, the suggested build from the F-Droid API.
+   * A direct-URL entry with none of these carries no version metadata, so it can't
    * be update-checked — it just won't show an Update badge.
    *
    * [http] is injectable so the URL/pin paths are unit-testable without a network.
    */
   internal fun latestVersionCode(app: CatalogApp, http: (String) -> String = ::httpGet): Long? {
     app.versionCode?.let { return it }
+    app.versionUrl?.let { url ->
+      return runCatching { JSONObject(http(url)).getLong("versionCode") }.getOrNull()
+    }
     if (app.source != "fdroid") return null
     return runCatching {
           JSONObject(http("https://f-droid.org/api/v1/packages/${app.fdroidId ?: app.packageName}"))

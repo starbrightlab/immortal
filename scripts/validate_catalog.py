@@ -20,8 +20,8 @@ ALLOWED_SOURCES = {"fdroid", "url"}
 ALLOWED_DEVICES = {"touch", "tv"}
 KNOWN_FIELDS = {
     "name", "packageName", "source", "fdroidId", "apkUrl", "versionCode",
-    "minSdk", "description", "longDescription", "iconUrl", "author",
-    "homepage", "submittedBy", "devices",
+    "versionUrl", "minSdk", "description", "longDescription", "iconUrl",
+    "author", "homepage", "submittedBy", "devices",
 }
 
 errors = []
@@ -89,7 +89,7 @@ def main():
         if source == "fdroid" and not (a.get("fdroidId") or pkg):
             err(f"{ctx} source 'fdroid' requires fdroidId (or a valid packageName)")
 
-        for ufield in ("apkUrl", "iconUrl", "homepage"):
+        for ufield in ("apkUrl", "iconUrl", "homepage", "versionUrl"):
             u = a.get(ufield)
             if u and not u.startswith("https://"):
                 err(f"{ctx} {ufield} must be https:// — found '{u}'")
@@ -104,14 +104,18 @@ def main():
         vc = a.get("versionCode")
         if vc is not None and not isinstance(vc, int):
             err(f"{ctx} versionCode must be an integer, found {vc!r}")
-        # A direct-URL app has no live version source, so without a declared
-        # versionCode the store can't tell when it's out of date — it'll never
-        # show an Update. F-Droid apps don't need one (resolved from the API).
-        # The launcher itself ships a separate self-updater, so it's exempt.
-        if source == "url" and vc is None and pkg != "com.immortal.launcher":
-            warn(f"{ctx} source 'url' without versionCode won't get update detection — "
-                 f"add versionCode (and bump it on each release) so the store can "
-                 f"offer updates without a delete-and-reinstall")
+        # A direct-URL app needs a live version source, else the store can't tell
+        # when it's out of date and will never show an Update. Either a declared
+        # versionCode (bumped per release) OR a versionUrl (a JSON manifest the
+        # store reads live — zero catalog edits per release) satisfies this.
+        # F-Droid apps don't need either (resolved from the API); the launcher
+        # ships its own self-updater, so it's exempt.
+        if (source == "url" and vc is None and not a.get("versionUrl")
+                and pkg != "com.immortal.launcher"):
+            warn(f"{ctx} source 'url' without versionCode or versionUrl won't get "
+                 f"update detection — add a versionCode (bumped per release) or a "
+                 f"versionUrl (a JSON manifest with a versionCode field, read live) "
+                 f"so the store can offer updates without a delete-and-reinstall")
 
         devices = a.get("devices", [])
         if not isinstance(devices, list) or any(d not in ALLOWED_DEVICES for d in devices):
@@ -130,6 +134,8 @@ def main():
                 head(a["apkUrl"], f"{ctx} apkUrl")
             if a.get("iconUrl"):
                 head(a["iconUrl"], f"{ctx} iconUrl")
+            if a.get("versionUrl"):
+                head(a["versionUrl"], f"{ctx} versionUrl")
             if source == "fdroid":
                 fid = a.get("fdroidId") or pkg
                 head(f"https://f-droid.org/api/v1/packages/{fid}", f"{ctx} fdroidId")
