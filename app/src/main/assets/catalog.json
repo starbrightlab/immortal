@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updated": "2026-06-22",
+  "updated": "2026-07-01",
   "note": "Portal app catalog, schema v2. All v2 fields are ADDITIVE so v1 clients keep working. Entries with source 'fdroid' resolve the current APK at install time via the F-Droid API, so they never go stale. Entries with source 'url' use a direct apkUrl (use this for your own custom Portal apps). Multi-ABI apps (e.g. VLC) ship separate per-architecture APKs on F-Droid; pin the arm64-v8a build with 'versionCode' since Portal is arm64. New in v2: iconUrl (https PNG; omit to get a monogram tile), author, homepage, submittedBy (community credit), longDescription (detail page), devices (['touch','tv'] — omit when the app runs on every Portal). minSdk drives the compatibility badge: the first-gen Portal/Portal+ and Portal TV are API 28, the 2019/2021 models are API 29.",
   "categories": [
     {
@@ -271,6 +271,20 @@
           "author": "veereshai",
           "homepage": "https://github.com/veereshai/HippoMuncher",
           "submittedBy": "veereshai"
+        },
+        {
+          "name": "Portal-Kasa",
+          "packageName": "com.portal.kasa",
+          "source": "url",
+          "apkUrl": "https://github.com/rudysev/portal-kasa/releases/download/v1.0.1/portal-kasa-v1.0.1.apk",
+          "versionCode": 2,
+          "minSdk": 28,
+          "description": "Toggle TP-Link Kasa smart plugs and bulbs on your Wi-Fi — local, no account, no cloud.",
+          "longDescription": "A TP-Link Kasa controller built for the Portal: every plug and bulb on your Wi-Fi on one glanceable dashboard (green = on), with one-tap toggles and All on / All off. Control is entirely local LAN — no TP-Link account, no cloud, no sign-in; devices are discovered by UDP broadcast and switched directly over TCP. The dashboard re-syncs every ~30 seconds while open (backing off in the background), so changes made from the Kasa phone app or a physical button show up on their own. Pairs with the Jarvis assistant (also in this store) for voice control: enable \"Kasa Plugs\" under its External tools and say \"hey jarvis, turn on the coffee maker\". The Portal and the devices must be on the same Wi-Fi network.",
+          "iconUrl": "https://raw.githubusercontent.com/rudysev/portal-kasa/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+          "author": "rudysev",
+          "homepage": "https://github.com/rudysev/portal-kasa",
+          "submittedBy": "rudysev"
         }
       ]
     }
