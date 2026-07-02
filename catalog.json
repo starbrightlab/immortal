@@ -317,6 +317,7 @@
           "packageName": "com.portal.overlays",
           "source": "url",
           "apkUrl": "https://github.com/GodricTM/PortalOverlays/releases/latest/download/PortalOverlays.apk",
+          "versionCode": 12,
           "minSdk": 28,
           "description": "Floating always-on-top HUD — nav buttons, widgets, notification banners, and a now-playing screen saver.",
           "longDescription": "A background service that layers a configurable HUD over whatever's on screen: floating Back / Home / Recents / Control-Center navigation, draggable clock, weather, battery and sticky-note widgets, a status strip, ntfy.sh push banners, and a system-notification mirror (WhatsApp, Messenger, and the like) via a notification listener. Urgent alerts get a full-attention 'breaking news' popup that is read aloud. It also ships its own now-playing screen saver — cover art, clock, battery and a music visualizer over a black, photo, or web-page background (for example an Immich Kiosk feed). Keyless and no Google services; weather is Open-Meteo. Spoken alerts use the sideloaded Portal TTS engine (https://github.com/GodricTM/portal-tts-engine) when it is installed, and are silently skipped when it is not.",
