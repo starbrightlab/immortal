@@ -50,6 +50,10 @@ object WallpaperConfig {
   const val DARK = "dark"
   const val SCREENSAVER = "screensaver"
   const val PHOTO_PREFIX = "photo:"
+  // Live, self-computed backgrounds (no photo source): a sky gradient that drifts through the day,
+  // and the real night sky projected for the device's location. Formerly ForkHome-only.
+  const val SKY = "sky"
+  const val STARFIELD = "starfield"
 
   data class Config(val mode: String = DARK, val grain: Boolean = false)
 
@@ -158,6 +162,11 @@ fun HomeBackground(modifier: Modifier = Modifier) {
   val gradient = WallpaperConfig.gradientColors(mode)
   androidx.compose.foundation.layout.Box(modifier) {
     when {
+      mode == WallpaperConfig.SKY -> {
+        SkyBackground()
+        DayProgressBar()
+      }
+      mode == WallpaperConfig.STARFIELD -> StarFieldBackground()
       gradient != null -> {
         androidx.compose.foundation.layout.Box(
             Modifier.fillMaxSize().background(Brush.verticalGradient(gradient.map { Color(it) })))

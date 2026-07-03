@@ -1478,6 +1478,22 @@ private fun WallpaperSection() {
               Modifier.fillMaxSize()
                   .background(Brush.verticalGradient(listOf(Color(0xFF2C3E50), Color(0xFF4CA1AF)))))
         }
+        WallpaperSwatch("Sky", selected = mode == WallpaperConfig.SKY, onClick = {
+          mode = WallpaperConfig.SKY
+          WallpaperConfig.setMode(context, WallpaperConfig.SKY)
+        }) {
+          Spacer(
+              Modifier.fillMaxSize()
+                  .background(Brush.verticalGradient(listOf(Color(0xFF3A7BD5), Color(0xFF8FD3F4)))))
+        }
+        WallpaperSwatch("Star field", selected = mode == WallpaperConfig.STARFIELD, onClick = {
+          mode = WallpaperConfig.STARFIELD
+          WallpaperConfig.setMode(context, WallpaperConfig.STARFIELD)
+        }) {
+          Spacer(
+              Modifier.fillMaxSize()
+                  .background(Brush.verticalGradient(listOf(Color(0xFF05060F), Color(0xFF0C1430)))))
+        }
       }
       Divider()
       Row(
