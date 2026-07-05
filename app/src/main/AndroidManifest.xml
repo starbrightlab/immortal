@@ -19,6 +19,12 @@
          `pm grant ... WRITE_SECURE_SETTINGS`. Harmless no-op if not granted. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Touch sounds: writes Settings.System.SOUND_EFFECTS_ENABLED. This must be
+         DECLARED for the "Allow modifying system settings" toggle to be enableable;
+         without it the grant screen shows but its switch is dead, and Settings.System
+         writes fail. The user grants it interactively (SystemSounds.requestWriteAccess). -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Gesture-wave-to-wake on the screensaver (GestureCamera). Optional feature so
          camera-less models still install. -->
