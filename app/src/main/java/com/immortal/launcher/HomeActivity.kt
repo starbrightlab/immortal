@@ -77,6 +77,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -642,6 +643,13 @@ private fun LauncherScreen(
   var pendingPair by remember { mutableStateOf<Pair<String, String>?>(null) }
   // Folder currently being renamed.
   var renaming by remember { mutableStateOf<String?>(null) }
+  // Dwell-to-fold: while an app is dragged over another app, foldCandidate tracks that app;
+  // once the finger holds still (see the dwell LaunchedEffect) foldTarget is armed and its tile
+  // highlights, so releasing there makes a folder instead of a swap. moveTick restarts the dwell
+  // on every drag movement, so a quick pass-through just reorders.
+  var foldCandidate by remember { mutableStateOf<String?>(null) }
+  var foldTarget by remember { mutableStateOf<String?>(null) }
+  var moveTick by remember { mutableStateOf(0) }
 
   fun persist() = UserLayout.save(context, assignments.toMap())
   fun replaceAssignments(next: Map<String, String>) {
@@ -703,6 +711,9 @@ private fun LauncherScreen(
           dragPos.x < screenW * 0.14f -> -1
           else -> 0
         }
+    // Any movement restarts the dwell timer and drops the fold highlight; only a pause re-arms it.
+    moveTick++
+    foldTarget = null
     val src = dragKey ?: return
     val srcIdx = gridSlots.indexOf(src)
     if (srcIdx < 0) return
@@ -710,6 +721,9 @@ private fun LauncherScreen(
     if (tgtIdx == srcIdx) return
     // Hovering an app over a folder files it in (handled on drop) — don't live-swap into it.
     val tgt = gridSlots.getOrNull(tgtIdx)
+    // Dwell-to-fold: remember the app we're passing directly over so a pause here can arm a new
+    // folder. Anything else under the finger (folder, widget, built-in, blank) clears the candidate.
+    foldCandidate = if (src.startsWith(APP_KEY) && tgt != null && tgt.startsWith(APP_KEY)) tgt else null
     if (src.startsWith(APP_KEY) && tgt != null && tgt.startsWith(FOLDER_KEY)) return
     val next = HomeGrid.swap(gridSlots, srcIdx, tgtIdx)
     if (next != gridSlots) gridSlots = next
@@ -718,18 +732,30 @@ private fun LauncherScreen(
     edgeDir = 0
     val src = dragKey
     if (src != null) {
-      val tgtIdx = targetSlotAt(dragPos)
-      val tgt = tgtIdx?.let { gridSlots.getOrNull(it) }
-      if (src.startsWith(APP_KEY) && tgt != null && tgt.startsWith(FOLDER_KEY)) {
-        // File the app into the folder; undo any live swaps so the folder stays put.
+      val armed = foldTarget
+      if (src.startsWith(APP_KEY) && armed != null && armed.startsWith(APP_KEY) && armed != src) {
+        // Dwell-to-fold: the app rested on another app — make a folder from the pair. Undo any live
+        // swaps first so the grid is back to its pre-drag order; the reconcile effect then removes
+        // both apps and drops the new folder tile in for them once it's named.
         dragOriginalSlots?.let { gridSlots = it }
-        assignments[src.removePrefix(APP_KEY)] = tgt.removePrefix(FOLDER_KEY)
-        persist()
+        UserLayout.saveGridSlots(context, gridSlots)
+        pendingPair = src.removePrefix(APP_KEY) to armed.removePrefix(APP_KEY)
+      } else {
+        val tgtIdx = targetSlotAt(dragPos)
+        val tgt = tgtIdx?.let { gridSlots.getOrNull(it) }
+        if (src.startsWith(APP_KEY) && tgt != null && tgt.startsWith(FOLDER_KEY)) {
+          // File the app into the folder; undo any live swaps so the folder stays put.
+          dragOriginalSlots?.let { gridSlots = it }
+          assignments[src.removePrefix(APP_KEY)] = tgt.removePrefix(FOLDER_KEY)
+          persist()
+        }
+        UserLayout.saveGridSlots(context, gridSlots)
       }
-      UserLayout.saveGridSlots(context, gridSlots)
     }
     dragKey = null
     dragOriginalSlots = null
+    foldTarget = null
+    foldCandidate = null
   }
   fun cancelTileDrag() {
     // Don't revert — commit the tiles where they were last dragged, so a brief finger-off-screen
@@ -738,6 +764,8 @@ private fun LauncherScreen(
     if (dragKey != null) UserLayout.saveGridSlots(context, gridSlots)
     dragKey = null
     dragOriginalSlots = null
+    foldTarget = null
+    foldCandidate = null
   }
   // Debounced page flip while a drag rests against a screen edge.
   LaunchedEffect(edgeDir) {
@@ -748,6 +776,18 @@ private fun LauncherScreen(
         if (target != pagerState.currentPage) pagerState.animateScrollToPage(target)
       }
       edgeDir = 0
+    }
+  }
+  // Dwell-to-fold: if a dragged app rests over another app for a beat, arm folder creation so the
+  // release makes a folder (a quick pass-through just reorders). moveTick restarts this on every
+  // movement, so the delay only completes once the finger holds still over the candidate.
+  LaunchedEffect(moveTick, dragKey) {
+    val src = dragKey ?: return@LaunchedEffect
+    if (!src.startsWith(APP_KEY) || foldCandidate == null) return@LaunchedEffect
+    delay(FOLD_DWELL_MS)
+    val cand = foldCandidate
+    if (dragKey == src && cand != null && cand.startsWith(APP_KEY) && gridSlots.contains(cand)) {
+      foldTarget = cand
     }
   }
   // Auto-arrange: pack every tile into the clean default order (built-ins, widgets, folders, then
@@ -1005,11 +1045,18 @@ private fun LauncherScreen(
                 }
                 key.startsWith(APP_KEY) ->
                     appByKey[key]?.let { app ->
+                      val isFoldTarget = foldTarget == key
                       AppTile(
                           app = app,
                           editMode = editMode,
                           dimmed = isDragged,
-                          modifier = boundsMod.alpha(if (isDragged) 0f else 1f),
+                          modifier =
+                              boundsMod
+                                  .alpha(if (isDragged) 0f else 1f)
+                                  .then(
+                                      if (isFoldTarget)
+                                          Modifier.border(2.dp, Color.White, RoundedCornerShape(18.dp))
+                                      else Modifier),
                           onClick = { onLaunch(app.component) },
                           onDelete = { onUninstall(app.component.packageName) },
                       )
@@ -1256,6 +1303,8 @@ private fun SlideToStop(onStop: () -> Unit) {
 private const val APP_KEY = "app:"
 private const val FOLDER_KEY = "folder:"
 private const val WIDGET_KEY = "widget-tile:"
+// How long a dragged app must rest over another app before the drop makes a folder (dwell-to-fold).
+private const val FOLD_DWELL_MS = 1000L
 private const val BUILTIN_CALLS = "builtin:calls"
 private const val BUILTIN_STORE = "builtin:store"
 private const val BUILTIN_TOOLS = "builtin:tools"
