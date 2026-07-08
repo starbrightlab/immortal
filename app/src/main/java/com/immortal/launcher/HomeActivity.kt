@@ -2820,16 +2820,18 @@ private fun ImmortalTimersWidget(modifier: Modifier = Modifier) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       if (state.ringing) {
         TimerChip("Stop") { TimerAlarm.stop(context) }
+      } else if (remainingMs > 0) {
+        TimerChip(if (state.running) "Pause" else "Start") {
+          if (state.running) TimerStore.pause(context) else TimerStore.resume(context)
+        }
+        TimerChip("Reset") {
+          TimerStore.clear(context)
+        }
       } else {
         listOf(5, 10, 30).forEach { minutes ->
           TimerChip("${minutes}m") { TimerStore.start(context, minutes * 60_000L) }
         }
         TimerChip("Custom") { showCustom = true }
-        if (remainingMs > 0) {
-          TimerChip(if (state.running) "Pause" else "Start") {
-            if (state.running) TimerStore.pause(context) else TimerStore.resume(context)
-          }
-        }
       }
     }
   }
