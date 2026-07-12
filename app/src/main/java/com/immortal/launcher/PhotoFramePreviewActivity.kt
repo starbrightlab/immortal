@@ -38,6 +38,11 @@ class PhotoFramePreviewActivity : ComponentActivity() {
   private lateinit var frame: PhotoFrameController
   private var powerReceiver: BroadcastReceiver? = null
 
+  // Read from the *latest* intent (onCreate or onNewIntent), never captured in a closure:
+  // this activity is singleTask, so a relaunch while the frame is already up reuses the live
+  // instance and skips onCreate entirely (issue #146 regression).
+  private var launchDismissOnExit = false
+
   // Overnight "night clock" mode: this activity is the dimmed bedside flip clock for the window.
   private var nightClock = false
   private val nightWatch = Handler(Looper.getMainLooper())
@@ -77,7 +82,7 @@ class PhotoFramePreviewActivity : ComponentActivity() {
     // behave like PhotoDreamService's tap (issue #146). Deliberate on-demand starts (settings
     // preview, face picker, header button, MQTT command) keep returning to where they came from.
     // The night clock never launches anything — a 3am tap should just hand back, dark.
-    val launchDismissOnExit = intent.getBooleanExtra(EXTRA_LAUNCH_DISMISS_APP, false) && !nightClock
+    launchDismissOnExit = intent.getBooleanExtra(EXTRA_LAUNCH_DISMISS_APP, false) && !nightClock
     frame.onExit = {
       Log.i(TAG, "onExit (tap) -> finish(), launchDismiss=$launchDismissOnExit")
       // The user tapped the frame: they're unambiguously here. Without this the continuation
@@ -136,6 +141,17 @@ class PhotoFramePreviewActivity : ComponentActivity() {
             })
       }
     }
+  }
+
+  // singleTask relaunch onto a live frame (most commonly DreamPolicy's force-wake continuation
+  // when this instance survived under the dream) lands here, not onCreate. Re-derive the
+  // dismiss behaviour from the fresh intent — last launch wins, matching what onCreate would
+  // have decided — and log it, so a reused instance is visible in a logcat capture.
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    launchDismissOnExit = intent.getBooleanExtra(EXTRA_LAUNCH_DISMISS_APP, false) && !nightClock
+    Log.i(TAG, "onNewIntent (reused instance): launchDismiss=$launchDismissOnExit")
   }
 
   private fun applyKeepScreenOn() {
