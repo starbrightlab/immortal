@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updated": "2026-07-04",
+  "updated": "2026-07-12",
   "note": "Portal app catalog, schema v2. All v2 fields are ADDITIVE so v1 clients keep working. Entries with source 'fdroid' resolve the current APK at install time via the F-Droid API, so they never go stale. Entries with source 'url' use a direct apkUrl (use this for your own custom Portal apps); give them a 'versionCode' (bumped per release) OR a 'versionUrl' — a JSON manifest (e.g. the app's own version.json) with a 'versionCode' field that the store reads live, so a 'releases/latest/download' app stays current with no catalog edit per release. Multi-ABI apps (e.g. VLC) ship separate per-architecture APKs on F-Droid; pin the arm64-v8a build with 'versionCode' since Portal is arm64. New in v2: iconUrl (https PNG; omit to get a monogram tile), author, homepage, submittedBy (community credit), longDescription (detail page), devices (['touch','tv'] — omit when the app runs on every Portal). minSdk drives the compatibility badge: the first-gen Portal/Portal+ and Portal TV are API 28, the 2019/2021 models are API 29.",
   "categories": [
     {
@@ -317,10 +317,10 @@
           "packageName": "com.portal.overlays",
           "source": "url",
           "apkUrl": "https://github.com/GodricTM/PortalOverlays/releases/latest/download/PortalOverlays.apk",
-          "versionCode": 12,
+          "versionCode": 14,
           "minSdk": 28,
-          "description": "Floating always-on-top HUD — nav buttons, widgets, notification banners, and a now-playing screen saver.",
-          "longDescription": "A background service that layers a configurable HUD over whatever's on screen: floating Back / Home / Recents / Control-Center navigation, draggable clock, weather, battery and sticky-note widgets, a status strip, ntfy.sh push banners, and a system-notification mirror (WhatsApp, Messenger, and the like) via a notification listener. Urgent alerts get a full-attention 'breaking news' popup that is read aloud. It also ships its own now-playing screen saver — cover art, clock, battery and a music visualizer over a black, photo, or web-page background (for example an Immich Kiosk feed). Keyless and no Google services; weather is Open-Meteo. Spoken alerts use the sideloaded Portal TTS engine (https://github.com/GodricTM/portal-tts-engine) when it is installed, and are silently skipped when it is not.",
+          "description": "A floating HUD for sideloaded Portals - widgets, notifications, ticker, status strip, floating nav, and Now Playing.",
+          "longDescription": "Draws draggable widgets (clock, weather, battery, sticky note), mirrored notification banners, an RSS/Atom/JSON ticker, a live status strip (time, date, weather, battery, network speed, pinned app dock, tap-to-open segments, and more), a floating Back/Home/Recents nav cluster, and a fullscreen Now Playing view with album art and transport controls - all on top of any app. Push banners via ntfy.sh or a self-hosted ntfy server. Checks GitHub for in-app updates (automatic popup on launch). No Google Play Services required.",
           "iconUrl": "https://raw.githubusercontent.com/GodricTM/PortalOverlays/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
           "author": "GodricTM",
           "homepage": "https://github.com/GodricTM/PortalOverlays",
