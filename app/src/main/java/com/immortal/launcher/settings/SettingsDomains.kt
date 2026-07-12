@@ -255,6 +255,33 @@ object SettingsDomains {
                       "Play videos",
                       get = { it.includeVideo },
                       set = ScreensaverConfig::setIncludeVideo),
+                  // On-device cache: only meaningful for a network source that re-fetches the same
+                  // assets every loop (Immich / WebDAV). Hidden for a local folder or the built-in
+                  // feed, where there's nothing to save a round-trip on.
+                  BoolSpec(
+                      "cacheEnabled",
+                      "Store media on this device",
+                      get = { it.cacheEnabled },
+                      set = ScreensaverConfig::setCacheEnabled,
+                      help =
+                          "Downloads each photo and video from your server once, then plays it from " +
+                              "this device on every loop instead of fetching it again. Videos are " +
+                              "shrunk to fit the screen. The frame loads faster and your server does " +
+                              "far less work; it uses some of this device's storage.",
+                      visible = { _, s -> s.usesImmich || s.usesDav }),
+                  IntSpec(
+                      "cacheBudgetGb",
+                      "Storage limit",
+                      get = { it.cacheBudgetGb },
+                      set = ScreensaverConfig::setCacheBudgetGb,
+                      min = ScreensaverConfig.CACHE_GB_MIN,
+                      max = ScreensaverConfig.CACHE_GB_MAX,
+                      step = 1,
+                      format = { "$it GB" },
+                      help =
+                          "The most storage the saved copies may use. When it fills up, the items " +
+                              "shown longest ago are removed first. Also limited by free space.",
+                      visible = { _, s -> (s.usesImmich || s.usesDav) && s.cacheEnabled }),
                   BoolSpec(
                       "batterySaver",
                       "Sleep on battery when nobody's around",

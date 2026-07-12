@@ -119,6 +119,14 @@ dependencies {
   // render the BitMatrix to a Bitmap ourselves, no Android-specific zxing module needed.
   implementation("com.google.zxing:core:3.5.3")
 
+  // Media3 Transformer: on-device, hardware-accelerated video downscale/transcode for the
+  // screensaver media cache ([VideoTranscoder]) — turns near-original remote clips into
+  // 1200x800 derivatives the Portal stores and replays locally. -effect provides Presentation
+  // (aspect-fit resize); -common carries MediaItem etc.
+  implementation("androidx.media3:media3-transformer:1.5.1")
+  implementation("androidx.media3:media3-effect:1.5.1")
+  implementation("androidx.media3:media3-common:1.5.1")
+
   // Unit tests (pure JVM — no device/emulator). org.json provides a real
   // implementation so JSON-parsing logic can be tested off-device (the android.jar
   // stub used in unit tests otherwise throws "not mocked").

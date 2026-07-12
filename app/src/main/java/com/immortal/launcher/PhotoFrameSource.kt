@@ -34,6 +34,7 @@ sealed class PhotoFrameSource {
       val url: String,
       val user: String,
       val pass: String,
+      val includeVideo: Boolean,
       val shuffle: Boolean,
   ) : PhotoFrameSource()
 
@@ -86,6 +87,7 @@ sealed class PhotoFrameSource {
                   url = settings.davUrl!!,
                   user = settings.davUser.orEmpty(),
                   pass = settings.davPass.orEmpty(),
+                  includeVideo = settings.includeVideo,
                   shuffle = settings.shuffle,
               )
           settings.usesSmb ->

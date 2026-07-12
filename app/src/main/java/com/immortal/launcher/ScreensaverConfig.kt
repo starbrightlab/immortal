@@ -50,6 +50,11 @@ object ScreensaverConfig {
   const val FIT_FIT = "fit" // letterbox to show the whole image
   const val DEFAULT_INTERVAL = 30
   const val DEFAULT_ALBUM_REFRESH_MIN = 60
+  // On-device media-cache storage limit, in GB (the "Storage limit" control's range). Capped at
+  // 32 — the most any Portal ships with (Portal+ = 32 GB; the 10" units are 16 GB), and the
+  // runtime budget is further bounded by actual free space (see MediaCache.defaultBudget).
+  const val CACHE_GB_MIN = 1
+  const val CACHE_GB_MAX = 32
 
   // Which edge the calendar widget hugs. Top of that edge either way.
   const val CAL_SIDE_LEFT = "left"
@@ -125,6 +130,12 @@ object ScreensaverConfig {
       val albumRefreshMin: Int = DEFAULT_ALBUM_REFRESH_MIN,
       val shuffle: Boolean = false,
       val includeVideo: Boolean = true,
+      // On-device media cache (Immich / WebDAV sources only): download each asset once and replay
+      // it from local storage on every loop — transcoding videos to a screen-sized copy — instead
+      // of re-fetching from the server. Off by default. [cacheBudgetGb] caps the disk it may use
+      // (also bounded at runtime by free space). See MediaCache / VideoTranscoder.
+      val cacheEnabled: Boolean = false,
+      val cacheBudgetGb: Int = 4,
       // Calendar widget: a public iCalendar (.ics) feed link (Google "secret iCal"
       // address or an Apple iCloud public-calendar / webcal link) and how much of it
       // to show on the frame. Empty link = the widget is off.
@@ -267,6 +278,8 @@ object ScreensaverConfig {
             clampAlbumRefresh(p.getInt("album_refresh_min", DEFAULT_ALBUM_REFRESH_MIN)),
         shuffle = p.getBoolean("shuffle", false),
         includeVideo = p.getBoolean("include_video", true),
+        cacheEnabled = p.getBoolean("cache_enabled", false),
+        cacheBudgetGb = p.getInt("cache_budget_gb", 4).coerceIn(CACHE_GB_MIN, CACHE_GB_MAX),
         calendarUrl = p.getString("calendar_url", null),
         calendarRange = CalendarFeed.clampRange(p.getString("calendar_range", CalendarFeed.RANGE_DAY)),
         calendarEnabled = p.getBoolean("calendar_enabled", true),
@@ -421,6 +434,12 @@ object ScreensaverConfig {
 
   fun setIncludeVideo(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("include_video", on).apply()
+
+  fun setCacheEnabled(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("cache_enabled", on).apply()
+
+  fun setCacheBudgetGb(c: Context, gb: Int) =
+      prefs(c).edit().putInt("cache_budget_gb", gb.coerceIn(CACHE_GB_MIN, CACHE_GB_MAX)).apply()
 
   fun setBatterySaver(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("battery_saver", on).apply()

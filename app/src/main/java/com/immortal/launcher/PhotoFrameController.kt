@@ -171,6 +171,15 @@ class PhotoFrameController(
   // this instead of an HTTP download, so SMB reuses all the remote advance/tick/fallback logic.
   private var remoteFetch: ((String) -> Bitmap?)? = null
   private var smbSource: SmbSource? = null
+  // On-device media cache for stable-URL HTTP sources (Immich, WebDAV): images are stored as
+  // fetched, videos as 1200x800 derivatives, so each asset is pulled from the server once and
+  // then replayed from local storage on every loop. Null unless such a source is active. A
+  // background worker on [transcodeIo] warms the video cache ahead of playback. See
+  // [enableMediaCache]/[fetchRemoteImage]/[schedulePrefetch].
+  private var mediaCache: MediaCache? = null
+  private var transcoder: VideoTranscoder? = null
+  private val transcodeIo = Executors.newSingleThreadExecutor()
+  @Volatile private var prefetchRunning = false
   // Web-page source: a fullscreen WebView that owns the whole frame (the page brings its own
   // clock/widgets, so the photo layer and Immortal overlay are skipped).
   private var webView: android.webkit.WebView? = null
@@ -232,6 +241,8 @@ class PhotoFrameController(
 
   fun start() {
     settings = ScreensaverConfig.load(context)
+    // Caching off? Reclaim any space a previous "on" session left behind (best-effort, off-thread).
+    if (!settings.cacheEnabled) Thread { MediaCache.purge(context) }.start()
     val source = PhotoFrameSource.from(settings, allowWebPage = faceOverride == null)
     applyFit()
     refreshCalendar.run()
@@ -348,7 +359,9 @@ class PhotoFrameController(
               remoteMode = true
               remoteIndex = -1
               remoteFailStreak = 0
+              enableMediaCache()
               advanceRemote(+1)
+              schedulePrefetch()
             } else {
               // Server unreachable / album empty → never leave the frame blank. Say so: the
               // swap to the built-in feed is otherwise invisible in a user report (issue #142).
@@ -360,15 +373,21 @@ class PhotoFrameController(
       }
       is PhotoFrameSource.WebDav -> {
         io.execute {
-          val urls = DavSource.listImageUrls(source.url, source.user, source.pass).orEmpty()
+          val media =
+              DavSource.listMedia(source.url, source.user, source.pass, source.includeVideo)
+                  .orEmpty()
           ui.post {
-            if (urls.isNotEmpty()) {
-              remoteUrls = if (source.shuffle) urls.shuffled() else urls
+            if (media.isNotEmpty()) {
+              val ordered = if (source.shuffle) media.shuffled() else media
+              remoteUrls = ordered.map { it.url }
+              remoteVideos = ordered.filter { it.isVideo }.mapTo(HashSet()) { it.url }
               remoteHeaders = DavSource.authHeaders(source.user, source.pass)
               remoteMode = true
               remoteIndex = -1
               remoteFailStreak = 0
+              enableMediaCache()
               advanceRemote(+1)
+              schedulePrefetch()
             } else {
               startWeb()
             }
@@ -456,6 +475,7 @@ class PhotoFrameController(
     smbSource = null
     io.shutdownNow()
     metaIo.shutdownNow()
+    transcodeIo.shutdownNow()
   }
 
   // --- UI ---------------------------------------------------------------------
@@ -1085,8 +1105,10 @@ class PhotoFrameController(
   }
 
   /** Stream variant: buffers to bytes so the bounds pass can run before the real decode. */
-  private fun decodeBoundedStream(input: java.io.InputStream): Bitmap? {
-    val bytes = input.readBytes()
+  private fun decodeBoundedStream(input: java.io.InputStream): Bitmap? = decodeBoundedBytes(input.readBytes())
+
+  /** Two-pass decode of in-memory image bytes, bounded to [MAX_EDGE] (see [sampleSizeFor]). */
+  private fun decodeBoundedBytes(bytes: ByteArray): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     val opts =
@@ -1231,14 +1253,20 @@ class PhotoFrameController(
     val url = remoteUrls[remoteIndex]
     val g = gen
     if (url in remoteVideos) {
-      showRemoteVideo(url, g)
+      // Prefer a cached 1200x800 derivative (plays from disk, no network). On a miss, stream the
+      // original this once and warm the cache in the background for the next loop.
+      val cached = mediaCache?.getIfPresent(url, isVideo = true)
+      if (cached != null) {
+        showRemoteVideo(android.net.Uri.fromFile(cached), emptyMap(), g)
+      } else {
+        showRemoteVideo(android.net.Uri.parse(url), remoteHeaders, g)
+        schedulePrefetch()
+      }
       return
     }
     stopVideo()
     io.execute {
-      val fetch = remoteFetch
-      val bmp =
-          runCatching { fetch?.invoke(url) ?: downloadBitmap(url, remoteHeaders) }.getOrNull()
+      val bmp = runCatching { fetchRemoteImage(url) }.getOrNull()
       ui.post {
         if (g != gen) return@post // superseded by a newer advance
         if (!remoteMode) return@post // raced with startWeb() flipping us off
@@ -1260,11 +1288,12 @@ class PhotoFrameController(
   }
 
   /**
-   * Stream a remote video (an Immich playback URL) through the shared [videoView]. Mirrors the
-   * local [showVideo] — muted, advance on completion, skip on error — but the URI variant carries
-   * [remoteHeaders] so the server's auth (`x-api-key`) rides along with the stream.
+   * Play a remote video through the shared [videoView] from [uri]: either an Immich/WebDAV
+   * playback URL (with [headers] carrying the server's auth) streamed live, or a `file://` URI
+   * for a cached 1200x800 derivative (empty headers). Mirrors the local [showVideo] — muted,
+   * advance on completion, skip on error.
    */
-  private fun showRemoteVideo(url: String, g: Int) {
+  private fun showRemoteVideo(uri: android.net.Uri, headers: Map<String, String>, g: Int) {
     cancelKenBurns()
     faceRenderer.setCaption(null, null)
     photo.setImageDrawable(null)
@@ -1293,7 +1322,7 @@ class PhotoFrameController(
             }
             true
           }
-          videoView.setVideoURI(android.net.Uri.parse(url), remoteHeaders)
+          videoView.setVideoURI(uri, headers)
           // Safety net: advance even if a clip is very long or never reports done.
           ui.postDelayed(remoteTick, maxOf(intervalMs(), 5 * 60_000L))
         }
@@ -1591,6 +1620,99 @@ class PhotoFrameController(
     c.setRequestProperty("User-Agent", USER_AGENT)
     headers.forEach { (k, v) -> c.setRequestProperty(k, v) }
     return c.inputStream.use { decodeBoundedStream(it) }
+  }
+
+  // --- on-device media cache (Immich / WebDAV) --------------------------------
+
+  /**
+   * Spin up the cache + transcoder for a stable-URL HTTP source, if the user has enabled it. The
+   * budget is the user's chosen GB cap, still bounded by free space so a small Portal is never
+   * pushed over. No-op (leaves [mediaCache] null → direct fetch) when the setting is off.
+   */
+  private fun enableMediaCache() {
+    if (mediaCache != null || !settings.cacheEnabled) return
+    val ceiling = settings.cacheBudgetGb.toLong() * 1024L * 1024L * 1024L
+    val budget = MediaCache.defaultBudget(context.filesDir.usableSpace, ceiling)
+    mediaCache = MediaCache(context, budget).also { it.enforceBudget() } // apply a lowered cap now
+    transcoder = VideoTranscoder(context)
+  }
+
+  /**
+   * Fetch a remote image, going through [mediaCache] when one is active (Immich/WebDAV): a hit
+   * decodes straight from disk with no network; a miss downloads the bytes, caches them, and
+   * decodes. SMB (a custom [remoteFetch]) and the uncached sources fall back to the direct path.
+   */
+  private fun fetchRemoteImage(url: String): Bitmap? {
+    val cache = mediaCache
+    if (cache != null && remoteFetch == null) {
+      cache.getIfPresent(url, isVideo = false)?.let { f ->
+        runCatching { decodeBoundedFile(f.path) }.getOrNull()?.let { return it }
+      }
+      val bytes = runCatching { downloadBytes(url, remoteHeaders) }.getOrNull() ?: return null
+      cache.putImage(url, bytes)
+      return decodeBoundedBytes(bytes)
+    }
+    return remoteFetch?.invoke(url) ?: downloadBitmap(url, remoteHeaders)
+  }
+
+  /** Raw bytes of an authed HTTP GET (for caching before decode). Null on failure. */
+  private fun downloadBytes(spec: String, headers: Map<String, String>): ByteArray? {
+    val c = URL(spec).openConnection() as HttpURLConnection
+    c.connectTimeout = 8000
+    c.readTimeout = 12000
+    c.instanceFollowRedirects = true
+    c.setRequestProperty("User-Agent", USER_AGENT)
+    headers.forEach { (k, v) -> c.setRequestProperty(k, v) }
+    return c.inputStream.use { it.readBytes() }
+  }
+
+  /** Stream an authed HTTP GET straight to [dst] (for the video prefetch source). */
+  private fun downloadToFile(spec: String, headers: Map<String, String>, dst: java.io.File): Boolean =
+      runCatching {
+            val c = URL(spec).openConnection() as HttpURLConnection
+            c.connectTimeout = 8000
+            c.readTimeout = 20000
+            c.instanceFollowRedirects = true
+            c.setRequestProperty("User-Agent", USER_AGENT)
+            headers.forEach { (k, v) -> c.setRequestProperty(k, v) }
+            c.inputStream.use { input -> dst.outputStream().use { input.copyTo(it) } }
+            dst.length() > 0L
+          }
+          .getOrDefault(false)
+
+  /**
+   * Background-warm the video cache: for each not-yet-cached video, pull the source once, transcode
+   * it to a 1200x800 derivative, and commit it. One clip at a time (single-thread [transcodeIo]) so
+   * a wall of Portals doesn't thrash — the first loop still streams originals; every loop after is
+   * local. Guarded by [prefetchRunning] so overlapping advances don't stack workers.
+   */
+  private fun schedulePrefetch() {
+    val cache = mediaCache ?: return
+    val tc = transcoder ?: return
+    if (prefetchRunning) return
+    prefetchRunning = true
+    transcodeIo.execute {
+      try {
+        for (url in remoteVideos.toList()) {
+          if (!remoteMode || Thread.currentThread().isInterrupted) break
+          if (cache.isCached(url, isVideo = true)) continue
+          val target = cache.videoFile(url)
+          val srcTmp = cache.tempFor(java.io.File(target.path + ".src"))
+          val outTmp = cache.tempFor(target)
+          try {
+            if (!downloadToFile(url, remoteHeaders, srcTmp)) continue
+            if (runCatching { tc.transcode(srcTmp, outTmp) }.getOrDefault(false)) {
+              cache.commit(outTmp, target)
+            }
+          } finally {
+            runCatching { srcTmp.delete() }
+            runCatching { if (outTmp.exists()) outTmp.delete() }
+          }
+        }
+      } finally {
+        prefetchRunning = false
+      }
+    }
   }
 
   private val MATCH = FrameLayout.LayoutParams.MATCH_PARENT

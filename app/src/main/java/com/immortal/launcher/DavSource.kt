@@ -42,16 +42,47 @@ object DavSource {
       runCatching { propfind(dir(baseUrl), authHeaders(user, pass), "0") != null }
           .getOrDefault(false)
 
+  /** One playable asset under a WebDAV folder: a file URL, plus whether it is a video. */
+  data class Media(val url: String, val isVideo: Boolean)
+
   /**
    * Image file URLs under [baseUrl] (recursing into subfolders), capped at [cap]. Null on
    * failure. The base URL is the full WebDAV folder URL (e.g.
    * `http://nas:30035/media/photos/library/`).
    */
   fun listImageUrls(baseUrl: String, user: String?, pass: String?, cap: Int = 1000): List<String>? =
+      crawl(baseUrl, user, pass, includeVideo = false, cap = cap)?.map { it.url }
+
+  /**
+   * Playable media (image URLs, plus video URLs when [includeVideo]) under [baseUrl], capped at
+   * [cap]. Videos stream through the same auth'd remote path as Immich (a plain GET with the
+   * Basic-auth header), so a WebDAV share can back a video wall — see [PhotoFrameController]'s
+   * WebDAV branch. Null on failure.
+   */
+  fun listMedia(
+      baseUrl: String,
+      user: String?,
+      pass: String?,
+      includeVideo: Boolean = false,
+      cap: Int = 1000,
+  ): List<Media>? = crawl(baseUrl, user, pass, includeVideo, cap)
+
+  /**
+   * PROPFIND-crawl [baseUrl] and its subfolders, returning image files (and, when [includeVideo],
+   * video files) as [Media]. The single crawl behind both [listImageUrls] and [listMedia]. Null on
+   * failure; best-effort throughout.
+   */
+  private fun crawl(
+      baseUrl: String,
+      user: String?,
+      pass: String?,
+      includeVideo: Boolean,
+      cap: Int,
+  ): List<Media>? =
       runCatching {
             val headers = authHeaders(user, pass)
             val origin = origin(baseUrl) ?: return null
-            val out = ArrayList<String>()
+            val out = ArrayList<Media>()
             val stack = ArrayDeque<String>()
             stack.addLast(dir(baseUrl))
             val seen = HashSet<String>()
@@ -64,8 +95,14 @@ object DavSource {
                 if (out.size >= cap) break
                 if (href.trimEnd('/') == selfPath.trimEnd('/')) continue // the folder itself
                 val full = origin + href
-                if (isCollection) stack.addLast(dir(full))
-                else if (LocalMedia.classify(href) == LocalMedia.Kind.IMAGE) out.add(full)
+                if (isCollection) {
+                  stack.addLast(dir(full))
+                } else
+                    when (LocalMedia.classify(href)) {
+                      LocalMedia.Kind.IMAGE -> out.add(Media(full, false))
+                      LocalMedia.Kind.VIDEO -> if (includeVideo) out.add(Media(full, true))
+                      else -> {}
+                    }
               }
             }
             out
