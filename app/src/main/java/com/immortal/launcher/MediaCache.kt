@@ -36,6 +36,13 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
 
   init {
     runCatching { dir.mkdirs() }
+    // Sweep temp files stranded by a process death mid-download/transcode. They're '.'-prefixed,
+    // so the budget never counts them — without this sweep a crashy stretch could quietly fill
+    // the disk with invisible half-downloaded sources (~100-200 MB each). Any live temp belongs
+    // to a previous controller instance, and only one screensaver runs at a time.
+    runCatching {
+      dir.listFiles()?.filter { it.isFile && it.name.startsWith(".") }?.forEach { it.delete() }
+    }
   }
 
   /** Stable SHA-1 hex of the source URL — the cache key, independent of source or session. */
@@ -112,6 +119,14 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
   /** Current resident size (excludes in-flight temp files). */
   fun sizeBytes(): Long =
       dir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") }?.sumOf { it.length() } ?: 0L
+
+  /**
+   * Whether the cache has meaningful room left (under ~90% of budget). The prefetch worker stops
+   * here rather than transcoding clips whose commit would just evict warmer entries — on an album
+   * bigger than the budget, filling past this line turns the cache into a treadmill (every add
+   * evicts something the slideshow still wants, so the server keeps getting re-hit forever).
+   */
+  fun hasRoom(): Boolean = sizeBytes() < budgetBytes - budgetBytes / 10
 
   companion object {
     const val DIR = "screensaver-media-cache"

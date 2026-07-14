@@ -106,6 +106,33 @@ class MediaCacheTest {
   }
 
   @Test
+  fun init_sweepsStrandedTempFiles() {
+    // A process death mid-download strands hidden temp files the budget can't see. A fresh
+    // cache instance must reap them — and must not touch real entries.
+    val dir = File(tmp.root, "cache").apply { mkdirs() }
+    File(dir, ".abc.mp4.src.tmp").outputStream().use { it.write(ByteArray(500)) }
+    File(dir, ".def.mp4.tmp").outputStream().use { it.write(ByteArray(500)) }
+    val real = File(dir, "0123456789abcdef.mp4")
+    real.outputStream().use { it.write(ByteArray(500)) }
+
+    val c = MediaCache(dir, Long.MAX_VALUE)
+    assertFalse(File(dir, ".abc.mp4.src.tmp").exists())
+    assertFalse(File(dir, ".def.mp4.tmp").exists())
+    assertTrue("real entries survive the sweep", real.exists())
+    assertEquals(500L, c.sizeBytes())
+  }
+
+  @Test
+  fun hasRoom_stopsShortOfTheBudget() {
+    val c = cache(budget = 10_000L) // room threshold = 9,000
+    assertTrue(c.hasRoom())
+    seed(c, "a", isVideo = true, size = 8_000, mtime = 1_000L)
+    assertTrue("8000 < 9000", c.hasRoom())
+    seed(c, "b", isVideo = true, size = 1_500, mtime = 1_001L)
+    assertFalse("9500 >= 9000", c.hasRoom())
+  }
+
+  @Test
   fun defaultBudget_capsAndReservesHeadroom() {
     val gb = 1024L * 1024 * 1024
     // Plenty free → capped at the ceiling (default 4 GB).

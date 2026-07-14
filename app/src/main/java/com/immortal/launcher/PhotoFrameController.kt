@@ -180,6 +180,10 @@ class PhotoFrameController(
   private var transcoder: VideoTranscoder? = null
   private val transcodeIo = Executors.newSingleThreadExecutor()
   @Volatile private var prefetchRunning = false
+  // Set when a prefetch pass finds the cache out of room, so later misses don't spawn a worker
+  // (and log) just to rediscover that every ~30s. Cleared when a corrupt entry is deleted (space
+  // freed); resets with the controller each dream session.
+  @Volatile private var prefetchFull = false
   // Web-page source: a fullscreen WebView that owns the whole frame (the page brings its own
   // clock/widgets, so the photo layer and Immortal overlay are skipped).
   private var webView: android.webkit.WebView? = null
@@ -1253,11 +1257,11 @@ class PhotoFrameController(
     val url = remoteUrls[remoteIndex]
     val g = gen
     if (url in remoteVideos) {
-      // Prefer a cached 1200x800 derivative (plays from disk, no network). On a miss, stream the
-      // original this once and warm the cache in the background for the next loop.
+      // Prefer a cached screen-sized derivative (plays from disk, no network). On a miss, stream
+      // the original this once and warm the cache in the background for the next loop.
       val cached = mediaCache?.getIfPresent(url, isVideo = true)
       if (cached != null) {
-        showRemoteVideo(android.net.Uri.fromFile(cached), emptyMap(), g)
+        showRemoteVideo(android.net.Uri.fromFile(cached), emptyMap(), g, cachedFile = cached)
       } else {
         showRemoteVideo(android.net.Uri.parse(url), remoteHeaders, g)
         schedulePrefetch()
@@ -1290,10 +1294,27 @@ class PhotoFrameController(
   /**
    * Play a remote video through the shared [videoView] from [uri]: either an Immich/WebDAV
    * playback URL (with [headers] carrying the server's auth) streamed live, or a `file://` URI
-   * for a cached 1200x800 derivative (empty headers). Mirrors the local [showVideo] — muted,
-   * advance on completion, skip on error.
+   * for a cached screen-sized derivative (empty headers, [cachedFile] set). Mirrors the local
+   * [showVideo] — muted, advance on completion, skip on error.
+   *
+   * A playback error on a *cached* file deletes it: a truncated or codec-incompatible derivative
+   * would otherwise fail every loop forever — and because the cache-hit lookup touches the file's
+   * LRU stamp, eviction would actually protect the corrupt entry. Deleting it makes the next
+   * encounter stream the original and re-transcode, so the slot self-heals like the image path.
    */
-  private fun showRemoteVideo(uri: android.net.Uri, headers: Map<String, String>, g: Int) {
+  private fun showRemoteVideo(
+      uri: android.net.Uri,
+      headers: Map<String, String>,
+      g: Int,
+      cachedFile: java.io.File? = null,
+  ) {
+    fun dropCorruptCache() {
+      cachedFile?.let { f ->
+        Log.w(TAG, "cached video failed to play; deleting for re-fetch: ${f.name}")
+        runCatching { f.delete() }
+        prefetchFull = false // space freed; let the prefetch worker re-warm this slot
+      }
+    }
     cancelKenBurns()
     faceRenderer.setCaption(null, null)
     photo.setImageDrawable(null)
@@ -1316,6 +1337,7 @@ class PhotoFrameController(
             if (g == gen) advanceRemote(+1)
           }
           videoView.setOnErrorListener { _, _, _ ->
+            dropCorruptCache()
             if (g == gen) {
               remoteFailStreak++
               advanceRemote(+1)
@@ -1327,6 +1349,7 @@ class PhotoFrameController(
           ui.postDelayed(remoteTick, maxOf(intervalMs(), 5 * 60_000L))
         }
         .onFailure {
+          dropCorruptCache()
           if (g == gen) {
             remoteFailStreak++
             advanceRemote(+1)
@@ -1627,14 +1650,22 @@ class PhotoFrameController(
   /**
    * Spin up the cache + transcoder for a stable-URL HTTP source, if the user has enabled it. The
    * budget is the user's chosen GB cap, still bounded by free space so a small Portal is never
-   * pushed over. No-op (leaves [mediaCache] null → direct fetch) when the setting is off.
+   * pushed over. No-op (leaves [mediaCache] null → direct fetch) when the setting is off, or when
+   * the disk is so full the budget is negligible — enabling then would just churn (every write
+   * immediately evicted) without ever helping.
    */
   private fun enableMediaCache() {
     if (mediaCache != null || !settings.cacheEnabled) return
     val ceiling = settings.cacheBudgetGb.toLong() * 1024L * 1024L * 1024L
-    val budget = MediaCache.defaultBudget(context.filesDir.usableSpace, ceiling)
+    val free = context.filesDir.usableSpace
+    val budget = MediaCache.defaultBudget(free, ceiling)
+    if (budget < MIN_CACHE_BUDGET_BYTES) {
+      Log.w(TAG, "media cache enabled but disk too full (free=${free / MB}MB -> budget=${budget / MB}MB); not caching")
+      return
+    }
     mediaCache = MediaCache(context, budget).also { it.enforceBudget() } // apply a lowered cap now
     transcoder = VideoTranscoder(context)
+    Log.i(TAG, "media cache on: budget=${budget / MB}MB (cap=${settings.cacheBudgetGb}GB, free=${free / MB}MB)")
   }
 
   /**
@@ -1681,38 +1712,72 @@ class PhotoFrameController(
           .getOrDefault(false)
 
   /**
-   * Background-warm the video cache: for each not-yet-cached video, pull the source once, transcode
-   * it to a 1200x800 derivative, and commit it. One clip at a time (single-thread [transcodeIo]) so
-   * a wall of Portals doesn't thrash — the first loop still streams originals; every loop after is
-   * local. Guarded by [prefetchRunning] so overlapping advances don't stack workers.
+   * Background-warm the video cache: for each not-yet-cached video, pull the source once,
+   * transcode it to a screen-sized derivative, and commit it. One clip at a time (single-thread
+   * [transcodeIo]) so a wall of Portals doesn't thrash — the first loop still streams originals;
+   * every loop after is local. Guarded by [prefetchRunning] so overlapping advances don't stack
+   * workers.
+   *
+   * Warms in *playlist order from the current position* ([prefetchOrder]) so the clips about to
+   * be shown are cached first, and **stops when the cache runs out of room** ([MediaCache.hasRoom])
+   * — on an album bigger than the budget, pressing on would evict warm entries to add cold ones,
+   * turning the cache into a treadmill that re-hits the server forever.
    */
   private fun schedulePrefetch() {
     val cache = mediaCache ?: return
     val tc = transcoder ?: return
-    if (prefetchRunning) return
+    if (prefetchRunning || prefetchFull) return
+    // Snapshot playlist order + headers on the UI thread (both are mutated here only).
+    val queue = prefetchOrder(remoteUrls, remoteVideos, remoteIndex)
+    if (queue.isEmpty()) return
+    val headers = remoteHeaders
     prefetchRunning = true
-    transcodeIo.execute {
-      try {
-        for (url in remoteVideos.toList()) {
-          if (!remoteMode || Thread.currentThread().isInterrupted) break
-          if (cache.isCached(url, isVideo = true)) continue
-          val target = cache.videoFile(url)
-          val srcTmp = cache.tempFor(java.io.File(target.path + ".src"))
-          val outTmp = cache.tempFor(target)
-          try {
-            if (!downloadToFile(url, remoteHeaders, srcTmp)) continue
-            if (runCatching { tc.transcode(srcTmp, outTmp) }.getOrDefault(false)) {
-              cache.commit(outTmp, target)
+    // execute can only reject after stop() shut the executor down; reset the guard and move on.
+    runCatching {
+          transcodeIo.execute {
+            var built = 0
+            var failed = 0
+            try {
+              for (url in queue) {
+                if (!remoteMode || Thread.currentThread().isInterrupted) break
+                if (!cache.hasRoom()) {
+                  prefetchFull = true
+                  Log.i(TAG, "prefetch: cache full at ${cache.sizeBytes() / MB}MB; stopping (album larger than budget)")
+                  break
+                }
+                if (cache.isCached(url, isVideo = true)) continue
+                val target = cache.videoFile(url)
+                val srcTmp = cache.tempFor(java.io.File(target.path + ".src"))
+                val outTmp = cache.tempFor(target)
+                try {
+                  if (!downloadToFile(url, headers, srcTmp)) {
+                    failed++
+                    Log.w(TAG, "prefetch: download failed for $url")
+                    continue
+                  }
+                  if (runCatching { tc.transcode(srcTmp, outTmp) }.getOrDefault(false) &&
+                      cache.commit(outTmp, target)) {
+                    built++
+                    Log.i(
+                        TAG,
+                        "prefetch: cached ${target.name} (${srcTmp.length() / MB}MB -> ${target.length() / MB}MB)")
+                  } else {
+                    failed++ // transcode already logged its own reason under ImmortalTranscode
+                  }
+                } finally {
+                  runCatching { srcTmp.delete() }
+                  runCatching { if (outTmp.exists()) outTmp.delete() }
+                }
+              }
+            } finally {
+              prefetchRunning = false
+              if (built + failed > 0) {
+                Log.i(TAG, "prefetch pass done: $built cached, $failed failed, cache=${cache.sizeBytes() / MB}MB")
+              }
             }
-          } finally {
-            runCatching { srcTmp.delete() }
-            runCatching { if (outTmp.exists()) outTmp.delete() }
           }
         }
-      } finally {
-        prefetchRunning = false
-      }
-    }
+        .onFailure { prefetchRunning = false }
   }
 
   private val MATCH = FrameLayout.LayoutParams.MATCH_PARENT
@@ -1741,6 +1806,25 @@ class PhotoFrameController(
     }
 
     const val TAG = "ImmortalPhotoFrame"
+    const val MB = 1024L * 1024L
+    // Below this computed budget the cache isn't worth enabling: every write would evict
+    // something at least as warm, so it would only add churn. See [enableMediaCache].
+    const val MIN_CACHE_BUDGET_BYTES = 256L * 1024L * 1024L
+
+    /**
+     * The video URLs from [urls] in playlist order starting *after* [currentIndex] (wrapping),
+     * i.e. the order the slideshow will actually want them — so the prefetch worker warms the
+     * near future first, not a HashSet's arbitrary order. Skips the currently-playing index
+     * (it's already streaming; downloading it again in parallel would double the bandwidth).
+     * Tolerates currentIndex = -1 (nothing shown yet -> playlist order from the top). Pure.
+     */
+    internal fun prefetchOrder(urls: List<String>, videos: Set<String>, currentIndex: Int): List<String> {
+      if (urls.isEmpty() || videos.isEmpty()) return emptyList()
+      val start = if (currentIndex in urls.indices) currentIndex + 1 else 0
+      return (0 until urls.size - if (currentIndex in urls.indices) 1 else 0)
+          .map { urls[(start + it) % urls.size] }
+          .filter { it in videos }
+    }
     // Cap on the longest edge of any decoded photo. Full-res camera originals (tens of MP) decode
     // to bitmaps larger than the hardware Canvas can draw (~100MB), which crashes the launcher and
     // makes Android drop its default-home role. The largest Portal panel is 1920px; 2560 leaves

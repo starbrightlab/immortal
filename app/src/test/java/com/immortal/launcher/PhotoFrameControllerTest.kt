@@ -39,4 +39,32 @@ class PhotoFrameControllerTest {
     assertNull(PhotoFrameController.videoCoverSize(1920, 1080, 0, 0))
     assertNull(PhotoFrameController.videoCoverSize(-1, 1080, 1920, 1080))
   }
+
+  // --- prefetchOrder: what the cache-warming worker downloads, and in what order ---
+
+  private val urls = listOf("p0", "v1", "p2", "v3", "v4")
+  private val videos = setOf("v1", "v3", "v4")
+
+  @Test
+  fun prefetchOrder_startsAfterCurrentAndWraps() {
+    // Playing index 2 ("p2"): the playlist continues v3, v4, p0, v1 — videos only.
+    assertEquals(listOf("v3", "v4", "v1"), PhotoFrameController.prefetchOrder(urls, videos, 2))
+  }
+
+  @Test
+  fun prefetchOrder_skipsTheCurrentlyPlayingVideo() {
+    // Playing v1: it's already streaming; downloading it again would double the bandwidth.
+    assertEquals(listOf("v3", "v4"), PhotoFrameController.prefetchOrder(urls, videos, 1))
+  }
+
+  @Test
+  fun prefetchOrder_beforeFirstAdvanceUsesPlaylistOrder() {
+    assertEquals(listOf("v1", "v3", "v4"), PhotoFrameController.prefetchOrder(urls, videos, -1))
+  }
+
+  @Test
+  fun prefetchOrder_emptyInputs() {
+    assertEquals(emptyList<String>(), PhotoFrameController.prefetchOrder(emptyList(), videos, 0))
+    assertEquals(emptyList<String>(), PhotoFrameController.prefetchOrder(urls, emptySet(), 0))
+  }
 }
