@@ -682,7 +682,7 @@ class PhotoFrameController(
     return when (dayKey(millis)) {
       today -> "Today"
       tomorrow -> "Tomorrow"
-      else -> SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date(millis))
+      else -> DateFormatter.format(Date(millis), "EEEMMMd")
     }
   }
 
@@ -769,7 +769,7 @@ class PhotoFrameController(
 
     if (welcomeCfg.showDate) {
       val dateView = text(welcomeCfg.dateSize, welcomeCfg.dateColor, false)
-      dateView.text = SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(Date())
+      dateView.text = DateFormatter.format(Date(), "EEEEMMMd")
       dateView.gravity = Gravity.CENTER
       dateView.maxLines = 1
       val dateLp = LinearLayout.LayoutParams(
@@ -896,7 +896,7 @@ class PhotoFrameController(
     val now = Date()
     val clockPattern = if (ImmortalSettings.use24HourClock(context)) "H:mm" else "h:mm"
     dashClock.text = SimpleDateFormat(clockPattern, Locale.getDefault()).format(now)
-    dashDate.text = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now)
+    dashDate.text = DateFormatter.format(now, "EEEEMMMMd")
     dashWeather.text = weatherText
     dashWeather.visibility = if (weatherText.isNotBlank()) View.VISIBLE else View.GONE
     dashEvent.visibility = View.GONE

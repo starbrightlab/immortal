@@ -199,15 +199,14 @@ enum class DateFormat {
   NUMERIC_MDY,
   ISO;
 
-  /** The SimpleDateFormat pattern for this format. SHORT matches the original overlay. */
-  fun pattern(): String =
+  fun format(date: java.util.Date): String =
       when (this) {
-        SHORT -> "EEE, MMM d"
-        LONG -> "EEEE, MMMM d"
-        WRITTEN -> "EEEE, MMMM d, yyyy"
-        NUMERIC_DMY -> "dd/MM/yyyy"
-        NUMERIC_MDY -> "MM/dd/yyyy"
-        ISO -> "yyyy-MM-dd"
+        SHORT -> DateFormatter.format(date, "EEEMMMd")
+        LONG -> DateFormatter.format(date, "EEEEMMMMd")
+        WRITTEN -> DateFormatter.format(date, "yEEEEMMMMd")
+        NUMERIC_DMY -> java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(date)
+        NUMERIC_MDY -> java.text.SimpleDateFormat("MM/dd/yyyy", java.util.Locale.getDefault()).format(date)
+        ISO -> java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(date)
       }
 
   companion object {

@@ -170,7 +170,7 @@ object DigitalClockView {
       controller.flipMinute?.text = cal.get(Calendar.MINUTE).toString().padStart(2, '0')
       controller.flipSecond?.text = cal.get(Calendar.SECOND).toString().padStart(2, '0')
     }
-    controller.dateText?.text = java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.getDefault()).format(now)
+    controller.dateText?.text = DateFormatter.format(now, "EEEEMMMMd")
   }
 
   private fun buildDateView(context: Context, settings: DigitalClockConfig.Settings, color: Int): TextView {

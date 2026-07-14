@@ -1502,7 +1502,7 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
         }
       }
       Text(
-          SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(now),
+          DateFormatter.format(now, "EEEEMMMMd"),
           color = Color(0xFFDADADA),
           fontSize = 18.sp,
           modifier = Modifier.padding(top = 4.dp),

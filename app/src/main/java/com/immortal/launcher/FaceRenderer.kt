@@ -530,7 +530,7 @@ class FaceRenderer(
           clockFace?.update(now, blinkOn)
           if (face.clock.showDate)
               dateView?.text =
-                  SimpleDateFormat(face.clock.dateFormat.pattern(), Locale.getDefault()).format(now)
+                  face.clock.dateFormat.format(now)
           val (pct, charging) = batteryInfo()
           val hasBattery = pct >= 0
           batteryView?.text = if (hasBattery) (if (charging) "$pct% ⚡" else "$pct%") else ""
