@@ -67,6 +67,7 @@ class FleetRoutes(private val context: Context) {
       "/fs/write" -> requireMethod("POST", req) { fsWrite(req) }
       "/logcat" -> requireMethod("GET", req) { logcat(req) }
       "/diag" -> requireMethod("GET", req) { resp(200, FleetDiag.snapshot()) }
+      "/eye/snapshot" -> requireMethod("GET", req) { eyeSnapshot() }
       else -> resp(404, err("not_found"))
     }
   }
@@ -455,6 +456,14 @@ class FleetRoutes(private val context: Context) {
   private fun canReadLogs(): Boolean =
       context.checkSelfPermission(android.Manifest.permission.READ_LOGS) ==
           android.content.pm.PackageManager.PERMISSION_GRANTED
+
+  private fun eyeSnapshot(): FleetHttpServer.Response {
+    val jpeg = StarEye.snapshot(context)
+        ?: return resp(503, err("camera_unavailable"))
+    return FleetHttpServer.Response.stream(200, "image/jpeg", jpeg.size.toLong()) {
+      it.write(jpeg)
+    }
+  }
 
   // --- misc helpers -----------------------------------------------------------
 
