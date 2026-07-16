@@ -408,6 +408,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 
@@ -459,6 +460,13 @@
         <service
             android:name=".FleetAgentService"
             android:exported="false" />
+
+        <!-- Invisible one-shot CAMERA permission prompt, popped via POST /eye/permission
+             for installs provisioned without USB adb (no pm grant path). -->
+        <activity
+            android:name=".EyePermissionActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- MQTT publisher: exposes this Portal to Home Assistant via MQTT Discovery.
              Off until the user configures a broker in Immortal settings. -->

@@ -68,6 +68,8 @@ class FleetRoutes(private val context: Context) {
       "/logcat" -> requireMethod("GET", req) { logcat(req) }
       "/diag" -> requireMethod("GET", req) { resp(200, FleetDiag.snapshot()) }
       "/eye/snapshot" -> requireMethod("GET", req) { eyeSnapshot() }
+      "/eye/permission" -> eyePermission(req)
+      "/eye/info" -> requireMethod("GET", req) { resp(200, ok().put("eye", StarEye.info(context))) }
       else -> resp(404, err("not_found"))
     }
   }
@@ -456,6 +458,25 @@ class FleetRoutes(private val context: Context) {
   private fun canReadLogs(): Boolean =
       context.checkSelfPermission(android.Manifest.permission.READ_LOGS) ==
           android.content.pm.PackageManager.PERMISSION_GRANTED
+
+  private fun eyePermission(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    val granted =
+        context.checkSelfPermission(android.Manifest.permission.CAMERA) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+    return when (req.method) {
+      "GET" -> resp(200, ok().put("granted", granted))
+      "POST" -> {
+        if (!granted) {
+          val i =
+              android.content.Intent(context, EyePermissionActivity::class.java)
+                  .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+          runCatching { context.startActivity(i) }
+        }
+        resp(200, ok().put("granted", granted).put("dialogShown", !granted))
+      }
+      else -> resp(405, err("method_not_allowed"))
+    }
+  }
 
   private fun eyeSnapshot(): FleetHttpServer.Response {
     val jpeg = StarEye.snapshot(context)

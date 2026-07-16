@@ -57,6 +57,11 @@ object FleetConfig {
 
   fun port(c: Context): Int = prefs(c).getInt("port", DEFAULT_PORT)
 
+  fun setPort(c: Context, port: Int) {
+    prefs(c).edit().putInt("port", port).apply()
+    writeManifest(c)
+  }
+
   /**
    * The bearer token every request must carry. Generated once (SecureRandom, 32
    * hex chars) on first read and persisted, so it's stable for the kit/inventory.
@@ -112,7 +117,7 @@ object FleetConfig {
   }
 
   /**
-   * Apply a kit-written `provision.json` (`{name?, enabled?}`) if present, then
+   * Apply a kit-written `provision.json` (`{name?, enabled?, port?}`) if present, then
    * delete it. Called from [FleetAgentService.ensureRunning] on start/boot.
    * Returns true if a file was found and consumed.
    */
@@ -122,6 +127,7 @@ object FleetConfig {
     runCatching {
       val o = JSONObject(f.readText())
       if (o.has("name")) setName(c, o.getString("name"))
+      if (o.has("port")) setPort(c, o.getInt("port"))
       if (o.has("enabled")) setEnabled(c, o.getBoolean("enabled"))
       // Once enabled, force a token to exist so the manifest carries it for the kit.
       if (isEnabled(c)) token(c)

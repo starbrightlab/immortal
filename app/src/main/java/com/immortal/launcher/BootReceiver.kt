@@ -16,6 +16,13 @@ import android.os.Looper
 /** Re-asserts our screensaver settings after a reboot. */
 class BootReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
+    if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+      // After a fleet-pushed update the process is killed; bring the agent back
+      // without requiring someone to physically tap the launcher icon.
+      FleetAgentService.ensureRunning(context)
+      MqttService.sync(context)
+      return
+    }
     if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
       SettingsGuard.reaffirmAdb(context)
       SettingsGuard.reaffirmScreensaver(context)

@@ -18,6 +18,9 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.params.StreamConfigurationMap
+import android.graphics.Rect
+import android.graphics.YuvImage
+import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
@@ -52,9 +55,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object StarEye {
   private const val TAG = "ImmortalStarEye"
-  private const val WIDTH = 1280
-  private const val HEIGHT = 720
+  // VGA — the Portal+ HAL threw fatal device errors (error 3) on a 1280x720
+  // YUV stream; 640x480 matches the class of stream GestureCamera runs reliably.
+  private const val WIDTH = 640
+  private const val HEIGHT = 480
   private const val TIMEOUT_MS = 5000L
+  private const val SKIP_FRAMES = 2
 
   /** Concurrency guard — only one snapshot at a time. */
   private val busy = AtomicBoolean(false)
@@ -76,10 +82,32 @@ object StarEye {
       return null
     }
     try {
+      // Legacy Camera1 first — this HAL is LEGACY-level (hwLevel 0) and the
+      // Camera2 shim dies with fatal error 3 mid-capture. Each attempt gets its
+      // own foreground kick: the camera service refuses background opens and a
+      // single kick expires before a second attempt starts.
+      kickForeground(context)
+      snapshotCamera1()?.let { return it }
+      kickForeground(context)
       return doSnapshot(context)
     } finally {
       busy.set(false)
     }
+  }
+
+  /**
+   * Bring the app briefly to TOP via an invisible activity so the camera
+   * service will grant the open (see [EyePermissionActivity]). Blocks ~900ms
+   * to let the activity reach resumed state before the capture starts.
+   */
+  private fun kickForeground(context: Context) {
+    val i =
+        android.content.Intent(context, EyePermissionActivity::class.java)
+            .putExtra(EyePermissionActivity.EXTRA_KICK, true)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(i) }
+        .onFailure { Log.w(TAG, "foreground kick failed", it) }
+    runCatching { Thread.sleep(900) }
   }
 
   @Suppress("MissingPermission")
@@ -94,22 +122,28 @@ object StarEye {
     var result: ByteArray? = null
     var device: CameraDevice? = null
     var session: CameraCaptureSession? = null
-    val reader = pickJpegSize(manager, cameraId).let { size ->
-      ImageReader.newInstance(size.width, size.height, ImageFormat.JPEG, 2)
+    var framesSeen = 0
+    // YUV stream + software JPEG encode. The Portal+ HAL (aloha, API 28) never
+    // delivers JPEG-format frames — both one-shot still captures and repeating
+    // JPEG requests fail with reason=0. YUV_420_888 preview is the path
+    // GestureCamera already uses successfully on this hardware.
+    val reader = pickYuvSize(manager, cameraId).let { size ->
+      ImageReader.newInstance(size.width, size.height, ImageFormat.YUV_420_888, 2)
     }
 
     reader.setOnImageAvailableListener({ r ->
       val image = runCatching { r.acquireLatestImage() }.getOrNull() ?: return@setOnImageAvailableListener
       try {
-        val buf = image.planes[0].buffer
-        val bytes = ByteArray(buf.remaining())
-        buf.get(bytes)
-        result = bytes
+        // Skip the first frames so auto-exposure settles — frame 0 is often black.
+        if (framesSeen++ >= SKIP_FRAMES && result == null) {
+          result = yuvToJpeg(image, 85)
+          latch.countDown()
+        }
       } catch (t: Throwable) {
         Log.w(TAG, "read image failed", t)
+        latch.countDown()
       } finally {
         runCatching { image.close() }
-        latch.countDown()
       }
     }, handler)
 
@@ -123,15 +157,23 @@ object StarEye {
                 override fun onConfigured(s: CameraCaptureSession) {
                   session = s
                   runCatching {
-                    val req = camera.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
+                    // Deliberately identical to GestureCamera's request — the one
+                    // shape known to run on this HAL.
+                    val req = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                       addTarget(reader.surface)
-                      set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
                       set(CaptureRequest.CONTROL_AF_MODE,
                           CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-                      set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
-                      set(CaptureRequest.JPEG_QUALITY, 85.toByte())
                     }
-                    s.capture(req.build(), null, handler)
+                    s.setRepeatingRequest(req.build(),
+                        object : CameraCaptureSession.CaptureCallback() {
+                          override fun onCaptureFailed(
+                              sess: CameraCaptureSession,
+                              request: CaptureRequest,
+                              failure: android.hardware.camera2.CaptureFailure
+                          ) {
+                            Log.w(TAG, "capture failed: reason=${failure.reason}")
+                          }
+                        }, handler)
                   }.onFailure {
                     Log.w(TAG, "capture failed", it); latch.countDown()
                   }
@@ -171,16 +213,132 @@ object StarEye {
       } ?: manager.cameraIdList.firstOrNull()
 
   /**
-   * Pick a JPEG output size close to [WIDTH]×[HEIGHT] — not every camera
+   * Pick a YUV output size close to [WIDTH]×[HEIGHT] — not every camera
    * supports arbitrary sizes, so fall back to the nearest available.
    */
-  private fun pickJpegSize(manager: CameraManager, cameraId: String): Size {
+  private fun pickYuvSize(manager: CameraManager, cameraId: String): Size {
     val cfg = manager.getCameraCharacteristics(cameraId)
         .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) as? StreamConfigurationMap
-    val sizes = cfg?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray<Size>()
+    val sizes = cfg?.getOutputSizes(ImageFormat.YUV_420_888) ?: emptyArray<Size>()
     if (sizes.isEmpty()) return Size(WIDTH, HEIGHT)
     // Nearest by pixel-count difference from target.
     val target = WIDTH.toLong() * HEIGHT.toLong()
     return sizes.minByOrNull { kotlin.math.abs(it.width.toLong() * it.height.toLong() - target) }!!
+  }
+
+  /** Camera characteristics dump for `GET /eye/info` — debugging aid. */
+  fun info(context: Context): org.json.JSONObject {
+    val out = org.json.JSONObject()
+    runCatching {
+      val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+      val cams = org.json.JSONArray()
+      for (id in manager.cameraIdList) {
+        val ch = manager.getCameraCharacteristics(id)
+        val cfg = ch.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) as? StreamConfigurationMap
+        cams.put(
+            org.json.JSONObject()
+                .put("id", id)
+                .put("facing", ch.get(CameraCharacteristics.LENS_FACING))
+                .put("hwLevel", ch.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL))
+                .put("yuvSizes",
+                    (cfg?.getOutputSizes(ImageFormat.YUV_420_888) ?: emptyArray())
+                        .take(6).joinToString(",")))
+      }
+      out.put("camera2", cams)
+    }.onFailure { out.put("camera2Error", it.toString()) }
+    @Suppress("DEPRECATION")
+    runCatching { out.put("camera1Count", android.hardware.Camera.getNumberOfCameras()) }
+        .onFailure { out.put("camera1Error", it.toString()) }
+    return out
+  }
+
+  /** Legacy android.hardware.Camera capture — fallback for broken Camera2 HALs. */
+  @Suppress("DEPRECATION")
+  private fun snapshotCamera1(): ByteArray? {
+    var camId = 0
+    val info = android.hardware.Camera.CameraInfo()
+    for (i in 0 until android.hardware.Camera.getNumberOfCameras()) {
+      android.hardware.Camera.getCameraInfo(i, info)
+      if (info.facing == android.hardware.Camera.CameraInfo.CAMERA_FACING_FRONT) {
+        camId = i
+        break
+      }
+    }
+    val cam = runCatching { android.hardware.Camera.open(camId) }
+        .onFailure { Log.w(TAG, "camera1 open failed", it) }
+        .getOrNull() ?: return null
+    try {
+      val params = cam.parameters
+      val target = WIDTH * HEIGHT
+      val size = params.supportedPreviewSizes
+          .minByOrNull { kotlin.math.abs(it.width * it.height - target) } ?: return null
+      params.setPreviewSize(size.width, size.height)
+      params.previewFormat = ImageFormat.NV21
+      cam.parameters = params
+
+      val latch = CountDownLatch(1)
+      var jpeg: ByteArray? = null
+      var frames = 0
+      cam.setPreviewTexture(android.graphics.SurfaceTexture(0))
+      cam.setPreviewCallback { data, c ->
+        if (data != null && frames++ >= SKIP_FRAMES && jpeg == null) {
+          runCatching {
+            val s = c.parameters.previewSize
+            val out = java.io.ByteArrayOutputStream()
+            YuvImage(data, ImageFormat.NV21, s.width, s.height, null)
+                .compressToJpeg(Rect(0, 0, s.width, s.height), 85, out)
+            jpeg = out.toByteArray()
+          }.onFailure { Log.w(TAG, "camera1 encode failed", it) }
+          latch.countDown()
+        }
+      }
+      cam.startPreview()
+      val landed = runCatching { latch.await(TIMEOUT_MS, TimeUnit.MILLISECONDS) }.getOrDefault(false)
+      if (!landed) Log.w(TAG, "camera1 snapshot timed out after ${TIMEOUT_MS}ms")
+      cam.setPreviewCallback(null)
+      runCatching { cam.stopPreview() }
+      return jpeg
+    } catch (t: Throwable) {
+      Log.w(TAG, "camera1 snapshot failed", t)
+      return null
+    } finally {
+      runCatching { cam.release() }
+    }
+  }
+
+  /** YUV_420_888 → NV21 → JPEG via [YuvImage]. Handles row/pixel strides. */
+  private fun yuvToJpeg(image: Image, quality: Int): ByteArray {
+    val w = image.width
+    val h = image.height
+    val nv21 = ByteArray(w * h * 3 / 2)
+
+    // Y plane, row by row (rowStride may exceed width).
+    val y = image.planes[0]
+    var out = 0
+    val yBuf = y.buffer
+    for (row in 0 until h) {
+      yBuf.position(row * y.rowStride)
+      yBuf.get(nv21, out, w)
+      out += w
+    }
+
+    // Interleave VU (NV21 order) from the U and V planes, honouring pixelStride.
+    val u = image.planes[1]
+    val v = image.planes[2]
+    val uBuf = u.buffer
+    val vBuf = v.buffer
+    val cw = w / 2
+    val ch = h / 2
+    for (row in 0 until ch) {
+      for (col in 0 until cw) {
+        nv21[out++] = vBuf.get(row * v.rowStride + col * v.pixelStride)
+        nv21[out++] = uBuf.get(row * u.rowStride + col * u.pixelStride)
+      }
+    }
+
+    val jpeg = java.io.ByteArrayOutputStream()
+    YuvImage(nv21, ImageFormat.NV21, w, h, null)
+        .compressToJpeg(Rect(0, 0, w, h), quality, jpeg)
+    return jpeg.toByteArray()
   }
 }
