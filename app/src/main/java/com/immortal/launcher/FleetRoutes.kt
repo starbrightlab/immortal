@@ -8,6 +8,7 @@
 package com.immortal.launcher
 
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -301,6 +302,19 @@ class FleetRoutes(private val context: Context) {
       "identify" -> {
         identify()
         resp(200, ok().put("action", "identify"))
+      }
+      // Star embodiment: bring the native face scene to the screen / send it home.
+      "starface" -> {
+        context.startActivity(
+            Intent(context, StarFaceActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        resp(200, ok().put("action", "starface"))
+      }
+      "home" -> {
+        context.startActivity(
+            Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        resp(200, ok().put("action", "home"))
       }
       // Needs the signature/privileged REBOOT permission we don't hold — report honestly.
       "reboot" -> resp(200, JSONObject().put("ok", false).put("action", "reboot").put("result", "not_permitted"))

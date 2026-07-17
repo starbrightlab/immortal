@@ -468,6 +468,15 @@
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- Star's native face: fullscreen breathing-orb scene driven by the live
+             pipeline state. Launched remotely via fleet POST /action "starface". -->
+        <activity
+            android:name=".StarFaceActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- MQTT publisher: exposes this Portal to Home Assistant via MQTT Discovery.
              Off until the user configures a broker in Immortal settings. -->
         <service
