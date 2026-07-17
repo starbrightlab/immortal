@@ -83,6 +83,7 @@ nav:
   - Hardware limitations: limitations.md
   - For developers:
       - Releasing: releasing.md
+      - Side-by-side installs (LIFEBOAT): lifeboat.md
       - Submitting an app: submitting-apps.md
   - Design notes:
       - Multi-room audio: design/multi-room-audio.md

@@ -77,6 +77,8 @@ android {
     debug {
       // Lets a debug build install alongside a provisioned release for testing.
       applicationIdSuffix = ".debug"
+      // Distinct launcher label so two side-by-side Immortals are tellable apart.
+      resValue("string", "app_name", "Immortal LIFEBOAT")
     }
     // Release-faithful iteration build. Same applicationId + same signing key + minify off
     // (inherited from release via initWith), so it provisions identically — home role, device
@@ -95,7 +97,10 @@ android {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
-  buildFeatures { compose = true }
+  buildFeatures {
+    compose = true
+    resValues = true
+  }
 }
 
 dependencies {

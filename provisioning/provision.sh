@@ -17,6 +17,8 @@
 #                             use the Shizuku API, e.g. Aurora's Shizuku mode)
 #   ./provision.sh --fleet    enable the WiFi fleet agent and record this device
 #                             for the laptop fleet tool (the persistent channel)
+#   ./provision.sh --grants   (re)apply just the adb-granted permissions + appops +
+#                             install auto-confirm (e.g. after reinstalling the APK)
 #   ./provision.sh --wifi-adb on-demand raw adb-over-WiFi for shell/scrcpy (temp;
 #                             pauses Shizuku, resets on reboot)
 #   ./provision.sh --alexa    restore the original Amazon Alexa app; the "hey"
@@ -339,6 +341,18 @@ grant_perms() {
   # also self-enables on launch (WRITE_SECURE_SETTINGS), so this is belt-and-braces.
   a shell cmd notification allow_listener \
     "$PKG/com.immortal.launcher.MediaNotificationListenerService" >/dev/null 2>&1 || true
+  # Enroll InstallConfirmService as an accessibility service so the fleet agent's
+  # installs auto-confirm the system dialog (autoConfirm:true in /info) — without it
+  # every WiFi-pushed install waits on a physical tap. Appended, not overwritten:
+  # Meta's own accessibility services (key events, presence touch) must keep running.
+  local svc="$PKG/$PKG.InstallConfirmService" cur
+  cur="$(a shell settings get secure enabled_accessibility_services | tr -d '\r')"
+  case "$cur" in
+    *"$svc"*) : ;;
+    null|"") a shell settings put secure enabled_accessibility_services "$svc" >/dev/null 2>&1 ;;
+    *) a shell settings put secure enabled_accessibility_services "$cur:$svc" >/dev/null 2>&1 ;;
+  esac
+  a shell settings put secure accessibility_enabled 1 >/dev/null 2>&1
   ok "Permissions granted"
 }
 
@@ -945,6 +959,7 @@ case "${1:-}" in
   --overlay-fix) resolve_adb; wait_for_device; disable_installer_overlay ;;
   --shizuku|-z) resolve_adb; wait_for_device; start_shizuku ;;
   --fleet|-f)   resolve_adb; wait_for_device; enable_fleet ;;
+  --grants|-g)  resolve_adb; wait_for_device; grant_perms ;;
   --wifi-adb)   enable_wifi_adb_now ;;
   --alexa|-A)   resolve_adb; wait_for_device; restore_alexa ;;
   --update-hey) do_update_hey ;;
