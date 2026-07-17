@@ -221,11 +221,34 @@ fun StarFaceScreen(state: StarLive.State, detail: String?) {
           animationSpec = tween(1100),
           label = "core")
 
+  // Upper-right clock + date, ticking once a second.
+  var clock by remember { mutableStateOf(clockNow()) }
+  LaunchedEffect(Unit) {
+    while (isActive) {
+      clock = clockNow()
+      delay(1000)
+    }
+  }
+
   Box(Modifier.fillMaxSize().background(Color(0xFF04060D))) {
     Canvas(Modifier.fillMaxSize()) {
       drawStarfield(stars, t)
       drawPortrait(t, state, shown, previous, fade, core)
     }
+    Text(
+        text = clock.first,
+        color = Color.White.copy(alpha = 0.78f),
+        fontSize = 46.sp,
+        fontWeight = FontWeight.Light,
+        letterSpacing = 2.sp,
+        modifier = Modifier.align(Alignment.TopEnd).padding(top = 20.dp, end = 30.dp))
+    Text(
+        text = clock.second,
+        color = Color.White.copy(alpha = 0.45f),
+        fontSize = 18.sp,
+        fontWeight = FontWeight.Light,
+        letterSpacing = 2.sp,
+        modifier = Modifier.align(Alignment.TopEnd).padding(top = 82.dp, end = 31.dp))
     Text(
         text = buildString {
           append(
@@ -246,6 +269,14 @@ fun StarFaceScreen(state: StarLive.State, detail: String?) {
         letterSpacing = 3.sp,
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp))
   }
+}
+
+/** ("6:32 PM", "Fri · Jul 17") in the device's local timezone. */
+private fun clockNow(): Pair<String, String> {
+  val now = java.util.Calendar.getInstance()
+  val time = java.text.SimpleDateFormat("h:mm a", java.util.Locale.US).format(now.time)
+  val date = java.text.SimpleDateFormat("EEE · MMM d", java.util.Locale.US).format(now.time)
+  return time to date
 }
 
 private fun DrawScope.drawStarfield(stars: List<Star>, t: Float) {
