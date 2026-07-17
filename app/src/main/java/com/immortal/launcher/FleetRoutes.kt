@@ -71,6 +71,9 @@ class FleetRoutes(private val context: Context) {
       "/eye/snapshot" -> requireMethod("GET", req) { eyeSnapshot() }
       "/eye/permission" -> eyePermission(req)
       "/eye/info" -> requireMethod("GET", req) { resp(200, ok().put("eye", StarEye.info(context))) }
+      "/ear/stream" -> requireMethod("GET", req) { earStream() }
+      "/speak" -> speak(req)
+      "/play" -> play(req)
       else -> resp(404, err("not_found"))
     }
   }
@@ -499,6 +502,71 @@ class FleetRoutes(private val context: Context) {
       it.write(jpeg)
     }
   }
+
+  /** Unbounded raw-PCM mic stream (16 kHz mono s16le) — ends on client disconnect. */
+  private fun earStream(): FleetHttpServer.Response {
+    if (!StarEar.hasPermission(context)) return resp(403, err("no_mic_permission"))
+    if (StarEar.isBusy()) return resp(409, err("mic_busy"))
+    return FleetHttpServer.Response.stream(
+        200, "audio/l16; rate=${StarEar.SAMPLE_RATE}; channels=1", -1) { out ->
+          StarEar.stream(out)
+        }
+  }
+
+  /** POST body = WAV bytes → play through the Portal speakers; GET → {"playing"}. */
+  private fun play(req: FleetHttpServer.Request): FleetHttpServer.Response =
+      when (req.method) {
+        "GET" -> resp(200, ok().put("playing", StarVoice.playing))
+        "POST" -> {
+          val f = File(context.cacheDir, "star-play-${System.currentTimeMillis()}.wav")
+          try {
+            val written = f.outputStream().use { req.streamBodyTo(it) }
+            if (written <= 44L) {
+              runCatching { f.delete() }
+              resp(400, err("empty_audio"))
+            } else {
+              val error = StarVoice.play(f)
+              if (error == null) resp(200, ok().put("playing", true).put("bytes", written))
+              else {
+                runCatching { f.delete() }
+                resp(503, err(error))
+              }
+            }
+          } catch (t: Throwable) {
+            runCatching { f.delete() }
+            resp(500, err("upload_failed"))
+          }
+        }
+        else -> resp(405, err("method_not_allowed"))
+      }
+
+  /** POST {"text","rate"?,"pitch"?} → native TTS; GET → {"speaking"}; DELETE-ish via {"stop":true}. */
+  private fun speak(req: FleetHttpServer.Request): FleetHttpServer.Response =
+      when (req.method) {
+        "GET" -> resp(200, ok().put("speaking", StarVoice.speaking))
+        "POST" -> {
+          val body = parseJson(req.bodyText())
+          if (body == null) resp(400, err("bad_json"))
+          else if (body.optBoolean("stop", false)) {
+            StarVoice.stop()
+            resp(200, ok().put("stopped", true))
+          } else {
+            val text = body.optString("text")
+            if (text.isBlank()) resp(400, err("text_required"))
+            else {
+              val error =
+                  StarVoice.speak(
+                      context,
+                      text,
+                      body.optDouble("rate", 1.0).toFloat(),
+                      body.optDouble("pitch", 1.0).toFloat())
+              if (error == null) resp(200, ok().put("speaking", true))
+              else resp(503, err(error))
+            }
+          }
+        }
+        else -> resp(405, err("method_not_allowed"))
+      }
 
   // --- misc helpers -----------------------------------------------------------
 

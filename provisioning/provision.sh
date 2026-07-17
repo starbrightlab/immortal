@@ -316,6 +316,8 @@ grant_perms() {
   # StarEye: the fleet agent's /eye/snapshot camera capture. Runtime permission,
   # so an uninstall/reinstall silently loses it (bit us 2026-07-17) — re-grant here.
   a shell pm grant "$PKG" android.permission.CAMERA >/dev/null 2>&1
+  # StarEar: the fleet agent's /ear/stream mic capture — same runtime-permission trap.
+  a shell pm grant "$PKG" android.permission.RECORD_AUDIO >/dev/null 2>&1
   # Lets Immortal bring the photo frame back instantly when the system force-wakes
   # the screensaver (~2 min in, a quirk of Meta's power manager) even if another
   # app is in the foreground. SYSTEM_ALERT_WINDOW holders may start activities
