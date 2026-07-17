@@ -98,7 +98,10 @@ class StarFaceActivity : ComponentActivity() {
           if (ts.isEmpty() || ts != lastTs) {
             lastTs = ts
             state = StarLive.State.parse(payload.optString("state"))
-            detail = payload.optString("detail").ifBlank { null }
+            // optString turns a JSON null into the literal string "null"
+            detail =
+                if (payload.isNull("detail")) null
+                else payload.optString("detail").ifBlank { null }
           }
         }
         delay(POLL_MS)
