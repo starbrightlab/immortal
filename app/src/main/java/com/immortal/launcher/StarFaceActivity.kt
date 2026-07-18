@@ -251,9 +251,24 @@ fun StarFaceScreen(state: StarLive.State, detail: String?) {
 
   val stars = remember { makeStarfield(140, seed = 7) }
 
-  val idleArt = ImageBitmap.imageResource(R.drawable.star_idle)
-  val thinkingArt = ImageBitmap.imageResource(R.drawable.star_thinking)
-  val speakingArt = ImageBitmap.imageResource(R.drawable.star_speaking)
+  // Two cap wardrobes — Eagles on even hours, Phillies on odd. The hour is
+  // re-checked once a minute; the existing crossfade makes the swap gentle.
+  var phillies by remember { mutableStateOf(hourIsOdd()) }
+  LaunchedEffect(Unit) {
+    while (isActive) {
+      phillies = hourIsOdd()
+      delay(60 * 1000L)
+    }
+  }
+
+  val idleArt =
+      ImageBitmap.imageResource(if (phillies) R.drawable.star_idle_phillies else R.drawable.star_idle)
+  val thinkingArt =
+      ImageBitmap.imageResource(
+          if (phillies) R.drawable.star_thinking_phillies else R.drawable.star_thinking)
+  val speakingArt =
+      ImageBitmap.imageResource(
+          if (phillies) R.drawable.star_speaking_phillies else R.drawable.star_speaking)
   val art =
       when (state) {
         StarLive.State.THINKING -> thinkingArt
@@ -376,6 +391,9 @@ fun StarFaceScreen(state: StarLive.State, detail: String?) {
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp))
   }
 }
+
+private fun hourIsOdd(): Boolean =
+    java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) % 2 == 1
 
 /** ("6:32 PM", "Fri · Jul 17") in the device's local timezone. */
 private fun clockNow(): Pair<String, String> {
