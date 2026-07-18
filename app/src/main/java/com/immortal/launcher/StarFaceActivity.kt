@@ -154,6 +154,68 @@ object StarLive {
           .getOrNull()
 }
 
+// --- air quality -----------------------------------------------------------
+
+/** One location's current reading from Open-Meteo's keyless air-quality API. */
+data class AqiReading(val label: String, val aqi: Int, val pm25: Int)
+
+object AirQuality {
+  // Same two spots as the SPA's AirQualityCard and the wake-turn weather
+  // context: home and the beach house.
+  private val SPOTS =
+      listOf(
+          Triple("Lehman PA", 41.32, -76.02),
+          Triple("Lewes DE", 38.77, -75.14))
+
+  fun fetch(): List<AqiReading> =
+      SPOTS.mapNotNull { (label, lat, lon) ->
+        runCatching {
+              val url =
+                  URL(
+                      "https://air-quality-api.open-meteo.com/v1/air-quality" +
+                          "?latitude=$lat&longitude=$lon" +
+                          "&current=us_aqi,pm2_5&timezone=America%2FNew_York")
+              val conn = url.openConnection() as HttpURLConnection
+              conn.connectTimeout = 5000
+              conn.readTimeout = 5000
+              try {
+                if (conn.responseCode != 200) return@runCatching null
+                val cur =
+                    JSONObject(conn.inputStream.bufferedReader().readText())
+                        .optJSONObject("current") ?: return@runCatching null
+                AqiReading(
+                    label,
+                    cur.optDouble("us_aqi", Double.NaN).takeIf { !it.isNaN() }?.toInt()
+                        ?: return@runCatching null,
+                    cur.optDouble("pm2_5", 0.0).toInt())
+              } finally {
+                conn.disconnect()
+              }
+            }
+            .getOrNull()
+      }
+
+  fun bandColor(aqi: Int): Color =
+      when {
+        aqi <= 50 -> Color(0xFF4ADE80)
+        aqi <= 100 -> Color(0xFFFACC15)
+        aqi <= 150 -> Color(0xFFFB923C)
+        aqi <= 200 -> Color(0xFFF87171)
+        aqi <= 300 -> Color(0xFFC084FC)
+        else -> Color(0xFFE879F9)
+      }
+
+  fun bandName(aqi: Int): String =
+      when {
+        aqi <= 50 -> "good"
+        aqi <= 100 -> "moderate"
+        aqi <= 150 -> "unhealthy (sensitive)"
+        aqi <= 200 -> "unhealthy"
+        aqi <= 300 -> "very unhealthy"
+        else -> "hazardous"
+      }
+}
+
 // --- scene ---------------------------------------------------------------
 
 private class Star(val x: Float, val y: Float, val r: Float, val phase: Float, val speed: Float)
@@ -230,10 +292,47 @@ fun StarFaceScreen(state: StarLive.State, detail: String?) {
     }
   }
 
+  // Upper-left air quality, refreshed every 30 min (Open-Meteo caps free
+  // usage generously; two calls per refresh is nothing).
+  var aqi by remember { mutableStateOf<List<AqiReading>>(emptyList()) }
+  LaunchedEffect(Unit) {
+    while (isActive) {
+      val readings = withContext(Dispatchers.IO) { AirQuality.fetch() }
+      if (readings.isNotEmpty()) aqi = readings
+      delay(30 * 60 * 1000L)
+    }
+  }
+
   Box(Modifier.fillMaxSize().background(Color(0xFF04060D))) {
     Canvas(Modifier.fillMaxSize()) {
       drawStarfield(stars, t)
       drawPortrait(t, state, shown, previous, fade, core)
+    }
+    if (aqi.isNotEmpty()) {
+      androidx.compose.foundation.layout.Column(
+          modifier = Modifier.align(Alignment.TopStart).padding(top = 24.dp, start = 30.dp)) {
+        Text(
+            text = "AIR QUALITY",
+            color = Color.White.copy(alpha = 0.40f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            letterSpacing = 3.sp)
+        for (r in aqi) {
+          Text(
+              text = "${r.aqi}  ${r.label}",
+              color = AirQuality.bandColor(r.aqi).copy(alpha = 0.85f),
+              fontSize = 24.sp,
+              fontWeight = FontWeight.Light,
+              letterSpacing = 1.sp,
+              modifier = Modifier.padding(top = 8.dp))
+          Text(
+              text = "${AirQuality.bandName(r.aqi)} · pm2.5 ${r.pm25}",
+              color = Color.White.copy(alpha = 0.38f),
+              fontSize = 13.sp,
+              fontWeight = FontWeight.Light,
+              letterSpacing = 1.5.sp)
+        }
+      }
     }
     Text(
         text = clock.first,
