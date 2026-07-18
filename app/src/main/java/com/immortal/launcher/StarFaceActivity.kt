@@ -169,7 +169,7 @@ object AirQuality {
 
   fun fetch(): List<AqiReading> =
       SPOTS.mapNotNull { (label, lat, lon) ->
-        runCatching {
+        runCatching<AqiReading?> {
               val url =
                   URL(
                       "https://air-quality-api.open-meteo.com/v1/air-quality" +
@@ -179,7 +179,10 @@ object AirQuality {
               conn.connectTimeout = 5000
               conn.readTimeout = 5000
               try {
-                if (conn.responseCode != 200) return@runCatching null
+                if (conn.responseCode != 200) {
+                  android.util.Log.w("StarFaceAqi", "$label: HTTP ${conn.responseCode}")
+                  return@runCatching null
+                }
                 val cur =
                     JSONObject(conn.inputStream.bufferedReader().readText())
                         .optJSONObject("current") ?: return@runCatching null
@@ -293,13 +296,17 @@ fun StarFaceScreen(state: StarLive.State, detail: String?) {
   }
 
   // Upper-left air quality, refreshed every 30 min (Open-Meteo caps free
-  // usage generously; two calls per refresh is nothing).
+  // usage generously; two calls per refresh is nothing). Until the first
+  // successful fetch, retry every 30s so a transient network hiccup at
+  // launch doesn't blank the widget for half an hour.
   var aqi by remember { mutableStateOf<List<AqiReading>>(emptyList()) }
   LaunchedEffect(Unit) {
     while (isActive) {
       val readings = withContext(Dispatchers.IO) { AirQuality.fetch() }
+      android.util.Log.i("StarFaceAqi", "fetched ${readings.size} readings: " +
+          readings.joinToString { "${it.label}=${it.aqi}" })
       if (readings.isNotEmpty()) aqi = readings
-      delay(30 * 60 * 1000L)
+      delay(if (aqi.isEmpty()) 30 * 1000L else 30 * 60 * 1000L)
     }
   }
 
