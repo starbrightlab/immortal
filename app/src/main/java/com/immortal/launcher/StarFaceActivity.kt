@@ -320,22 +320,22 @@ fun StarFaceScreen(state: StarLive.State, detail: String?) {
           modifier = Modifier.align(Alignment.TopStart).padding(top = 24.dp, start = 30.dp)) {
         Text(
             text = "AIR QUALITY",
-            color = Color.White.copy(alpha = 0.40f),
-            fontSize = 13.sp,
+            color = Color.White.copy(alpha = 0.45f),
+            fontSize = 18.sp,
             fontWeight = FontWeight.Light,
-            letterSpacing = 3.sp)
+            letterSpacing = 4.sp)
         for (r in aqi) {
           Text(
               text = "${r.aqi}  ${r.label}",
-              color = AirQuality.bandColor(r.aqi).copy(alpha = 0.85f),
-              fontSize = 24.sp,
+              color = AirQuality.bandColor(r.aqi).copy(alpha = 0.90f),
+              fontSize = 40.sp,
               fontWeight = FontWeight.Light,
               letterSpacing = 1.sp,
-              modifier = Modifier.padding(top = 8.dp))
+              modifier = Modifier.padding(top = 12.dp))
           Text(
               text = "${AirQuality.bandName(r.aqi)} · pm2.5 ${r.pm25}",
-              color = Color.White.copy(alpha = 0.38f),
-              fontSize = 13.sp,
+              color = Color.White.copy(alpha = 0.45f),
+              fontSize = 18.sp,
               fontWeight = FontWeight.Light,
               letterSpacing = 1.5.sp)
         }
