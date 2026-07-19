@@ -9,9 +9,14 @@ package com.immortal.launcher
 
 import android.util.Base64
 import android.util.Log
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.net.URL
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -30,7 +35,13 @@ import org.json.JSONObject
  * access_token lives in memory only (short-lived, ~1h), refreshed on demand.
  */
 object SpotifyClient {
-  const val REDIRECT_URI = "stargazer-star://spotify-callback"
+  /** RFC 8252 native-app flow: loopback redirect on a fixed port. Meta's
+   *  built-in Portal browser can't navigate to custom URI schemes
+   *  (`stargazer-star://…` was the earlier attempt — Agree just bounced), but
+   *  it happily follows an http://127.0.0.1 redirect, which we then catch with
+   *  a short-lived ServerSocket on the Portal itself. */
+  const val LOOPBACK_PORT = 5187
+  const val REDIRECT_URI = "http://127.0.0.1:$LOOPBACK_PORT/spotify-callback"
   private const val TAG = "SpotifyClient"
   private const val AUTH_HOST = "https://accounts.spotify.com"
   private const val API_HOST = "https://api.spotify.com/v1"
@@ -80,6 +91,62 @@ object SpotifyClient {
     return "$AUTH_HOST/authorize?" + params.entries.joinToString("&") {
       "${it.key}=${URLEncoder.encode(it.value, "UTF-8")}"
     }
+  }
+
+  // --- Loopback callback catcher -----------------------------------------
+
+  data class Callback(val code: String?, val state: String?, val error: String?)
+
+  /** Bind a ServerSocket on 127.0.0.1:LOOPBACK_PORT, block for one HTTP
+   *  request (the browser's redirect), extract code/state/error from the
+   *  request line, and respond with a "signed in" confirmation page. Runs
+   *  synchronously — call from Dispatchers.IO. Times out after 5 minutes. */
+  fun awaitLoopbackCallback(timeoutMs: Int = 5 * 60_000): Callback? {
+    val body = ("<!doctype html><html><head><meta charset=\"utf-8\">" +
+        "<title>Signed in</title><style>body{font-family:system-ui,sans-serif;" +
+        "background:#04060D;color:#e5e7eb;display:flex;align-items:center;" +
+        "justify-content:center;height:100vh;margin:0}h1{color:#22D3EE}</style>" +
+        "</head><body><div><h1>Signed in</h1><p>You can close this window and " +
+        "return to Star.</p></div></body></html>").toByteArray()
+    return try {
+      val server = ServerSocket()
+      server.reuseAddress = true
+      server.bind(InetSocketAddress("127.0.0.1", LOOPBACK_PORT))
+      server.soTimeout = timeoutMs
+      server.use { srv ->
+        srv.accept().use { client ->
+          val reader = BufferedReader(InputStreamReader(client.getInputStream(), Charsets.UTF_8))
+          val requestLine = reader.readLine() ?: return@use null
+          // "GET /spotify-callback?code=X&state=Y HTTP/1.1"
+          val cb = parseCallback(requestLine)
+          val out: OutputStream = client.getOutputStream()
+          out.write(("HTTP/1.1 200 OK\r\n" +
+              "Content-Type: text/html; charset=utf-8\r\n" +
+              "Content-Length: ${body.size}\r\n" +
+              "Connection: close\r\n\r\n").toByteArray())
+          out.write(body)
+          out.flush()
+          cb
+        }
+      }
+    } catch (ex: Throwable) {
+      Log.w(TAG, "loopback callback failed: $ex")
+      null
+    }
+  }
+
+  private fun parseCallback(requestLine: String): Callback? {
+    // "GET /spotify-callback?code=X&state=Y HTTP/1.1"
+    val parts = requestLine.split(" ")
+    if (parts.size < 2) return Callback(null, null, "bad_request_line")
+    val target = parts[1]
+    val q = target.substringAfter('?', "")
+    if (q.isEmpty()) return Callback(null, null, "no_query")
+    val map = q.split("&").mapNotNull {
+      val kv = it.split("=", limit = 2)
+      if (kv.size == 2) kv[0] to URLDecoder.decode(kv[1], "UTF-8") else null
+    }.toMap()
+    return Callback(code = map["code"], state = map["state"], error = map["error"])
   }
 
   // --- Token exchange + refresh ------------------------------------------

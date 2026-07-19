@@ -465,10 +465,10 @@ private fun ModeWheel(
   // control instead of five floating dots.
   Column(
       modifier = modifier
-          .clip(RoundedCornerShape(40.dp))
+          .clip(RoundedCornerShape(48.dp))
           .background(Color(0xFF0B1220).copy(alpha = 0.55f))
-          .padding(vertical = 10.dp, horizontal = 8.dp),
-      verticalArrangement = Arrangement.spacedBy(6.dp),
+          .padding(vertical = 14.dp, horizontal = 10.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     for (m in StarMode.entries) {
@@ -477,15 +477,15 @@ private fun ModeWheel(
         // Left-side accent bar for the active mode.
         Box(
             modifier = Modifier
-                .width(4.dp)
-                .height(if (selected) 42.dp else 0.dp)
-                .clip(RoundedCornerShape(2.dp))
+                .width(5.dp)
+                .height(if (selected) 60.dp else 0.dp)
+                .clip(RoundedCornerShape(3.dp))
                 .background(Color(0xFF22D3EE)))
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(8.dp))
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
           Box(
               modifier = Modifier
-                  .size(60.dp)
+                  .size(84.dp)
                   .clip(CircleShape)
                   .background(
                       if (selected) Color(0xFF22D3EE).copy(alpha = 0.22f)
@@ -495,7 +495,7 @@ private fun ModeWheel(
           ) {
             Text(
                 text = m.icon,
-                fontSize = 26.sp,
+                fontSize = 40.sp,
                 color = Color.White.copy(alpha = if (selected) 1f else 0.65f),
             )
           }
@@ -503,10 +503,10 @@ private fun ModeWheel(
             Text(
                 text = m.label.uppercase(),
                 color = Color(0xFF22D3EE).copy(alpha = 0.75f),
-                fontSize = 9.sp,
-                letterSpacing = 1.5.sp,
+                fontSize = 11.sp,
+                letterSpacing = 2.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 2.dp),
+                modifier = Modifier.padding(top = 4.dp),
             )
           }
         }
@@ -544,7 +544,7 @@ private fun ComingSoonPanel(title: String, subtitle: String) {
 
 /** Every mode panel keeps this much space clear on the right so the mode
  *  wheel doesn't cover its content. Sized to match the wheel's visual width. */
-private val MODE_CONTENT_END_PAD = 108.dp
+private val MODE_CONTENT_END_PAD = 140.dp
 
 /** Photos — full-bleed picsum image via WebView, auto-rotating every 30s.
  *  V0 stub — swap the URL for Immich/SMB/URL feeds later. */
@@ -843,6 +843,42 @@ private fun SpotifyPanel() {
                   ctx.startActivity(
                       Intent(Intent.ACTION_VIEW, Uri.parse(url))
                           .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                  // Launch the loopback catcher — it blocks on ServerSocket.accept()
+                  // until the browser follows Spotify's redirect back to 127.0.0.1.
+                  scope.launch {
+                    val cb = withContext(Dispatchers.IO) {
+                      SpotifyClient.awaitLoopbackCallback()
+                    }
+                    if (cb == null) {
+                      SpotifyState.error = "loopback_timeout"
+                      SpotifyState.connecting = false
+                      return@launch
+                    }
+                    if (cb.error != null) {
+                      SpotifyState.error = cb.error
+                      SpotifyState.connecting = false
+                      return@launch
+                    }
+                    val code = cb.code
+                    if (code == null || cb.state != SpotifyState.pendingState) {
+                      SpotifyState.error = "callback_mismatch"
+                      SpotifyState.connecting = false
+                      return@launch
+                    }
+                    val tokens = withContext(Dispatchers.IO) {
+                      SpotifyClient.exchangeCode(clientId, code, verifier)
+                    }
+                    SpotifyState.pendingVerifier = null
+                    SpotifyState.pendingState = null
+                    if (tokens == null) {
+                      SpotifyState.error = "token_exchange_failed"
+                      SpotifyState.connecting = false
+                      return@launch
+                    }
+                    SpotifyState.applyTokens(ctx, tokens)
+                    SpotifyState.error = null
+                    SpotifyState.connecting = false
+                  }
                 }
                 .padding(horizontal = 28.dp, vertical = 14.dp),
         ) {
