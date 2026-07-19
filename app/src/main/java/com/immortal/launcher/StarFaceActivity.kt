@@ -15,10 +15,21 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -127,7 +138,7 @@ class StarFaceActivity : ComponentActivity() {
       }
     }
 
-    setContent { StarFaceScreen(state, detail, onTapWake, onEnroll) }
+    setContent { StarShellScreen(state, detail, onTapWake, onEnroll) }
   }
 
   private companion object {
@@ -293,8 +304,165 @@ private val SPEAKER_ROSTER = listOf(
     "Steve", "Noell", "Andy", "Sam", "Jack", "Richie", "Mandy", "River",
 )
 
+/** The five modes on the right-edge wheel. Order = draw order top-to-bottom. */
+private enum class StarMode(val icon: String, val label: String) {
+  STAR("✨", "Star"),
+  SPOTIFY("🎵", "Spotify"),
+  PHOTOS("🖼", "Photos"),
+  BROWSER("🌐", "Browser"),
+  SETTINGS("⚙", "Settings"),
+}
+
+/** Shell composable — owns the mode-wheel state and routes to per-mode content.
+ *  The wheel floats on the right and is visible in every mode so the user can
+ *  always jump between them. StarFace's own gestures live behind it, so the
+ *  wheel column doesn't intercept taps meant for the star face. */
 @Composable
-fun StarFaceScreen(
+fun StarShellScreen(
+    state: StarLive.State,
+    detail: String?,
+    onTapWake: () -> Unit = {},
+    onEnroll: (String) -> Unit = {},
+) {
+  var mode by remember { mutableStateOf(StarMode.STAR) }
+  Box(Modifier.fillMaxSize().background(Color(0xFF04060D))) {
+    when (mode) {
+      StarMode.STAR -> StarPresenceScreen(state, detail, onTapWake, onEnroll)
+      StarMode.SPOTIFY -> SpotifyPanel()
+      StarMode.PHOTOS -> ComingSoonPanel("Photos", "Immich / SMB / local folder photos.")
+      StarMode.BROWSER -> ComingSoonPanel("Browser", "Full WebView with bookmarks + a soft keyboard.")
+      StarMode.SETTINGS -> ComingSoonPanel("Settings", "Star + shell config: API endpoints, wardrobe pinning, wake threshold.")
+    }
+    ModeWheel(
+        current = mode,
+        onSelect = { mode = it },
+        modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
+    )
+  }
+}
+
+@Composable
+private fun ModeWheel(
+    current: StarMode,
+    onSelect: (StarMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+  Column(
+      modifier = modifier,
+      verticalArrangement = Arrangement.spacedBy(10.dp),
+  ) {
+    for (m in StarMode.entries) {
+      val selected = m == current
+      Box(
+          modifier = Modifier
+              .size(56.dp)
+              .clip(CircleShape)
+              .background(
+                  if (selected) Color(0xFF22D3EE).copy(alpha = 0.20f)
+                  else Color(0xFF0B1220).copy(alpha = 0.55f))
+              .clickable { onSelect(m) },
+          contentAlignment = Alignment.Center,
+      ) {
+        Text(
+            text = m.icon,
+            fontSize = 24.sp,
+            color = Color.White.copy(alpha = if (selected) 1f else 0.75f),
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun ComingSoonPanel(title: String, subtitle: String) {
+  Box(Modifier.fillMaxSize().padding(end = 88.dp), contentAlignment = Alignment.Center) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      Text(
+          text = title,
+          color = Color.White.copy(alpha = 0.85f),
+          fontSize = 42.sp,
+          fontWeight = FontWeight.Light,
+          letterSpacing = 4.sp)
+      Spacer(Modifier.height(16.dp))
+      Text(
+          text = subtitle,
+          color = Color.White.copy(alpha = 0.45f),
+          fontSize = 18.sp,
+          fontWeight = FontWeight.Light,
+          letterSpacing = 1.sp)
+      Spacer(Modifier.height(28.dp))
+      Text(
+          text = "coming soon",
+          color = Color(0xFF22D3EE).copy(alpha = 0.55f),
+          fontSize = 14.sp,
+          letterSpacing = 3.sp)
+    }
+  }
+}
+
+/** Spotify — v0: transport controls + a fake Now Playing card. Real playback
+ *  needs the Spotify Android SDK sideloaded (needs Play Services) OR the Web
+ *  API with a Connect-active device to control. This screen is the shell; the
+ *  auth + playback wiring lands in the next iteration.
+ *
+ *  Transport button taps log to logcat only for now — hook them to real Web
+ *  API calls (`PUT /me/player/play`, `POST /me/player/next`, etc.) once we
+ *  have a token stored on the WebAPI. */
+@Composable
+private fun SpotifyPanel() {
+  Box(Modifier.fillMaxSize().padding(end = 88.dp), contentAlignment = Alignment.Center) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      // Fake album card so we can see the shape.
+      Box(
+          modifier = Modifier
+              .size(240.dp)
+              .clip(RoundedCornerShape(16.dp))
+              .background(Color(0xFF1DB954).copy(alpha = 0.18f)),
+          contentAlignment = Alignment.Center,
+      ) {
+        Text("♫", fontSize = 96.sp, color = Color(0xFF1DB954).copy(alpha = 0.75f))
+      }
+      Spacer(Modifier.height(20.dp))
+      Text(
+          text = "Not connected",
+          color = Color.White.copy(alpha = 0.85f),
+          fontSize = 26.sp,
+          fontWeight = FontWeight.Light,
+          letterSpacing = 2.sp)
+      Spacer(Modifier.height(6.dp))
+      Text(
+          text = "Register a Spotify app + save the client ID to fleet config",
+          color = Color.White.copy(alpha = 0.45f),
+          fontSize = 14.sp,
+          fontWeight = FontWeight.Light)
+      Spacer(Modifier.height(24.dp))
+      Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        SpotifyTransportButton("⏮") { android.util.Log.i("StarFace", "spotify prev (stub)") }
+        SpotifyTransportButton("▶", primary = true) { android.util.Log.i("StarFace", "spotify play (stub)") }
+        SpotifyTransportButton("⏭") { android.util.Log.i("StarFace", "spotify next (stub)") }
+      }
+    }
+  }
+}
+
+@Composable
+private fun SpotifyTransportButton(glyph: String, primary: Boolean = false, onTap: () -> Unit) {
+  Box(
+      modifier = Modifier
+          .size(if (primary) 76.dp else 56.dp)
+          .clip(CircleShape)
+          .background(
+              if (primary) Color(0xFF1DB954).copy(alpha = 0.85f)
+              else Color(0xFF0B1220))
+          .clickable { onTap() },
+      contentAlignment = Alignment.Center,
+  ) {
+    Text(glyph, fontSize = if (primary) 32.sp else 22.sp, color = Color.White)
+  }
+}
+
+@Composable
+fun StarPresenceScreen(
     state: StarLive.State,
     detail: String?,
     onTapWake: () -> Unit = {},
