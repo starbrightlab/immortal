@@ -173,8 +173,9 @@ private data class PendingWidgetAdd(
     val provider: WidgetProviderEntry,
 )
 
-/** Calls→stock-home bridge: how many system Back presses reach Meta's launcher, and the gap
- *  between them (verified on the Portal TV — 5 presses lands on the stock launcher's Apps tab). */
+/** Portal-TV (ripleyhome) fallback for [launchStockHome]: how many system Back presses to reach
+ *  Meta's launcher, and the gap between them. Best-effort — on some Portal TVs the burst lands on
+ *  the previously-used app instead (issue #91), and it's untestable from here. */
 private const val STOCK_HOME_BACK_PRESSES = 5
 private const val STOCK_HOME_BACK_INTERVAL_MS = 300L
 private const val HOME_APP_WIDGET_HOST_ID = 0x4611
@@ -290,7 +291,13 @@ class HomeActivity : ComponentActivity() {
    * launcher's `portal://launcher/home` VIEW deep link instead resumes its
    * interactive Home tab directly — the Contacts/Favorites calling surface — and we
    * mark a bridge in flight so [DreamPolicy] doesn't claw the frame back during the
-   * transition.
+   * transition. (Launching Contacts directly is rejected as an untrusted caller, so the
+   * hand-off must go through the launcher.)
+   *
+   * Path order: the deep link is primary on touchscreen Portals. The accessibility
+   * Back-press burst is only a Portal-TV (ripleyhome) fallback for when the deep link
+   * doesn't resolve — on a touchscreen Portal a system BACK from Immortal (itself the
+   * home activity) never surfaces the stock launcher, so the burst can't be primary there.
    */
   private fun launchStockHome() {
     // Suppress the screensaver-relaunch race while the stock home comes forward, and
@@ -300,15 +307,6 @@ class HomeActivity : ComponentActivity() {
     // kills our process also see the bridge and return SUPPRESSED (not REDREAM).
     DreamPolicy.markBridge(this)
 
-    // Preferred path: a short burst of system Back presses reliably surfaces Meta's stock
-    // launcher (verified on the Portal TV) — unlike the portal:// deep link or a HOME launch,
-    // which cold-start ripleyhome's idle dream and bounce the user. Needs our accessibility
-    // service (baseline-enabled on provisioned devices); falls back to the deep link otherwise.
-    if (RemoteInput.available()) {
-      RemoteInput.backRepeat(STOCK_HOME_BACK_PRESSES, STOCK_HOME_BACK_INTERVAL_MS)
-      return
-    }
-
     fun fire(intent: Intent): Boolean =
         runCatching {
               startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -316,15 +314,24 @@ class HomeActivity : ComponentActivity() {
             }
             .getOrDefault(false)
 
-    // 1) Deep-link straight to the touchscreen stock launcher's Home tab.
+    // 1) Touchscreen Portals (Portal / Portal+ / Go / Mini): deep-link into the stock launcher's
+    //    Home tab. Needs the stock launcher enabled — provisioning leaves it so. Gate on
+    //    resolveActivity: launching an explicit-but-DISABLED component does NOT throw, so an
+    //    unguarded fire() would return true and swallow the tap (Calls silently no-ops) instead of
+    //    falling through. Resolving first means a disabled launcher drops to the fallbacks below.
     val deepLink =
         Intent(Intent.ACTION_VIEW, Uri.parse("portal://launcher/home"))
             .setPackage("com.facebook.alohaapps.launcher")
-    if (fire(deepLink)) return
+    if (packageManager.resolveActivity(deepLink, 0) != null && fire(deepLink)) return
 
-    // 2) Fallback for models without the portal:// deep link (e.g. the Portal TV's
-    //    ripleyhome): this device's real stock HOME, excluding ourselves and the
-    //    system fallback homes.
+    // 2) Portal TV (ripleyhome): no portal:// deep link, so the VIEW above didn't resolve. Surface
+    //    its stock launcher with a Back-press burst through the accessibility service.
+    if (RemoteInput.available()) {
+      RemoteInput.backRepeat(STOCK_HOME_BACK_PRESSES, STOCK_HOME_BACK_INTERVAL_MS)
+      return
+    }
+
+    // 3) Last resort: this device's real stock HOME, excluding ourselves and the fallback homes.
     val stock =
         packageManager
             .queryIntentActivities(
