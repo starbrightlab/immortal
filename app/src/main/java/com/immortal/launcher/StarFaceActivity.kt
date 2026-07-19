@@ -15,9 +15,11 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -89,9 +91,11 @@ class StarFaceActivity : ComponentActivity() {
 
     var state by mutableStateOf(StarLive.State.IDLE)
     var detail by mutableStateOf<String?>(null)
+    var apiBase by mutableStateOf(StarLive.DEFAULT_API)
 
     lifecycleScope.launch {
       val api = FleetConfig.getValue(this@StarFaceActivity, "star.api") ?: StarLive.DEFAULT_API
+      apiBase = api
       var lastTs = ""
       while (isActive) {
         val payload = withContext(Dispatchers.IO) { StarLive.fetchStatus(api) }
@@ -110,7 +114,14 @@ class StarFaceActivity : ComponentActivity() {
       }
     }
 
-    setContent { StarFaceScreen(state, detail) }
+    val onTapWake: () -> Unit = {
+      lifecycleScope.launch {
+        val ok = withContext(Dispatchers.IO) { StarLive.manualWake(apiBase) }
+        android.util.Log.i("StarFace", "tap-to-wake -> $apiBase ok=$ok")
+      }
+    }
+
+    setContent { StarFaceScreen(state, detail, onTapWake) }
   }
 
   private companion object {
@@ -152,6 +163,35 @@ object StarLive {
             }
           }
           .getOrNull()
+
+  /** Tap-to-wake — hits `POST $apiBase/Star/live/manual-wake` which the WebAPI
+   *  proxies to star-wake on localhost. Kept behind the WebAPI so the Portal
+   *  only needs :5205 open through the NUC firewall. */
+  fun manualWake(apiBase: String): Boolean {
+    val body = "{}".toByteArray()
+    return try {
+      val conn = URL("$apiBase/Star/live/manual-wake").openConnection() as HttpURLConnection
+      conn.requestMethod = "POST"
+      conn.doOutput = true
+      conn.doInput = true
+      conn.useCaches = false
+      conn.connectTimeout = 2500
+      conn.readTimeout = 4000
+      conn.setRequestProperty("Content-Type", "application/json")
+      conn.setFixedLengthStreamingMode(body.size)
+      conn.outputStream.use { it.write(body) }
+      try {
+        val rc = conn.responseCode
+        android.util.Log.i("StarFace", "manualWake POST $apiBase/Star/live/manual-wake -> $rc")
+        rc == 200
+      } finally {
+        conn.disconnect()
+      }
+    } catch (ex: Throwable) {
+      android.util.Log.w("StarFace", "manualWake POST $apiBase/Star/live/manual-wake failed: $ex")
+      false
+    }
+  }
 }
 
 // --- air quality -----------------------------------------------------------
@@ -236,7 +276,11 @@ private fun makeStarfield(n: Int, seed: Int): List<Star> {
 }
 
 @Composable
-fun StarFaceScreen(state: StarLive.State, detail: String?) {
+fun StarFaceScreen(
+    state: StarLive.State,
+    detail: String?,
+    onTapWake: () -> Unit = {},
+) {
   // Single time driver for the whole scene — everything is drawn as f(t).
   var t by remember { mutableFloatStateOf(0f) }
   LaunchedEffect(Unit) {
@@ -325,10 +369,26 @@ fun StarFaceScreen(state: StarLive.State, detail: String?) {
     }
   }
 
-  Box(Modifier.fillMaxSize().background(Color(0xFF04060D))) {
+  // Local tap feedback — a short amber ring pulse rendered immediately on
+  // touch so the interaction feels responsive even before the NUC state poll
+  // catches up (up to POLL_MS lag). Value is the frame-clock timestamp of the
+  // last tap; the ring fades over ~0.55s.
+  var tapAt by remember { mutableFloatStateOf(-10f) }
+
+  Box(
+      Modifier.fillMaxSize()
+          .background(Color(0xFF04060D))
+          .pointerInput(Unit) {
+            detectTapGestures(
+                onTap = {
+                  tapAt = t
+                  onTapWake()
+                })
+          }) {
     Canvas(Modifier.fillMaxSize()) {
       drawStarfield(stars, t)
       drawPortrait(t, state, shown, previous, fade, core)
+      drawTapPulse(t, tapAt)
     }
     if (aqi.isNotEmpty()) {
       androidx.compose.foundation.layout.Column(
@@ -464,6 +524,8 @@ private fun DrawScope.drawPortrait(
       blendMode = BlendMode.Screen,
       filterQuality = FilterQuality.High)
 
+  // (drawTapPulse lives below — it uses the same clock and center.)
+
   // Listening: expanding amber ripples — the honest "mic is hot" signal.
   if (state == StarLive.State.LISTENING) {
     val r0 = side * 0.34f
@@ -476,4 +538,19 @@ private fun DrawScope.drawPortrait(
           style = Stroke(width = 3f))
     }
   }
+}
+
+/** A single amber ring expanding from the portrait center, ~0.55s lifetime,
+ *  triggered by a tap on the face so the touch feels immediate. */
+private fun DrawScope.drawTapPulse(t: Float, tapAt: Float) {
+  val age = t - tapAt
+  if (age < 0f || age > 0.55f) return
+  val c = Offset(size.width / 2f, size.height / 2f)
+  val r0 = min(size.width, size.height) * 0.34f
+  val p = age / 0.55f
+  drawCircle(
+      color = Color(0xFFF59E0B).copy(alpha = (1f - p) * 0.55f),
+      radius = r0 * (1f + p * 1.2f),
+      center = c,
+      style = Stroke(width = 4f))
 }
