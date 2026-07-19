@@ -181,6 +181,18 @@ object DreamPolicy {
     // frame would wake the screen just to blank it again — a flash every time a stray sibling/system
     // dream cycles overnight (issue #73). Let the scheduler re-blank in place instead.
     if (SleepScheduler.handleRedreamDuringOvernight(context)) return
+    // Star Portals opt into showing StarFace as the idle screen instead of the
+    // photo frame. Fleet-pushed toggle: `POST /config { "set": { "star.default_idle": "true" } }`.
+    val starIdle = FleetConfig.getValue(context, "star.default_idle")?.equals("true", ignoreCase = true) == true
+    if (starIdle) {
+      runCatching {
+        context.startActivity(
+            Intent(context, StarFaceActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+      }
+          .onFailure { Log.w(TAG, "star-idle relaunch failed", it) }
+      return
+    }
     runCatching {
       context.startActivity(
           Intent(context, PhotoFramePreviewActivity::class.java)

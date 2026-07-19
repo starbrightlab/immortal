@@ -120,8 +120,14 @@ class StarFaceActivity : ComponentActivity() {
         android.util.Log.i("StarFace", "tap-to-wake -> $apiBase ok=$ok")
       }
     }
+    val onEnroll: (String) -> Unit = { name ->
+      lifecycleScope.launch {
+        val ok = withContext(Dispatchers.IO) { StarLive.manualEnroll(apiBase, name) }
+        android.util.Log.i("StarFace", "enroll $name -> ok=$ok")
+      }
+    }
 
-    setContent { StarFaceScreen(state, detail, onTapWake) }
+    setContent { StarFaceScreen(state, detail, onTapWake, onEnroll) }
   }
 
   private companion object {
@@ -167,10 +173,18 @@ object StarLive {
   /** Tap-to-wake — hits `POST $apiBase/Star/live/manual-wake` which the WebAPI
    *  proxies to star-wake on localhost. Kept behind the WebAPI so the Portal
    *  only needs :5205 open through the NUC firewall. */
-  fun manualWake(apiBase: String): Boolean {
-    val body = "{}".toByteArray()
+  fun manualWake(apiBase: String): Boolean = postJson("$apiBase/Star/live/manual-wake", "{}")
+
+  /** Long-press enroll picker — pass "clear" to sign out. */
+  fun manualEnroll(apiBase: String, name: String): Boolean {
+    val body = "{\"name\":\"${name.replace("\"", "\\\"")}\"}"
+    return postJson("$apiBase/Star/live/manual-enroll", body)
+  }
+
+  private fun postJson(url: String, body: String): Boolean {
+    val bytes = body.toByteArray()
     return try {
-      val conn = URL("$apiBase/Star/live/manual-wake").openConnection() as HttpURLConnection
+      val conn = URL(url).openConnection() as HttpURLConnection
       conn.requestMethod = "POST"
       conn.doOutput = true
       conn.doInput = true
@@ -178,17 +192,17 @@ object StarLive {
       conn.connectTimeout = 2500
       conn.readTimeout = 4000
       conn.setRequestProperty("Content-Type", "application/json")
-      conn.setFixedLengthStreamingMode(body.size)
-      conn.outputStream.use { it.write(body) }
+      conn.setFixedLengthStreamingMode(bytes.size)
+      conn.outputStream.use { it.write(bytes) }
       try {
         val rc = conn.responseCode
-        android.util.Log.i("StarFace", "manualWake POST $apiBase/Star/live/manual-wake -> $rc")
+        android.util.Log.i("StarFace", "POST $url -> $rc")
         rc == 200
       } finally {
         conn.disconnect()
       }
     } catch (ex: Throwable) {
-      android.util.Log.w("StarFace", "manualWake POST $apiBase/Star/live/manual-wake failed: $ex")
+      android.util.Log.w("StarFace", "POST $url failed: $ex")
       false
     }
   }
@@ -275,11 +289,16 @@ private fun makeStarfield(n: Int, seed: Int): List<Star> {
   }
 }
 
+private val SPEAKER_ROSTER = listOf(
+    "Steve", "Noell", "Andy", "Sam", "Jack", "Richie", "Mandy", "River",
+)
+
 @Composable
 fun StarFaceScreen(
     state: StarLive.State,
     detail: String?,
     onTapWake: () -> Unit = {},
+    onEnroll: (String) -> Unit = {},
 ) {
   // Single time driver for the whole scene — everything is drawn as f(t).
   var t by remember { mutableFloatStateOf(0f) }
@@ -295,12 +314,20 @@ fun StarFaceScreen(
 
   val stars = remember { makeStarfield(140, seed = 7) }
 
-  // Two cap wardrobes — Eagles on even hours, Phillies on odd. The hour is
-  // re-checked once a minute; the existing crossfade makes the swap gentle.
-  var phillies by remember { mutableStateOf(hourIsOdd()) }
+  // Two cap wardrobes — Eagles on even hours, Phillies on odd, unless the
+  // user tapped the hat to override. The override persists until the next
+  // hour flip (i.e. it doesn't stick forever — you'd forget you set it).
+  var wardrobeOverride by remember { mutableStateOf<Boolean?>(null) }
+  var lastAutoHourOdd by remember { mutableStateOf(hourIsOdd()) }
+  val phillies = wardrobeOverride ?: lastAutoHourOdd
   LaunchedEffect(Unit) {
     while (isActive) {
-      phillies = hourIsOdd()
+      val now = hourIsOdd()
+      if (now != lastAutoHourOdd) {
+        // Hour just flipped — drop any manual override so the schedule resumes.
+        wardrobeOverride = null
+        lastAutoHourOdd = now
+      }
       delay(60 * 1000L)
     }
   }
@@ -374,16 +401,39 @@ fun StarFaceScreen(
   // catches up (up to POLL_MS lag). Value is the frame-clock timestamp of the
   // last tap; the ring fades over ~0.55s.
   var tapAt by remember { mutableFloatStateOf(-10f) }
+  var showEnroll by remember { mutableStateOf(false) }
 
   Box(
       Modifier.fillMaxSize()
           .background(Color(0xFF04060D))
           .pointerInput(Unit) {
             detectTapGestures(
-                onTap = {
+                onTap = { offset ->
+                  // Portrait geometry has to match drawPortrait: centered,
+                  // side = 82% of min(width,height), hat is the top ~30% of
+                  // that face square. A tap inside the hat region flips the
+                  // wardrobe locally (until the next hour); anywhere else
+                  // fires the wake path.
+                  val side = min(size.width, size.height) * 0.82f
+                  val faceLeft = size.width / 2f - side / 2f
+                  val faceTop = size.height / 2f - side / 2f
+                  val inHat =
+                      offset.x >= faceLeft &&
+                          offset.x <= faceLeft + side &&
+                          offset.y >= faceTop &&
+                          offset.y <= faceTop + side * 0.30f
+                  if (inHat) {
+                    // Toggle the local override — if we were following the
+                    // schedule, override with the opposite; if we were
+                    // overriding, flip it (still overriding).
+                    wardrobeOverride = !(wardrobeOverride ?: lastAutoHourOdd)
+                    tapAt = t
+                    return@detectTapGestures
+                  }
                   tapAt = t
                   onTapWake()
-                })
+                },
+                onLongPress = { showEnroll = true })
           }) {
     Canvas(Modifier.fillMaxSize()) {
       drawStarfield(stars, t)
@@ -449,6 +499,60 @@ fun StarFaceScreen(
         fontWeight = FontWeight.Light,
         letterSpacing = 3.sp,
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp))
+
+    if (showEnroll) {
+      EnrollPickerDialog(
+          onPick = { name ->
+            onEnroll(name)
+            showEnroll = false
+          },
+          onDismiss = { showEnroll = false })
+    }
+  }
+}
+
+@Composable
+private fun EnrollPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
+  androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+    androidx.compose.material3.Surface(
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        color = Color(0xFF0B1220),
+        contentColor = Color(0xFFE5E7EB),
+    ) {
+      androidx.compose.foundation.layout.Column(
+          modifier = Modifier.padding(24.dp),
+      ) {
+        Text(
+            text = "Who's here?",
+            color = Color.White.copy(alpha = 0.85f),
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Light,
+            letterSpacing = 3.sp,
+            modifier = Modifier.padding(bottom = 12.dp))
+        for (name in SPEAKER_ROSTER) {
+          androidx.compose.material3.TextButton(
+              onClick = { onPick(name) },
+              modifier = Modifier.fillMaxSize().padding(vertical = 2.dp)) {
+            Text(
+                text = name,
+                color = Color(0xFF22D3EE),
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 1.sp)
+          }
+        }
+        androidx.compose.material3.TextButton(
+            onClick = { onPick("clear") },
+            modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
+          Text(
+              text = "Sign out",
+              color = Color.White.copy(alpha = 0.55f),
+              fontSize = 20.sp,
+              fontWeight = FontWeight.Light,
+              letterSpacing = 2.sp)
+        }
+      }
+    }
   }
 }
 
