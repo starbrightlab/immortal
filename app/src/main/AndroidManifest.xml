@@ -469,13 +469,24 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- Star's native face: fullscreen breathing-orb scene driven by the live
-             pipeline state. Launched remotely via fleet POST /action "starface". -->
+             pipeline state. Launched remotely via fleet POST /action "starface".
+             Also handles the Spotify OAuth callback via the stargazer-star://
+             scheme — singleTask so the redirect brings the existing instance
+             forward instead of stacking a new one. -->
         <activity
             android:name=".StarFaceActivity"
-            android:exported="false"
+            android:exported="true"
             android:excludeFromRecents="true"
+            android:launchMode="singleTask"
             android:screenOrientation="landscape"
-            android:theme="@style/Theme.SampleApp" />
+            android:theme="@style/Theme.SampleApp">
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="stargazer-star" android:host="spotify-callback" />
+            </intent-filter>
+        </activity>
 
         <!-- MQTT publisher: exposes this Portal to Home Assistant via MQTT Discovery.
              Off until the user configures a broker in Immortal settings. -->

@@ -7,8 +7,12 @@
 
 package com.immortal.launcher
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
+import androidx.compose.foundation.Image
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
@@ -55,6 +59,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.imageResource
@@ -109,6 +114,10 @@ class StarFaceActivity : ComponentActivity() {
       systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
+    // Load persisted Spotify refresh token on cold start.
+    SpotifyState.loadFromFleet(this)
+    handleMaybeSpotifyRedirect(intent)
+
     var state by mutableStateOf(StarLive.State.IDLE)
     var detail by mutableStateOf<String?>(null)
     var apiBase by mutableStateOf(StarLive.DEFAULT_API)
@@ -150,8 +159,104 @@ class StarFaceActivity : ComponentActivity() {
     setContent { StarShellScreen(state, detail, onTapWake, onEnroll) }
   }
 
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    handleMaybeSpotifyRedirect(intent)
+  }
+
+  private fun handleMaybeSpotifyRedirect(intent: Intent?) {
+    val data = intent?.data ?: return
+    if (data.scheme != "stargazer-star" || data.host != "spotify-callback") return
+    val code = data.getQueryParameter("code")
+    val state = data.getQueryParameter("state")
+    val err = data.getQueryParameter("error")
+    if (err != null) {
+      android.util.Log.w("StarFace", "spotify redirect error: $err")
+      SpotifyState.error = err
+      SpotifyState.connecting = false
+      return
+    }
+    val verifier = SpotifyState.pendingVerifier
+    if (code == null || verifier == null || state != SpotifyState.pendingState) {
+      android.util.Log.w("StarFace", "spotify redirect mismatched (code=${code != null} state-ok=${state == SpotifyState.pendingState})")
+      SpotifyState.error = "callback_mismatch"
+      SpotifyState.connecting = false
+      return
+    }
+    val clientId = FleetConfig.getValue(this, "star.spotify.client_id") ?: ""
+    if (clientId.isEmpty()) {
+      SpotifyState.error = "missing_client_id"
+      SpotifyState.connecting = false
+      return
+    }
+    SpotifyState.connecting = true
+    lifecycleScope.launch {
+      val tokens = withContext(Dispatchers.IO) {
+        SpotifyClient.exchangeCode(clientId, code, verifier)
+      }
+      SpotifyState.pendingVerifier = null
+      SpotifyState.pendingState = null
+      if (tokens == null) {
+        SpotifyState.error = "token_exchange_failed"
+        SpotifyState.connecting = false
+        return@launch
+      }
+      SpotifyState.applyTokens(this@StarFaceActivity, tokens)
+      SpotifyState.error = null
+      SpotifyState.connecting = false
+      android.util.Log.i("StarFace", "spotify connected")
+    }
+  }
+
   private companion object {
     const val POLL_MS = 1000L
+  }
+}
+
+/** Compose-observable Spotify state shared between the activity (intent handler)
+ *  and the panel (UI). Refresh token persists in FleetConfig; access token is
+ *  in-memory only and refreshed on demand. */
+object SpotifyState {
+  var refreshToken by mutableStateOf<String?>(null)
+  var accessToken: String? = null
+  var accessExpiresAt: Long = 0L
+  var pendingVerifier: String? = null
+  var pendingState: String? = null
+  var connecting by mutableStateOf(false)
+  var error by mutableStateOf<String?>(null)
+
+  val connected: Boolean get() = !refreshToken.isNullOrEmpty()
+
+  fun loadFromFleet(ctx: Context) {
+    val stored = FleetConfig.getValue(ctx, "star.spotify.refresh_token")
+    refreshToken = if (stored.isNullOrEmpty()) null else stored
+  }
+
+  fun applyTokens(ctx: Context, tokens: SpotifyClient.Tokens) {
+    accessToken = tokens.accessToken
+    accessExpiresAt = tokens.expiresAt
+    refreshToken = tokens.refreshToken
+    FleetConfig.setValue(ctx, "star.spotify.refresh_token", tokens.refreshToken)
+  }
+
+  fun clear(ctx: Context) {
+    accessToken = null
+    accessExpiresAt = 0L
+    refreshToken = null
+    FleetConfig.setValue(ctx, "star.spotify.refresh_token", "")
+  }
+
+  /** Returns a currently-valid access token, refreshing if needed. Null if
+   *  we're not connected or refresh failed. */
+  suspend fun getAccessToken(ctx: Context): String? {
+    val access = accessToken
+    if (access != null && System.currentTimeMillis() < accessExpiresAt) return access
+    val refresh = refreshToken ?: return null
+    val clientId = FleetConfig.getValue(ctx, "star.spotify.client_id") ?: return null
+    val tokens = withContext(Dispatchers.IO) { SpotifyClient.refresh(clientId, refresh) }
+        ?: return null
+    applyTokens(ctx, tokens)
+    return tokens.accessToken
   }
 }
 
@@ -664,47 +769,199 @@ private fun SettingLabel(text: String) {
       letterSpacing = 3.sp)
 }
 
-/** Spotify — v0: transport controls + a fake Now Playing card. Real playback
- *  needs the Spotify Android SDK sideloaded (needs Play Services) OR the Web
- *  API with a Connect-active device to control. This screen is the shell; the
- *  auth + playback wiring lands in the next iteration.
- *
- *  Transport button taps log to logcat only for now — hook them to real Web
- *  API calls (`PUT /me/player/play`, `POST /me/player/next`, etc.) once we
- *  have a token stored on the WebAPI. */
+/** Spotify — Now Playing card + transport, backed by the Web API. Auth is
+ *  Authorization Code with PKCE; the "Connect" button opens the Spotify
+ *  authorize URL in an external browser (Chrome or Meta's built-in), the
+ *  user signs in, and the stargazer-star:// redirect brings the code back
+ *  to the activity for token exchange. */
 @Composable
 private fun SpotifyPanel() {
+  val ctx = LocalContext.current
+  val scope = androidx.compose.runtime.rememberCoroutineScope()
+  val refreshToken = SpotifyState.refreshToken
+  val connecting = SpotifyState.connecting
+  val error = SpotifyState.error
+  var track by remember { mutableStateOf<SpotifyClient.Track?>(null) }
+  var pollTick by remember { mutableStateOf(0) }
+
+  // Poll currently-playing every 5s while the Spotify tab is open.
+  LaunchedEffect(refreshToken, pollTick) {
+    if (refreshToken.isNullOrEmpty()) {
+      track = null
+      return@LaunchedEffect
+    }
+    while (isActive) {
+      val access = SpotifyState.getAccessToken(ctx)
+      if (access != null) {
+        val t = withContext(Dispatchers.IO) { SpotifyClient.currentlyPlaying(access) }
+        track = t
+      }
+      delay(5000)
+    }
+  }
+
   Box(Modifier.fillMaxSize().padding(end = MODE_CONTENT_END_PAD), contentAlignment = Alignment.Center) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-      // Fake album card so we can see the shape.
-      Box(
-          modifier = Modifier
-              .size(240.dp)
-              .clip(RoundedCornerShape(16.dp))
-              .background(Color(0xFF1DB954).copy(alpha = 0.18f)),
-          contentAlignment = Alignment.Center,
-      ) {
-        Text("♫", fontSize = 96.sp, color = Color(0xFF1DB954).copy(alpha = 0.75f))
-      }
+      SpotifyArt(track?.artUrl)
       Spacer(Modifier.height(20.dp))
-      Text(
-          text = "Not connected",
-          color = Color.White.copy(alpha = 0.85f),
-          fontSize = 26.sp,
-          fontWeight = FontWeight.Light,
-          letterSpacing = 2.sp)
-      Spacer(Modifier.height(6.dp))
-      Text(
-          text = "Register a Spotify app + save the client ID to fleet config",
-          color = Color.White.copy(alpha = 0.45f),
-          fontSize = 14.sp,
-          fontWeight = FontWeight.Light)
-      Spacer(Modifier.height(24.dp))
-      Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        SpotifyTransportButton("⏮") { android.util.Log.i("StarFace", "spotify prev (stub)") }
-        SpotifyTransportButton("▶", primary = true) { android.util.Log.i("StarFace", "spotify play (stub)") }
-        SpotifyTransportButton("⏭") { android.util.Log.i("StarFace", "spotify next (stub)") }
+
+      if (!SpotifyState.connected) {
+        Text(
+            text = "Not connected",
+            color = Color.White.copy(alpha = 0.85f),
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Light,
+            letterSpacing = 2.sp)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = if (connecting) "Signing in…" else "Tap connect to authorize with your Spotify account.",
+            color = Color.White.copy(alpha = 0.45f),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Light)
+        if (error != null) {
+          Spacer(Modifier.height(4.dp))
+          Text(text = "error: $error", color = Color(0xFFF87171), fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(20.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFF1DB954).copy(alpha = 0.90f))
+                .clickable(enabled = !connecting) {
+                  val clientId = FleetConfig.getValue(ctx, "star.spotify.client_id") ?: ""
+                  if (clientId.isEmpty()) {
+                    SpotifyState.error = "missing_client_id"
+                    return@clickable
+                  }
+                  val verifier = SpotifyClient.makeVerifier()
+                  val state = SpotifyClient.makeVerifier().take(32)
+                  SpotifyState.pendingVerifier = verifier
+                  SpotifyState.pendingState = state
+                  SpotifyState.error = null
+                  SpotifyState.connecting = true
+                  val url = SpotifyClient.authorizeUrl(clientId, verifier, state)
+                  ctx.startActivity(
+                      Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                          .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+                .padding(horizontal = 28.dp, vertical = 14.dp),
+        ) {
+          Text(
+              text = if (connecting) "Waiting…" else "Connect Spotify",
+              color = Color.White,
+              fontSize = 18.sp,
+              fontWeight = FontWeight.Medium,
+              letterSpacing = 1.sp)
+        }
+      } else {
+        val t = track
+        if (t == null) {
+          Text(
+              text = "Nothing playing",
+              color = Color.White.copy(alpha = 0.85f),
+              fontSize = 22.sp,
+              fontWeight = FontWeight.Light)
+          Spacer(Modifier.height(4.dp))
+          Text(
+              text = "Start a track on any Spotify device — controls land here.",
+              color = Color.White.copy(alpha = 0.45f),
+              fontSize = 13.sp)
+        } else {
+          Text(
+              text = t.name,
+              color = Color.White.copy(alpha = 0.90f),
+              fontSize = 24.sp,
+              fontWeight = FontWeight.Medium,
+              textAlign = TextAlign.Center)
+          Spacer(Modifier.height(4.dp))
+          Text(
+              text = t.artist,
+              color = Color.White.copy(alpha = 0.60f),
+              fontSize = 16.sp,
+              fontWeight = FontWeight.Light,
+              textAlign = TextAlign.Center)
+          Text(
+              text = t.album,
+              color = Color.White.copy(alpha = 0.40f),
+              fontSize = 13.sp,
+              textAlign = TextAlign.Center)
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+          val isPlaying = t?.isPlaying == true
+          SpotifyTransportButton("⏮") {
+            scope.launch {
+              val access = SpotifyState.getAccessToken(ctx) ?: return@launch
+              withContext(Dispatchers.IO) { SpotifyClient.previous(access) }
+              // Kick a fresh poll so UI updates without waiting 5s.
+              pollTick++
+            }
+          }
+          SpotifyTransportButton(if (isPlaying) "⏸" else "▶", primary = true) {
+            scope.launch {
+              val access = SpotifyState.getAccessToken(ctx) ?: return@launch
+              withContext(Dispatchers.IO) {
+                if (isPlaying) SpotifyClient.pause(access) else SpotifyClient.play(access)
+              }
+              pollTick++
+            }
+          }
+          SpotifyTransportButton("⏭") {
+            scope.launch {
+              val access = SpotifyState.getAccessToken(ctx) ?: return@launch
+              withContext(Dispatchers.IO) { SpotifyClient.next(access) }
+              pollTick++
+            }
+          }
+        }
+        Spacer(Modifier.height(20.dp))
+        Text(
+            text = "Sign out",
+            color = Color.White.copy(alpha = 0.35f),
+            fontSize = 12.sp,
+            letterSpacing = 2.sp,
+            modifier = Modifier
+                .clickable { SpotifyState.clear(ctx) }
+                .padding(8.dp))
       }
+    }
+  }
+}
+
+/** Album art — Compose has no built-in image loader for URLs; fetch bytes in
+ *  a coroutine and swap into an ImageBitmap. Falls back to a green ♫ tile
+ *  while loading or on failure. */
+@Composable
+private fun SpotifyArt(url: String?) {
+  var bitmap by remember(url) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+  LaunchedEffect(url) {
+    if (url.isNullOrEmpty()) return@LaunchedEffect
+    val loaded = withContext(Dispatchers.IO) {
+      runCatching {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        conn.connectTimeout = 4000
+        conn.readTimeout = 6000
+        val bytes = conn.inputStream.use { it.readBytes() }
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+      }.getOrNull()
+    }
+    if (loaded != null) bitmap = loaded.asImageBitmap()
+  }
+  Box(
+      modifier = Modifier
+          .size(240.dp)
+          .clip(RoundedCornerShape(16.dp))
+          .background(Color(0xFF1DB954).copy(alpha = 0.18f)),
+      contentAlignment = Alignment.Center,
+  ) {
+    val bm = bitmap
+    if (bm != null) {
+      Image(
+          bitmap = bm,
+          contentDescription = null,
+          modifier = Modifier.fillMaxSize())
+    } else {
+      Text("♫", fontSize = 96.sp, color = Color(0xFF1DB954).copy(alpha = 0.75f))
     }
   }
 }
