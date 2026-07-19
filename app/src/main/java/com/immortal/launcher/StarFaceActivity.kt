@@ -27,10 +27,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -329,9 +338,9 @@ fun StarShellScreen(
     when (mode) {
       StarMode.STAR -> StarPresenceScreen(state, detail, onTapWake, onEnroll)
       StarMode.SPOTIFY -> SpotifyPanel()
-      StarMode.PHOTOS -> ComingSoonPanel("Photos", "Immich / SMB / local folder photos.")
-      StarMode.BROWSER -> ComingSoonPanel("Browser", "Full WebView with bookmarks + a soft keyboard.")
-      StarMode.SETTINGS -> ComingSoonPanel("Settings", "Star + shell config: API endpoints, wardrobe pinning, wake threshold.")
+      StarMode.PHOTOS -> PhotosPanel()
+      StarMode.BROWSER -> BrowserPanel()
+      StarMode.SETTINGS -> SettingsPanel()
     }
     ModeWheel(
         current = mode,
@@ -347,27 +356,55 @@ private fun ModeWheel(
     onSelect: (StarMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+  // Rounded pill rail behind all buttons — makes the wheel feel like one
+  // control instead of five floating dots.
   Column(
-      modifier = modifier,
-      verticalArrangement = Arrangement.spacedBy(10.dp),
+      modifier = modifier
+          .clip(RoundedCornerShape(40.dp))
+          .background(Color(0xFF0B1220).copy(alpha = 0.55f))
+          .padding(vertical = 10.dp, horizontal = 8.dp),
+      verticalArrangement = Arrangement.spacedBy(6.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     for (m in StarMode.entries) {
       val selected = m == current
-      Box(
-          modifier = Modifier
-              .size(56.dp)
-              .clip(CircleShape)
-              .background(
-                  if (selected) Color(0xFF22D3EE).copy(alpha = 0.20f)
-                  else Color(0xFF0B1220).copy(alpha = 0.55f))
-              .clickable { onSelect(m) },
-          contentAlignment = Alignment.Center,
-      ) {
-        Text(
-            text = m.icon,
-            fontSize = 24.sp,
-            color = Color.White.copy(alpha = if (selected) 1f else 0.75f),
-        )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        // Left-side accent bar for the active mode.
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(if (selected) 42.dp else 0.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color(0xFF22D3EE)))
+        Spacer(Modifier.width(6.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+          Box(
+              modifier = Modifier
+                  .size(60.dp)
+                  .clip(CircleShape)
+                  .background(
+                      if (selected) Color(0xFF22D3EE).copy(alpha = 0.22f)
+                      else Color.Transparent)
+                  .clickable { onSelect(m) },
+              contentAlignment = Alignment.Center,
+          ) {
+            Text(
+                text = m.icon,
+                fontSize = 26.sp,
+                color = Color.White.copy(alpha = if (selected) 1f else 0.65f),
+            )
+          }
+          if (selected) {
+            Text(
+                text = m.label.uppercase(),
+                color = Color(0xFF22D3EE).copy(alpha = 0.75f),
+                fontSize = 9.sp,
+                letterSpacing = 1.5.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+          }
+        }
       }
     }
   }
@@ -375,7 +412,7 @@ private fun ModeWheel(
 
 @Composable
 private fun ComingSoonPanel(title: String, subtitle: String) {
-  Box(Modifier.fillMaxSize().padding(end = 88.dp), contentAlignment = Alignment.Center) {
+  Box(Modifier.fillMaxSize().padding(end = MODE_CONTENT_END_PAD), contentAlignment = Alignment.Center) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
       Text(
           text = title,
@@ -400,6 +437,233 @@ private fun ComingSoonPanel(title: String, subtitle: String) {
   }
 }
 
+/** Every mode panel keeps this much space clear on the right so the mode
+ *  wheel doesn't cover its content. Sized to match the wheel's visual width. */
+private val MODE_CONTENT_END_PAD = 108.dp
+
+/** Photos — full-bleed picsum image via WebView, auto-rotating every 30s.
+ *  V0 stub — swap the URL for Immich/SMB/URL feeds later. */
+@Composable
+private fun PhotosPanel() {
+  var version by remember { mutableStateOf(0) }
+  val url = "https://picsum.photos/1920/1080?v=$version"
+  LaunchedEffect(Unit) {
+    while (isActive) {
+      delay(30 * 1000L)
+      version += 1
+    }
+  }
+  Box(Modifier.fillMaxSize().padding(end = MODE_CONTENT_END_PAD).background(Color(0xFF000000))) {
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { ctx ->
+          android.webkit.WebView(ctx).apply {
+            setBackgroundColor(0)
+            settings.loadWithOverviewMode = true
+            settings.useWideViewPort = true
+            settings.javaScriptEnabled = false
+            loadUrl(url)
+          }
+        },
+        update = { webView -> webView.loadUrl(url) })
+  }
+}
+
+/** Browser — simple URL bar + WebView. Not a full browser: no history stack,
+ *  no bookmarks, no tabs. Enough to open a page. */
+@Composable
+private fun BrowserPanel() {
+  var url by remember { mutableStateOf("https://docs.greblunashome.org") }
+  var editing by remember { mutableStateOf(url) }
+  var webViewRef by remember { mutableStateOf<android.webkit.WebView?>(null) }
+
+  Column(
+      Modifier.fillMaxSize().padding(end = MODE_CONTENT_END_PAD),
+  ) {
+    // URL bar
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .height(48.dp)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      BasicTextField(
+          value = editing,
+          onValueChange = { editing = it },
+          singleLine = true,
+          textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+          cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFF22D3EE)),
+          modifier = Modifier
+              .clip(RoundedCornerShape(20.dp))
+              .background(Color(0xFF0B1220))
+              .padding(horizontal = 16.dp, vertical = 10.dp),
+      )
+      Spacer(Modifier.width(8.dp))
+      Box(
+          modifier = Modifier
+              .clip(RoundedCornerShape(20.dp))
+              .background(Color(0xFF22D3EE).copy(alpha = 0.85f))
+              .clickable {
+                var target = editing.trim()
+                if (!target.startsWith("http")) target = "https://$target"
+                url = target
+                webViewRef?.loadUrl(target)
+              }
+              .padding(horizontal = 20.dp, vertical = 10.dp),
+      ) {
+        Text("Go", color = Color(0xFF04060D), fontSize = 16.sp, fontWeight = FontWeight.Medium)
+      }
+    }
+    // Bookmarks row
+    Row(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      for ((label, target) in BROWSER_BOOKMARKS) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF0B1220))
+                .clickable {
+                  editing = target
+                  url = target
+                  webViewRef?.loadUrl(target)
+                }
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        ) {
+          Text(label, color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+        }
+      }
+    }
+    // WebView
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { ctx ->
+          android.webkit.WebView(ctx).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            webViewClient = android.webkit.WebViewClient()
+            webViewRef = this
+            loadUrl(url)
+          }
+        })
+  }
+}
+
+private val BROWSER_BOOKMARKS = listOf(
+    "Docs" to "https://docs.greblunashome.org",
+    "Stargazer" to "https://stargazermi.com",
+    "World" to "http://192.168.1.158:5179/world/star",
+    "News" to "https://text.npr.org",
+)
+
+/** Settings — read/write the fleet-config knobs from the Portal itself, so
+ *  we don't need to hit `POST /config` from the NUC to tweak the star face. */
+@Composable
+private fun SettingsPanel() {
+  val ctx = LocalContext.current
+  var starIdle by remember {
+    mutableStateOf(
+        FleetConfig.getValue(ctx, "star.default_idle")?.equals("true", ignoreCase = true) == true)
+  }
+  val apiBase = remember {
+    FleetConfig.getValue(ctx, "star.api") ?: StarLive.DEFAULT_API
+  }
+
+  Box(
+      Modifier
+          .fillMaxSize()
+          .padding(end = MODE_CONTENT_END_PAD)
+          .verticalScroll(rememberScrollState())
+          .padding(24.dp),
+  ) {
+    Column {
+      Text(
+          text = "SETTINGS",
+          color = Color.White.copy(alpha = 0.45f),
+          fontSize = 16.sp,
+          fontWeight = FontWeight.Light,
+          letterSpacing = 4.sp)
+      Spacer(Modifier.height(20.dp))
+
+      SettingRow(
+          title = "Star as default idle",
+          subtitle = "Show StarFace instead of the photo frame when the Portal dreams.",
+      ) {
+        Switch(
+            checked = starIdle,
+            onCheckedChange = {
+              starIdle = it
+              FleetConfig.setValue(ctx, "star.default_idle", it.toString())
+            },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color(0xFF22D3EE),
+                checkedTrackColor = Color(0xFF22D3EE).copy(alpha = 0.35f),
+            ))
+      }
+
+      Spacer(Modifier.height(24.dp))
+      SettingLabel("Star API base")
+      Text(
+          text = apiBase,
+          color = Color(0xFF22D3EE).copy(alpha = 0.85f),
+          fontSize = 18.sp,
+          fontWeight = FontWeight.Light,
+          modifier = Modifier.padding(top = 4.dp))
+      Text(
+          text = "Set via `POST /config { \"set\": { \"star.api\": \"http://ip:port\" } }` " +
+              "on this Portal's fleet agent — edit-in-place lands in a later iteration.",
+          color = Color.White.copy(alpha = 0.40f),
+          fontSize = 12.sp,
+          modifier = Modifier.padding(top = 6.dp, end = 40.dp))
+
+      Spacer(Modifier.height(28.dp))
+      SettingLabel("Build")
+      Text(
+          text = "Immortal 1.66-star.x — StarFace shell + mode wheel.",
+          color = Color.White.copy(alpha = 0.55f),
+          fontSize = 14.sp,
+          fontWeight = FontWeight.Light,
+          modifier = Modifier.padding(top = 4.dp))
+    }
+  }
+}
+
+@Composable
+private fun SettingRow(title: String, subtitle: String, control: @Composable () -> Unit) {
+  Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.padding(vertical = 8.dp),
+  ) {
+    Column(Modifier.padding(end = 16.dp)) {
+      Text(
+          text = title,
+          color = Color.White.copy(alpha = 0.85f),
+          fontSize = 18.sp,
+          fontWeight = FontWeight.Light,
+          letterSpacing = 0.5.sp)
+      Text(
+          text = subtitle,
+          color = Color.White.copy(alpha = 0.45f),
+          fontSize = 13.sp,
+          fontWeight = FontWeight.Light,
+          modifier = Modifier.padding(top = 3.dp, end = 40.dp))
+    }
+    Spacer(Modifier.width(0.dp))
+    control()
+  }
+}
+
+@Composable
+private fun SettingLabel(text: String) {
+  Text(
+      text = text.uppercase(),
+      color = Color.White.copy(alpha = 0.45f),
+      fontSize = 12.sp,
+      letterSpacing = 3.sp)
+}
+
 /** Spotify — v0: transport controls + a fake Now Playing card. Real playback
  *  needs the Spotify Android SDK sideloaded (needs Play Services) OR the Web
  *  API with a Connect-active device to control. This screen is the shell; the
@@ -410,7 +674,7 @@ private fun ComingSoonPanel(title: String, subtitle: String) {
  *  have a token stored on the WebAPI. */
 @Composable
 private fun SpotifyPanel() {
-  Box(Modifier.fillMaxSize().padding(end = 88.dp), contentAlignment = Alignment.Center) {
+  Box(Modifier.fillMaxSize().padding(end = MODE_CONTENT_END_PAD), contentAlignment = Alignment.Center) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
       // Fake album card so we can see the shape.
       Box(
