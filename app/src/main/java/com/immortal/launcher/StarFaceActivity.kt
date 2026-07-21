@@ -26,6 +26,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -155,8 +158,14 @@ class StarFaceActivity : ComponentActivity() {
         android.util.Log.i("StarFace", "enroll $name -> ok=$ok")
       }
     }
+    val onCancel: () -> Unit = {
+      lifecycleScope.launch {
+        val ok = withContext(Dispatchers.IO) { StarLive.manualCancel(apiBase) }
+        android.util.Log.i("StarFace", "cancel -> ok=$ok")
+      }
+    }
 
-    setContent { StarShellScreen(state, detail, onTapWake, onEnroll) }
+    setContent { StarShellScreen(state, detail, onTapWake, onEnroll, onCancel) }
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -300,6 +309,9 @@ object StarLive {
    *  only needs :5205 open through the NUC firewall. */
   fun manualWake(apiBase: String): Boolean = postJson("$apiBase/Star/live/manual-wake", "{}")
 
+  /** Cancel a wake in progress — drops the recording without transcribing. */
+  fun manualCancel(apiBase: String): Boolean = postJson("$apiBase/Star/live/manual-cancel", "{}")
+
   /** Long-press enroll picker — pass "clear" to sign out. */
   fun manualEnroll(apiBase: String, name: String): Boolean {
     val body = "{\"name\":\"${name.replace("\"", "\\\"")}\"}"
@@ -335,8 +347,18 @@ object StarLive {
 
 // --- air quality -----------------------------------------------------------
 
-/** One location's current reading from Open-Meteo's keyless air-quality API. */
-data class AqiReading(val label: String, val aqi: Int, val pm25: Int)
+/** One location's current weather + air quality reading. Combines Open-Meteo's
+ *  keyless air-quality endpoint (aqi, pm2.5) and its forecast endpoint (temp,
+ *  hi/lo, WMO weather code). */
+data class WeatherReading(
+    val label: String,
+    val aqi: Int,
+    val pm25: Int,
+    val tempF: Int?,
+    val hiF: Int?,
+    val loF: Int?,
+    val weatherCode: Int?,
+)
 
 object AirQuality {
   // Same two spots as the SPA's AirQualityCard and the wake-turn weather
@@ -346,9 +368,9 @@ object AirQuality {
           Triple("Lehman PA", 41.32, -76.02),
           Triple("Lewes DE", 38.77, -75.14))
 
-  fun fetch(): List<AqiReading> =
+  fun fetch(): List<WeatherReading> =
       SPOTS.mapNotNull { (label, lat, lon) ->
-        runCatching<AqiReading?> {
+        val aqiPair: Pair<Int, Int>? = runCatching<Pair<Int, Int>?> {
               val url =
                   URL(
                       "https://air-quality-api.open-meteo.com/v1/air-quality" +
@@ -359,22 +381,63 @@ object AirQuality {
               conn.readTimeout = 5000
               try {
                 if (conn.responseCode != 200) {
-                  android.util.Log.w("StarFaceAqi", "$label: HTTP ${conn.responseCode}")
+                  android.util.Log.w("StarFaceAqi", "$label aqi: HTTP ${conn.responseCode}")
                   return@runCatching null
                 }
                 val cur =
                     JSONObject(conn.inputStream.bufferedReader().readText())
                         .optJSONObject("current") ?: return@runCatching null
-                AqiReading(
-                    label,
+                val aqiVal =
                     cur.optDouble("us_aqi", Double.NaN).takeIf { !it.isNaN() }?.toInt()
-                        ?: return@runCatching null,
-                    cur.optDouble("pm2_5", 0.0).toInt())
+                        ?: return@runCatching null
+                aqiVal to cur.optDouble("pm2_5", 0.0).toInt()
               } finally {
                 conn.disconnect()
               }
-            }
+            }.onFailure { android.util.Log.w("StarFaceAqi", "$label aqi exception", it) }
             .getOrNull()
+        if (aqiPair == null) return@mapNotNull null
+
+        // Forecast — best-effort, so if this fails we still return the AQI.
+        val fx = runCatching {
+              val url =
+                  URL(
+                      "https://api.open-meteo.com/v1/forecast" +
+                          "?latitude=$lat&longitude=$lon" +
+                          "&current=temperature_2m,weather_code" +
+                          "&daily=temperature_2m_max,temperature_2m_min" +
+                          "&temperature_unit=fahrenheit" +
+                          "&timezone=America%2FNew_York")
+              val conn = url.openConnection() as HttpURLConnection
+              conn.connectTimeout = 5000
+              conn.readTimeout = 5000
+              try {
+                if (conn.responseCode != 200) {
+                  android.util.Log.w("StarFaceAqi", "$label fx: HTTP ${conn.responseCode}")
+                  return@runCatching null
+                }
+                val root = JSONObject(conn.inputStream.bufferedReader().readText())
+                val cur = root.optJSONObject("current")
+                val dly = root.optJSONObject("daily")
+                Triple(
+                    cur?.optDouble("temperature_2m", Double.NaN)?.takeIf { !it.isNaN() }?.toInt(),
+                    dly?.optJSONArray("temperature_2m_max")?.optDouble(0, Double.NaN)?.takeIf { !it.isNaN() }?.toInt(),
+                    dly?.optJSONArray("temperature_2m_min")?.optDouble(0, Double.NaN)?.takeIf { !it.isNaN() }?.toInt(),
+                ) to cur?.optInt("weather_code", -1)?.takeIf { it >= 0 }
+              } finally {
+                conn.disconnect()
+              }
+            }.getOrNull()
+
+        WeatherReading(
+            label = label,
+            aqi = aqiPair.first,
+            pm25 = aqiPair.second,
+            tempF = fx?.first?.first,
+            hiF = fx?.first?.second,
+            loF = fx?.first?.third,
+            weatherCode = fx?.second,
+        )
       }
 
   fun bandColor(aqi: Int): Color =
@@ -395,6 +458,42 @@ object AirQuality {
         aqi <= 200 -> "unhealthy"
         aqi <= 300 -> "very unhealthy"
         else -> "hazardous"
+      }
+
+  /** WMO weather-code → short glyph + label. Only common codes; anything else
+   *  falls back to a neutral "—". */
+  fun conditionGlyph(code: Int?): String =
+      when (code) {
+        null -> ""
+        0 -> "☀"
+        1, 2 -> "⛅"
+        3 -> "☁"
+        45, 48 -> "🌫"
+        51, 53, 55, 56, 57 -> "🌦"
+        61, 63, 65, 66, 67, 80, 81, 82 -> "🌧"
+        71, 73, 75, 77, 85, 86 -> "❄"
+        95, 96, 99 -> "⛈"
+        else -> "•"
+      }
+
+  fun conditionName(code: Int?): String =
+      when (code) {
+        null -> ""
+        0 -> "clear"
+        1 -> "mainly clear"
+        2 -> "partly cloudy"
+        3 -> "overcast"
+        45, 48 -> "fog"
+        51, 53, 55 -> "drizzle"
+        56, 57 -> "freezing drizzle"
+        61, 63, 65 -> "rain"
+        66, 67 -> "freezing rain"
+        71, 73, 75, 77 -> "snow"
+        80, 81, 82 -> "showers"
+        85, 86 -> "snow showers"
+        95 -> "thunderstorm"
+        96, 99 -> "thunderstorm w/ hail"
+        else -> "—"
       }
 }
 
@@ -419,11 +518,13 @@ private val SPEAKER_ROSTER = listOf(
 )
 
 /** The five modes on the right-edge wheel. Order = draw order top-to-bottom. */
-private enum class StarMode(val icon: String, val label: String) {
+private enum class StarMode(val icon: String, val label: String, val showInWheel: Boolean = true) {
   STAR("✨", "Star"),
   SPOTIFY("🎵", "Spotify"),
-  PHOTOS("🖼", "Photos"),
-  BROWSER("🌐", "Browser"),
+  NETWORK("📡", "Network"),
+  VIDEO("🎬", "Video"),
+  PHOTOS("🖼", "Photos", showInWheel = false),
+  BROWSER("🌐", "Browser", showInWheel = false),
   SETTINGS("⚙", "Settings"),
 }
 
@@ -437,21 +538,54 @@ fun StarShellScreen(
     detail: String?,
     onTapWake: () -> Unit = {},
     onEnroll: (String) -> Unit = {},
+    onCancel: () -> Unit = {},
 ) {
   var mode by remember { mutableStateOf(StarMode.STAR) }
+  // Video mode has a fullscreen affordance: tap the frame → expand over Star
+  // + wheel, tap again or back → collapse to the right-side panel.
+  var videoExpanded by remember { mutableStateOf(false) }
   Box(Modifier.fillMaxSize().background(Color(0xFF04060D))) {
-    when (mode) {
-      StarMode.STAR -> StarPresenceScreen(state, detail, onTapWake, onEnroll)
-      StarMode.SPOTIFY -> SpotifyPanel()
-      StarMode.PHOTOS -> PhotosPanel()
-      StarMode.BROWSER -> BrowserPanel()
-      StarMode.SETTINGS -> SettingsPanel()
+    // Star is always the focal point — Spotify/Video/Network render as
+    // right-side panels that share the frame with the portrait. Settings is
+    // the one exception; it's read-write configuration and takes the whole
+    // surface. Fullscreen video is another exception, drawn as a top layer.
+    if (mode == StarMode.SETTINGS) {
+      SettingsPanel()
+    } else {
+      Row(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+          StarPresenceScreen(state, detail, onTapWake, onEnroll, onCancel)
+        }
+        when (mode) {
+          StarMode.SPOTIFY -> SpotifyPanel(Modifier.width(420.dp).fillMaxHeight())
+          StarMode.BROWSER -> BrowserPanel(Modifier.width(560.dp).fillMaxHeight())
+          StarMode.NETWORK -> NetworkPanel(Modifier.width(480.dp).fillMaxHeight())
+          StarMode.VIDEO ->
+              VideoPanel(
+                  modifier = Modifier.width(560.dp).fillMaxHeight(),
+                  expanded = false,
+                  onToggleExpand = { videoExpanded = true },
+              )
+          else -> {}
+        }
+        Spacer(Modifier.width(MODE_CONTENT_END_PAD))
+      }
     }
     ModeWheel(
         current = mode,
-        onSelect = { mode = it },
+        onSelect = {
+          mode = it
+          if (it != StarMode.VIDEO) videoExpanded = false
+        },
         modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
     )
+    if (mode == StarMode.VIDEO && videoExpanded) {
+      VideoPanel(
+          modifier = Modifier.fillMaxSize(),
+          expanded = true,
+          onToggleExpand = { videoExpanded = false },
+      )
+    }
   }
 }
 
@@ -471,7 +605,7 @@ private fun ModeWheel(
       verticalArrangement = Arrangement.spacedBy(10.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    for (m in StarMode.entries) {
+    for (m in StarMode.entries.filter { it.showInWheel }) {
       val selected = m == current
       Row(verticalAlignment = Alignment.CenterVertically) {
         // Left-side accent bar for the active mode.
@@ -577,13 +711,15 @@ private fun PhotosPanel() {
 /** Browser — simple URL bar + WebView. Not a full browser: no history stack,
  *  no bookmarks, no tabs. Enough to open a page. */
 @Composable
-private fun BrowserPanel() {
+private fun BrowserPanel(modifier: Modifier = Modifier) {
   var url by remember { mutableStateOf("https://docs.greblunashome.org") }
   var editing by remember { mutableStateOf(url) }
   var webViewRef by remember { mutableStateOf<android.webkit.WebView?>(null) }
 
   Column(
-      Modifier.fillMaxSize().padding(end = MODE_CONTENT_END_PAD),
+      modifier
+          .background(Color(0xFF0B1220).copy(alpha = 0.55f))
+          .padding(horizontal = 12.dp, vertical = 12.dp),
   ) {
     // URL bar
     Row(
@@ -648,7 +784,18 @@ private fun BrowserPanel() {
           android.webkit.WebView(ctx).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-            webViewClient = android.webkit.WebViewClient()
+            // Same tolerance as PhotoFrameController's WebView — default cancels
+            // the whole load on any subresource SSL blip.
+            webViewClient =
+                object : android.webkit.WebViewClient() {
+                  override fun onReceivedSslError(
+                      view: android.webkit.WebView?,
+                      handler: android.webkit.SslErrorHandler?,
+                      error: android.net.http.SslError?
+                  ) {
+                    handler?.proceed()
+                  }
+                }
             webViewRef = this
             loadUrl(url)
           }
@@ -659,7 +806,7 @@ private fun BrowserPanel() {
 private val BROWSER_BOOKMARKS = listOf(
     "Docs" to "https://docs.greblunashome.org",
     "Stargazer" to "https://stargazermi.com",
-    "World" to "http://192.168.1.158:5179/world/star",
+    "World" to "http://star.greblunashome.org/world/star",
     "News" to "https://text.npr.org",
 )
 
@@ -775,7 +922,7 @@ private fun SettingLabel(text: String) {
  *  user signs in, and the stargazer-star:// redirect brings the code back
  *  to the activity for token exchange. */
 @Composable
-private fun SpotifyPanel() {
+private fun SpotifyPanel(modifier: Modifier = Modifier) {
   val ctx = LocalContext.current
   val scope = androidx.compose.runtime.rememberCoroutineScope()
   val refreshToken = SpotifyState.refreshToken
@@ -800,7 +947,12 @@ private fun SpotifyPanel() {
     }
   }
 
-  Box(Modifier.fillMaxSize().padding(end = MODE_CONTENT_END_PAD), contentAlignment = Alignment.Center) {
+  Box(
+      modifier
+          .background(Color(0xFF0B1220).copy(alpha = 0.55f))
+          .padding(horizontal = 24.dp, vertical = 20.dp),
+      contentAlignment = Alignment.Center,
+  ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
       SpotifyArt(track?.artUrl)
       Spacer(Modifier.height(20.dp))
@@ -1002,6 +1154,216 @@ private fun SpotifyArt(url: String?) {
   }
 }
 
+/** Video player mode. Fixed sample URL for now (Sanity CDN). Tap the frame to
+ *  expand fullscreen — StarShellScreen re-renders us over Star + wheel. Tap
+ *  again or press back to collapse. Video keeps playing across the transition
+ *  because the same composable instance owns the VideoView. */
+@Composable
+private fun VideoPanel(
+    modifier: Modifier = Modifier,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+) {
+  val ctx = LocalContext.current
+  // Placeholder until we wire a real feed / playlist. Steve's sample.
+  val url = "https://cdn.sanity.io/files/b51ltrqw/production/f4666f9bbfb8dee6858d8643502766903d5033f3.mp4"
+
+  androidx.activity.compose.BackHandler(enabled = expanded) { onToggleExpand() }
+
+  // HTML5 video in a WebView — avoids SurfaceView hole-punching on Android 9,
+  // which was masking the Star Canvas whenever the video panel was visible.
+  val html = remember(url) {
+    """
+    <!doctype html><html><head><meta name="viewport" content="width=device-width">
+    <style>
+      html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100%}
+      video{width:100%;height:100%;object-fit:contain;background:#000}
+    </style></head><body>
+    <video src="$url" autoplay loop muted playsinline></video>
+    </body></html>
+    """.trimIndent()
+  }
+
+  Box(
+      modifier
+          .background(Color.Black)
+          .clickable { onToggleExpand() },
+      contentAlignment = Alignment.Center,
+  ) {
+    AndroidView(
+        modifier = Modifier.fillMaxSize(),
+        factory = { c ->
+          android.webkit.WebView(c).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            setBackgroundColor(android.graphics.Color.BLACK)
+            webViewClient =
+                object : android.webkit.WebViewClient() {
+                  override fun onReceivedSslError(
+                      view: android.webkit.WebView?,
+                      handler: android.webkit.SslErrorHandler?,
+                      error: android.net.http.SslError?
+                  ) {
+                    handler?.proceed()
+                  }
+                }
+            loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+          }
+        })
+    if (!expanded) {
+      Text(
+          text = "tap · fullscreen",
+          color = Color.White.copy(alpha = 0.55f),
+          fontSize = 11.sp,
+          letterSpacing = 2.sp,
+          modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp),
+      )
+    }
+  }
+}
+
+/** Network topology snapshot from webapi (`GET /Network/topology`). Stubbed on
+ *  the backend for now — hand-shaped mesh + a handful of devices. Real
+ *  implementation will merge arp-scan + mDNS + an unofficial Eero client. */
+@Composable
+private fun NetworkPanel(modifier: Modifier = Modifier) {
+  val ctx = LocalContext.current
+  var payload by remember { mutableStateOf<org.json.JSONObject?>(null) }
+  var error by remember { mutableStateOf<String?>(null) }
+
+  LaunchedEffect(Unit) {
+    while (isActive) {
+      val apiBase = FleetConfig.getValue(ctx, "star.api") ?: StarLive.DEFAULT_API
+      val fetched = withContext(Dispatchers.IO) {
+        runCatching {
+          val url = java.net.URL("$apiBase/Network/topology")
+          val conn = url.openConnection() as java.net.HttpURLConnection
+          conn.connectTimeout = 5000
+          conn.readTimeout = 5000
+          val body = conn.inputStream.bufferedReader().readText()
+          org.json.JSONObject(body)
+        }
+      }
+      fetched.onSuccess { payload = it; error = null }.onFailure { error = it.message }
+      delay(30_000)
+    }
+  }
+
+  Column(
+      modifier
+          .background(Color(0xFF0B1220).copy(alpha = 0.55f))
+          .padding(horizontal = 16.dp, vertical = 16.dp),
+  ) {
+    Text(
+        text = "NETWORK",
+        color = Color(0xFF22D3EE).copy(alpha = 0.75f),
+        fontSize = 12.sp,
+        letterSpacing = 3.sp,
+        fontWeight = FontWeight.Medium,
+    )
+    Spacer(Modifier.height(4.dp))
+    val stub = payload?.optBoolean("stub", false) == true
+    Text(
+        text = if (stub) "topology · stub feed" else "topology · live",
+        color = Color.White.copy(alpha = 0.45f),
+        fontSize = 11.sp,
+    )
+    Spacer(Modifier.height(16.dp))
+
+    val err = error
+    val p = payload
+    if (p == null) {
+      Text(
+          text = err ?: "Loading…",
+          color = if (err != null) Color(0xFFF87171) else Color.White.copy(alpha = 0.5f),
+          fontSize = 13.sp,
+      )
+      return@Column
+    }
+
+    val nodes = p.optJSONArray("nodes")
+    val devices = p.optJSONArray("devices")
+    val summary = p.optJSONObject("summary")
+    val gw = p.optJSONObject("gateway")
+
+    // Header row: gateway + totals
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(
+          text = gw?.optString("vendor") ?: "gateway",
+          color = Color.White.copy(alpha = 0.85f),
+          fontSize = 15.sp,
+          fontWeight = FontWeight.Medium,
+      )
+      Spacer(Modifier.width(6.dp))
+      Text(
+          text = gw?.optString("ip") ?: "",
+          color = Color.White.copy(alpha = 0.45f),
+          fontSize = 12.sp,
+      )
+    }
+    Spacer(Modifier.height(2.dp))
+    if (summary != null) {
+      Text(
+          text = "${summary.optInt("online")} online · ${summary.optInt("offline")} offline",
+          color = Color.White.copy(alpha = 0.55f),
+          fontSize = 12.sp,
+      )
+    }
+    Spacer(Modifier.height(14.dp))
+
+    // Scrollable node/device list
+    val scroll = rememberScrollState()
+    Column(Modifier.verticalScroll(scroll)) {
+      for (i in 0 until (nodes?.length() ?: 0)) {
+        val node = nodes!!.getJSONObject(i)
+        val nodeId = node.optString("id")
+        val name = node.optString("name")
+        val model = node.optString("model")
+        val conn = node.optString("connection")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(if (conn == "wired") "▬" else "≈", color = Color(0xFF22D3EE), fontSize = 14.sp)
+          Spacer(Modifier.width(6.dp))
+          Text(
+              text = name,
+              color = Color.White.copy(alpha = 0.90f),
+              fontSize = 16.sp,
+              fontWeight = FontWeight.Medium,
+          )
+          Spacer(Modifier.width(6.dp))
+          Text(
+              text = model,
+              color = Color.White.copy(alpha = 0.40f),
+              fontSize = 11.sp,
+          )
+        }
+        // Devices attached to this node
+        for (j in 0 until (devices?.length() ?: 0)) {
+          val d = devices!!.getJSONObject(j)
+          if (d.optString("node") != nodeId) continue
+          val rssi = d.optInt("signalDbm", 0)
+          val rssiStr = if (rssi != 0) " · $rssi dBm" else ""
+          Row(Modifier.padding(start = 20.dp, top = 4.dp)) {
+            Column {
+              Text(
+                  text = d.optString("name"),
+                  color = Color.White.copy(alpha = 0.80f),
+                  fontSize = 13.sp,
+              )
+              Text(
+                  text = "${d.optString("ip")} · ${d.optString("connection")}$rssiStr",
+                  color = Color.White.copy(alpha = 0.40f),
+                  fontSize = 11.sp,
+              )
+            }
+          }
+        }
+        Spacer(Modifier.height(10.dp))
+      }
+    }
+  }
+}
+
 @Composable
 private fun SpotifyTransportButton(glyph: String, primary: Boolean = false, onTap: () -> Unit) {
   Box(
@@ -1024,6 +1386,7 @@ fun StarPresenceScreen(
     detail: String?,
     onTapWake: () -> Unit = {},
     onEnroll: (String) -> Unit = {},
+    onCancel: () -> Unit = {},
 ) {
   // Single time driver for the whole scene — everything is drawn as f(t).
   var t by remember { mutableFloatStateOf(0f) }
@@ -1110,14 +1473,14 @@ fun StarPresenceScreen(
   // usage generously; two calls per refresh is nothing). Until the first
   // successful fetch, retry every 30s so a transient network hiccup at
   // launch doesn't blank the widget for half an hour.
-  var aqi by remember { mutableStateOf<List<AqiReading>>(emptyList()) }
+  var weather by remember { mutableStateOf<List<WeatherReading>>(emptyList()) }
   LaunchedEffect(Unit) {
     while (isActive) {
       val readings = withContext(Dispatchers.IO) { AirQuality.fetch() }
       android.util.Log.i("StarFaceAqi", "fetched ${readings.size} readings: " +
-          readings.joinToString { "${it.label}=${it.aqi}" })
-      if (readings.isNotEmpty()) aqi = readings
-      delay(if (aqi.isEmpty()) 30 * 1000L else 30 * 60 * 1000L)
+          readings.joinToString { "${it.label} aqi=${it.aqi} t=${it.tempF ?: '?'}" })
+      if (readings.isNotEmpty()) weather = readings
+      delay(if (weather.isEmpty()) 30 * 1000L else 30 * 60 * 1000L)
     }
   }
 
@@ -1165,29 +1528,73 @@ fun StarPresenceScreen(
       drawPortrait(t, state, shown, previous, fade, core)
       drawTapPulse(t, tapAt)
     }
-    if (aqi.isNotEmpty()) {
+    if (weather.isNotEmpty()) {
       androidx.compose.foundation.layout.Column(
           modifier = Modifier.align(Alignment.TopStart).padding(top = 24.dp, start = 30.dp)) {
         Text(
-            text = "AIR QUALITY",
+            text = "WEATHER",
             color = Color.White.copy(alpha = 0.45f),
             fontSize = 18.sp,
             fontWeight = FontWeight.Light,
             letterSpacing = 4.sp)
-        for (r in aqi) {
-          Text(
-              text = "${r.aqi}  ${r.label}",
-              color = AirQuality.bandColor(r.aqi).copy(alpha = 0.90f),
-              fontSize = 40.sp,
-              fontWeight = FontWeight.Light,
-              letterSpacing = 1.sp,
-              modifier = Modifier.padding(top = 12.dp))
-          Text(
-              text = "${AirQuality.bandName(r.aqi)} · pm2.5 ${r.pm25}",
-              color = Color.White.copy(alpha = 0.45f),
-              fontSize = 18.sp,
-              fontWeight = FontWeight.Light,
-              letterSpacing = 1.5.sp)
+        for (r in weather) {
+          // Big line: temp + condition glyph + location
+          Row(
+              modifier = Modifier.padding(top = 12.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Text(
+                text = r.tempF?.let { "$it°" } ?: "—",
+                color = Color.White.copy(alpha = 0.90f),
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 1.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = AirQuality.conditionGlyph(r.weatherCode),
+                fontSize = 32.sp,
+                color = Color.White.copy(alpha = 0.80f))
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = r.label,
+                color = Color.White.copy(alpha = 0.60f),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 1.sp)
+          }
+          // Sub-line: condition + hi/lo
+          val hiLo =
+              if (r.hiF != null && r.loF != null) "H ${r.hiF}° · L ${r.loF}°" else ""
+          val condTxt = AirQuality.conditionName(r.weatherCode)
+          val subline = listOf(condTxt, hiLo).filter { it.isNotEmpty() }.joinToString(" · ")
+          if (subline.isNotEmpty()) {
+            Text(
+                text = subline,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 1.sp)
+          }
+          // AQI chip in its color band
+          Row(
+              modifier = Modifier.padding(top = 4.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Text(
+                text = "AQI ${r.aqi}",
+                color = AirQuality.bandColor(r.aqi).copy(alpha = 0.95f),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 1.sp)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "· ${AirQuality.bandName(r.aqi)} · pm2.5 ${r.pm25}",
+                color = Color.White.copy(alpha = 0.40f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 1.sp)
+          }
+          Spacer(Modifier.height(10.dp))
         }
       }
     }
@@ -1224,6 +1631,29 @@ fun StarPresenceScreen(
         fontWeight = FontWeight.Light,
         letterSpacing = 3.sp,
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 36.dp))
+
+    // Cancel button — only visible while Star is actively recording an
+    // utterance. Aborts the recording without transcribing so an accidental
+    // wake-word trigger doesn't get sent to Claude.
+    if (state == StarLive.State.LISTENING) {
+      Box(
+          modifier = Modifier
+              .align(Alignment.BottomCenter)
+              .padding(bottom = 90.dp)
+              .clip(RoundedCornerShape(28.dp))
+              .background(Color(0xFFF87171).copy(alpha = 0.85f))
+              .clickable { onCancel() }
+              .padding(horizontal = 28.dp, vertical = 14.dp),
+      ) {
+        Text(
+            text = "Cancel",
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp,
+        )
+      }
+    }
 
     if (showEnroll) {
       EnrollPickerDialog(

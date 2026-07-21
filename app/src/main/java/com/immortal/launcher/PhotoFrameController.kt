@@ -452,7 +452,32 @@ class PhotoFrameController(
       loadWithOverviewMode = true
       useWideViewPort = true
     }
-    wv.webViewClient = android.webkit.WebViewClient() // keep navigation inside the WebView
+    // Custom client: accept SSL errors so subresources going through a self-signed
+    // upstream (vite dev's mkcert cert, Andy's NPM before LE renewal, etc.) don't
+    // silently cancel the whole page load. Default WebViewClient's
+    // onReceivedSslError calls handler.cancel(), which turns the frame black.
+    wv.webViewClient =
+        object : android.webkit.WebViewClient() {
+          override fun onReceivedSslError(
+              view: android.webkit.WebView?,
+              handler: android.webkit.SslErrorHandler?,
+              error: android.net.http.SslError?
+          ) {
+            Log.w("PhotoFrame", "onReceivedSslError: ${error?.url} primaryError=${error?.primaryError}")
+            handler?.proceed()
+          }
+
+          override fun onReceivedError(
+              view: android.webkit.WebView?,
+              request: android.webkit.WebResourceRequest?,
+              error: android.webkit.WebResourceError?
+          ) {
+            Log.w(
+                "PhotoFrame",
+                "onReceivedError: ${request?.url} code=${error?.errorCode} desc=${error?.description}"
+            )
+          }
+        }
     (view as FrameLayout).addView(wv, FrameLayout.LayoutParams(MATCH, MATCH))
     wv.loadUrl(url)
     webView = wv
