@@ -59,14 +59,14 @@ class ImmichConnectActivity : ComponentActivity() {
 @Composable
 private fun ImmichConnectScreen(onDone: () -> Unit) {
   val context = LocalContext.current
-  val ui = remember { Handler(Looper.getMainLooper()) }
+  val userLang = ImmortalSettings.load(context).language
   val existing = remember { ScreensaverConfig.load(context) }
-
   var url by remember { mutableStateOf(existing.immichUrl ?: "") }
   var key by remember { mutableStateOf(existing.immichKey ?: "") }
   var testing by remember { mutableStateOf(false) }
   var status by remember { mutableStateOf<String?>(null) }
-  // null = not connected yet (show the form); non-null = connected, show the album picker.
+  val ui = remember { Handler(Looper.getMainLooper()) }
+
   var albums by remember { mutableStateOf<List<ImmichSource.Album>?>(null) }
   var selectedAlbumId by remember { mutableStateOf(existing.immichAlbumId) }
   val (_, initialFocus) = rememberInitialFocus()
@@ -77,7 +77,7 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
     val u = url.trim()
     val k = key.trim()
     if (u.isEmpty() || k.isEmpty()) {
-      status = "Enter both the server address and an API key."
+      status = com.immortal.launcher.i18n.I18n.translate("Enter both the server address and an API key.", userLang)
       return
     }
     testing = true
@@ -91,7 +91,7 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
           ScreensaverConfig.setImmich(context, u, k)
           albums = list ?: emptyList()
         } else {
-          status = "Couldn't reach Immich or the key was rejected. Check the address and key."
+          status = com.immortal.launcher.i18n.I18n.translate("Couldn't reach Immich or the key was rejected. Check the address and key.", userLang)
         }
       }
     }
@@ -110,14 +110,18 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
               .padding(horizontal = 28.dp, vertical = 32.dp),
   ) {
     Column(modifier = Modifier.widthIn(max = 1100.dp)) {
-      Text("Immich server", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+      Text(
+          com.immortal.launcher.i18n.I18n.translate("Immich server", userLang),
+          color = Color.White,
+          fontSize = 34.sp,
+          fontWeight = FontWeight.SemiBold,
+      )
 
       val loaded = albums
       if (loaded == null) {
         // --- Step 1: connection details ---
         Text(
-            "Pull photos straight from your self-hosted Immich server. Enter its address and an " +
-                "API key (Immich → Account Settings → API Keys).",
+            com.immortal.launcher.i18n.I18n.translate("Pull photos straight from your self-hosted Immich server. Enter its address and an API key (Immich → Account Settings → API Keys).", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 16.sp,
             modifier = Modifier.padding(top = 6.dp),
@@ -136,7 +140,7 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
         OutlinedTextField(
             value = key,
             onValueChange = { key = it },
-            placeholder = { Text("API key", color = Color(0xFF777777)) },
+            placeholder = { Text(com.immortal.launcher.i18n.I18n.translate("API key", userLang), color = Color(0xFF777777)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
             shape = RoundedCornerShape(14.dp),
@@ -161,7 +165,7 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
                 },
         ) {
           Text(
-              if (testing) "Connecting…" else "Test & connect",
+              if (testing) com.immortal.launcher.i18n.I18n.translate("Connecting…", userLang) else com.immortal.launcher.i18n.I18n.translate("Test & connect", userLang),
               color = Color.White,
               fontSize = 18.sp,
               fontWeight = FontWeight.SemiBold,
@@ -170,11 +174,11 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
           )
         }
         Spacer(Modifier.heightIn(min = 12.dp))
-        CancelRow(onDone)
+        CancelRow(userLang, onDone)
       } else {
         // --- Step 2: pick an album (or the whole library) ---
         Text(
-            "Connected. Choose what to show:",
+            com.immortal.launcher.i18n.I18n.translate("Connected. Choose what to show:", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 16.sp,
             modifier = Modifier.padding(top = 6.dp),
@@ -183,13 +187,17 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
 
         Surface(color = Color(0xFF1C1C1E), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
           Column {
-            AlbumRow("Whole library", "All your photos", selectedAlbumId == null) {
+            AlbumRow(
+                com.immortal.launcher.i18n.I18n.translate("Whole library", userLang),
+                com.immortal.launcher.i18n.I18n.translate("All your photos", userLang),
+                selectedAlbumId == null
+            ) {
               selectedAlbumId = null
               choose(null, null)
             }
             loaded.forEach { a ->
               Divider()
-              AlbumRow(a.name, "${a.count} photo${if (a.count == 1) "" else "s"}", selectedAlbumId == a.id) {
+              AlbumRow(a.name, "${a.count} " + com.immortal.launcher.i18n.I18n.tr("photo", "fotos", userLang), selectedAlbumId == a.id) {
                 selectedAlbumId = a.id
                 choose(a.id, a.name)
               }
@@ -197,7 +205,7 @@ private fun ImmichConnectScreen(onDone: () -> Unit) {
           }
         }
         Spacer(Modifier.heightIn(min = 16.dp))
-        CancelRow(onDone)
+        CancelRow(userLang, onDone)
       }
     }
   }
@@ -220,7 +228,7 @@ private fun AlbumRow(title: String, subtitle: String, selected: Boolean, onClick
 }
 
 @Composable
-private fun CancelRow(onDone: () -> Unit) {
+private fun CancelRow(userLang: String, onDone: () -> Unit) {
   Surface(
       color = Color(0xFF1C1C1E),
       shape = RoundedCornerShape(16.dp),
@@ -228,7 +236,7 @@ private fun CancelRow(onDone: () -> Unit) {
           Modifier.fillMaxWidth().tvFocusable(RoundedCornerShape(16.dp), focusScale = 1f) { onDone() },
   ) {
     Text(
-        "Done",
+        com.immortal.launcher.i18n.I18n.translate("Done", userLang),
         color = Color(0xFFDDDDDD),
         fontSize = 16.sp,
         textAlign = TextAlign.Center,

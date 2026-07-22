@@ -154,15 +154,8 @@ object SettingsDomains {
 
   /** Short label for the active photo source, shown on the "Photo source" nav row. */
   private fun sourceLabel(s: ScreensaverConfig.Settings): String =
-      when {
-        s.usesImmich -> "Immich"
-        s.usesSmb -> "Network share"
-        s.usesDav -> "WebDAV"
-        s.usesWebUrl -> "Web page"
-        s.usesUrl -> "Shared album"
-        s.usesFolder -> "Local folder"
-        else -> "Immortal photos"
-      }
+      com.immortal.launcher.i18n.I18n.sourceLabel(
+          s.usesImmich, s.usesSmb, s.usesDav, s.usesWebUrl, s.usesUrl, s.usesFolder)
 
   /**
    * The photo-frame display settings — the slice the legacy `FleetScreensaver.toJson` reports.
@@ -241,7 +234,7 @@ object SettingsDomains {
                       get = { it.fit },
                       set = ScreensaverConfig::setFit,
                       options =
-                          listOf(ScreensaverConfig.FIT_FILL to "Fill", ScreensaverConfig.FIT_FIT to "Fit"),
+                          listOf(ScreensaverConfig.FIT_FILL to "fill", ScreensaverConfig.FIT_FIT to "fit"),
                       coerce = { FleetScreensaver.coerceFit(it) }),
                   IntSpec(
                       "intervalSec",
@@ -503,6 +496,18 @@ object SettingsDomains {
           load = ImmortalSettings::load,
           specs =
               listOf(
+                  EnumSpec(
+                      "language",
+                      "Language / Idioma",
+                      get = { it.language },
+                      set = ImmortalSettings::setLanguage,
+                      options =
+                          listOf(
+                              ImmortalSettings.LANG_AUTO to "System default / Idioma del sistema",
+                              ImmortalSettings.LANG_ES to "Español",
+                              ImmortalSettings.LANG_EN to "English"),
+                      coerce = oneOf(ImmortalSettings.LANG_AUTO, ImmortalSettings.LANG_ES, ImmortalSettings.LANG_EN),
+                      help = "Choose language for Immortal / Elige el idioma para la aplicación."),
                   EnumSpec(
                       "weatherUnit",
                       "Temperature unit",

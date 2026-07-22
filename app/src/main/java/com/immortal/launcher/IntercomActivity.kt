@@ -60,6 +60,7 @@ class IntercomActivity : ComponentActivity() {
 @Composable
 private fun IntercomScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val activity = context as? Activity
   val lan = remember { LanAudio() }
   DisposableEffect(Unit) { onDispose { lan.stop() } }
@@ -72,17 +73,17 @@ private fun IntercomScreen() {
   // Kick off the broadcast and reflect whether the port actually bound, so the UI
   // never claims it's broadcasting when the socket couldn't open.
   fun beginBroadcast() {
-    status = "Starting…"
+    status = com.immortal.launcher.i18n.I18n.translate("Starting…", userLang)
     lan.startBroadcast { ok ->
-      if (ok) { mode = "broadcasting"; status = "Broadcasting this room's audio" }
-      else { mode = "idle"; status = "Couldn't start — the broadcast port is in use" }
+      if (ok) { mode = "broadcasting"; status = com.immortal.launcher.i18n.I18n.translate("Broadcasting this room's audio", userLang) }
+      else { mode = "idle"; status = com.immortal.launcher.i18n.I18n.translate("Couldn't start — the broadcast port is in use", userLang) }
     }
   }
 
   val permLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
       androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
     if (granted) beginBroadcast()
-    else status = "Microphone permission is needed to broadcast"
+    else status = com.immortal.launcher.i18n.I18n.translate("Microphone permission is needed to broadcast", userLang)
   }
 
   fun startBroadcast() {
@@ -99,14 +100,14 @@ private fun IntercomScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      Text("Intercom", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-      Text("One-way audio between two Portals on the same Wi-Fi. No internet, no servers.",
+      Text(com.immortal.launcher.i18n.I18n.translate("Intercom", userLang), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+      Text(com.immortal.launcher.i18n.I18n.translate("One-way audio between two Portals on the same Wi-Fi. No internet, no servers.", userLang),
           color = Color(0xFF9A9A9A), fontSize = 15.sp, textAlign = TextAlign.Center)
 
       if (myIp.isNotBlank()) {
         Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
             shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-          Text("This Portal's address: $myIp", color = Color.White, fontSize = 15.sp,
+          Text(com.immortal.launcher.i18n.I18n.tr("This Portal's address: $myIp", "Dirección de este Portal: $myIp", userLang), color = Color.White, fontSize = 15.sp,
               modifier = Modifier.padding(16.dp))
         }
       }
@@ -117,7 +118,7 @@ private fun IntercomScreen() {
 
       // Broadcast (baby monitor in the nursery): this device's mic → the network.
       ActionButton(
-          label = if (mode == "broadcasting") "■ Stop broadcasting" else "🔊 Broadcast this room",
+          label = if (mode == "broadcasting") com.immortal.launcher.i18n.I18n.translate("■ Stop broadcasting", userLang) else com.immortal.launcher.i18n.I18n.translate("🔊 Broadcast this room", userLang),
           primary = mode != "broadcasting",
       ) {
         if (mode == "broadcasting") { lan.stop(); mode = "idle"; status = "" } else startBroadcast()
@@ -128,17 +129,17 @@ private fun IntercomScreen() {
           shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
           OutlinedTextField(value = host, onValueChange = { host = it }, singleLine = true,
-              label = { Text("Other Portal's address (e.g. 192.168.1.42)") },
+              label = { Text(com.immortal.launcher.i18n.I18n.translate("Other Portal's address (e.g. 192.168.1.42)", userLang)) },
               modifier = Modifier.fillMaxWidth())
           ActionButton(
-              label = if (mode == "listening") "■ Stop listening" else "👂 Listen",
+              label = if (mode == "listening") com.immortal.launcher.i18n.I18n.translate("■ Stop listening", userLang) else com.immortal.launcher.i18n.I18n.translate("👂 Listen", userLang),
               primary = mode != "listening",
           ) {
             if (mode == "listening") { lan.stop(); mode = "idle"; status = "" }
             else if (host.isNotBlank()) {
-              status = "Connecting…"
+              status = com.immortal.launcher.i18n.I18n.translate("Connecting…", userLang)
               lan.startListening(host.trim()) { ok ->
-                status = if (ok) "Listening to $host" else "Couldn't connect to $host"
+                status = if (ok) com.immortal.launcher.i18n.I18n.tr("Listening to $host", "Escuchando a $host", userLang) else com.immortal.launcher.i18n.I18n.tr("Couldn't connect to $host", "No se pudo conectar a $host", userLang)
                 mode = if (ok) "listening" else "idle"
               }
             }

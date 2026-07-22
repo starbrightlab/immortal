@@ -68,20 +68,20 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun IssOverlay(onDismiss: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var passes by remember { mutableStateOf<List<IssPasses.Pass>?>(null) }
   LaunchedEffect(Unit) { passes = withContext(Dispatchers.IO) { IssPasses.predict(context) } }
 
   BackHandler { onDismiss() }
   Scrim(onDismiss) {
     ToolCard {
-      Text("🛰️ Space station overhead", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+      Text(com.immortal.launcher.i18n.I18n.translate("🛰️ Space station overhead", userLang), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
       val p = passes
       when {
-        p == null -> Text("Finding passes…", color = Color(0xFFB0B0B0), fontSize = 16.sp)
+        p == null -> Text(com.immortal.launcher.i18n.I18n.translate("Finding passes…", userLang), color = Color(0xFFB0B0B0), fontSize = 16.sp)
         p.isEmpty() ->
             Text(
-                "No passes found. Check the device is online so it can fetch the latest orbit, " +
-                    "and that your location is set (it follows the weather tile).",
+                com.immortal.launcher.i18n.I18n.translate("No passes found. Check the device is online so it can fetch the latest orbit, and that your location is set (it follows the weather tile).", userLang),
                 color = Color(0xFFB0B0B0),
                 fontSize = 15.sp,
             )
@@ -89,7 +89,7 @@ internal fun IssOverlay(onDismiss: () -> Unit) {
           val first = p.first()
           Text(
               buildString {
-                append(if (first.visible) "Visible pass " else "Passes over ")
+                append(if (first.visible) com.immortal.launcher.i18n.I18n.tr("Visible pass ", "Pase visible ", userLang) else com.immortal.launcher.i18n.I18n.tr("Passes over ", "Pasa sobre ", userLang))
                 append(IssPasses.timeLabel(first.startMillis))
                 append(if (first.visible) " ✨" else "")
               },
@@ -108,12 +108,16 @@ internal fun IssOverlay(onDismiss: () -> Unit) {
                     Text(IssPasses.timeLabel(pass.startMillis), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     if (pass.visible) {
                       Surface(color = Color(0x33FFD54F), shape = RoundedCornerShape(8.dp)) {
-                        Text("✨ visible", color = Color(0xFFFFD54F), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                        Text("✨ " + com.immortal.launcher.i18n.I18n.translate("visible", userLang), color = Color(0xFFFFD54F), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                       }
                     }
                   }
                   Text(
-                      "Rises ${pass.startDir} · peak ${pass.maxElevationDeg}° to the ${pass.peakDir} · sets ${pass.endDir}",
+                      com.immortal.launcher.i18n.I18n.tr(
+                          "Rises ${pass.startDir} · peak ${pass.maxElevationDeg}° to the ${pass.peakDir} · sets ${pass.endDir}",
+                          "Sale ${pass.startDir} · pico ${pass.maxElevationDeg}° hacia el ${pass.peakDir} · se pone ${pass.endDir}",
+                          userLang
+                      ),
                       color = Color(0xFFB8B8B8),
                       fontSize = 14.sp,
                   )
@@ -122,13 +126,13 @@ internal fun IssOverlay(onDismiss: () -> Unit) {
             }
           }
           Text(
-              "Times are local. ✨ means it should be bright enough to see — go outside and look up to the listed direction.",
+              com.immortal.launcher.i18n.I18n.translate("Times are local. ✨ means it should be bright enough to see — go outside and look up to the listed direction.", userLang),
               color = Color(0xFF8A8A8A),
               fontSize = 12.sp,
           )
         }
       }
-      CloseButton("Close", onDismiss)
+      CloseButton(com.immortal.launcher.i18n.I18n.translate("Close", userLang), onDismiss)
     }
   }
 }

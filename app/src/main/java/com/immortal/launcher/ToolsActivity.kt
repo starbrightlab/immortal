@@ -91,6 +91,7 @@ private fun ToolsRoot(onExit: () -> Unit) {
 @Composable
 private fun ToolsScreen(onExit: () -> Unit, onOpen: (ToolPage) -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val activity = context as? Activity
   val firstFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
@@ -109,36 +110,74 @@ private fun ToolsScreen(onExit: () -> Unit, onOpen: (ToolPage) -> Unit) {
               .padding(horizontal = 28.dp, vertical = 32.dp),
   ) {
     Column(modifier = Modifier.widthIn(max = 1100.dp).focusRequester(firstFocus).focusGroup()) {
-      Text("Tools", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Extra utilities for your Portal.",
+          com.immortal.launcher.i18n.I18n.translate("Tools", userLang),
+          color = Color.White,
+          fontSize = 34.sp,
+          fontWeight = FontWeight.SemiBold,
+      )
+      Text(
+          com.immortal.launcher.i18n.I18n.translate("Extra utilities for your Portal.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
       )
       Spacer(Modifier.size(26.dp))
       Card {
-        ToolRow("Cameras", "View a saved RTSP camera feed") {
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Cameras", userLang),
+            com.immortal.launcher.i18n.I18n.translate("View a saved RTSP camera feed", userLang)
+        ) {
           context.startActivity(Intent(context, CameraViewerActivity::class.java))
         }
-        ToolRow("Countdowns", "Days until birthdays and events") {
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Countdowns", userLang),
+            com.immortal.launcher.i18n.I18n.translate("Days until birthdays and events", userLang)
+        ) {
           context.startActivity(Intent(context, CountdownSettingsActivity::class.java))
         }
-        ToolRow("Lamp", "A full-screen warm-white light") {
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Lamp", userLang),
+            com.immortal.launcher.i18n.I18n.translate("A full-screen warm-white light", userLang)
+        ) {
           context.startActivity(Intent(context, LampActivity::class.java))
         }
-        ToolRow("Bedtime story", "Public-domain tales read aloud") {
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Bedtime story", userLang),
+            com.immortal.launcher.i18n.I18n.translate("Public-domain tales read aloud", userLang)
+        ) {
           context.startActivity(Intent(context, BedtimeStoryActivity::class.java))
         }
-        ToolRow("Intercom", "Talk to another Portal on your Wi-Fi") {
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Intercom", userLang),
+            com.immortal.launcher.i18n.I18n.translate("Talk to another Portal on your Wi-Fi", userLang)
+        ) {
           context.startActivity(Intent(context, IntercomActivity::class.java))
         }
-        ToolRow("Timers", "Kitchen timers with a live countdown") { onOpen(ToolPage.TIMERS) }
-        ToolRow("Leave a note", "A sticky note or a quick voice memo") { onOpen(ToolPage.NOTES) }
-        ToolRow("Converter", "Units and currency") { onOpen(ToolPage.CONVERTER) }
-        ToolRow("ISS passes", "When the space station flies over") { onOpen(ToolPage.ISS) }
-        ToolRow("Aurora outlook", "Northern-lights chance for your location") { onOpen(ToolPage.AURORA) }
-        ToolRow("Speed test", "Check your internet speed (Cloudflare)") { onOpen(ToolPage.SPEEDTEST) }
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Timers", userLang),
+            com.immortal.launcher.i18n.I18n.translate("Kitchen timers with a live countdown", userLang)
+        ) { onOpen(ToolPage.TIMERS) }
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Leave a note", userLang),
+            com.immortal.launcher.i18n.I18n.translate("A sticky note or a quick voice memo", userLang)
+        ) { onOpen(ToolPage.NOTES) }
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Converter", userLang),
+            com.immortal.launcher.i18n.I18n.translate("Units and currency", userLang)
+        ) { onOpen(ToolPage.CONVERTER) }
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("ISS passes", userLang),
+            com.immortal.launcher.i18n.I18n.translate("When the space station flies over", userLang)
+        ) { onOpen(ToolPage.ISS) }
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Aurora outlook", userLang),
+            com.immortal.launcher.i18n.I18n.translate("Northern-lights chance for your location", userLang)
+        ) { onOpen(ToolPage.AURORA) }
+        ToolRow(
+            com.immortal.launcher.i18n.I18n.translate("Speed test", userLang),
+            com.immortal.launcher.i18n.I18n.translate("Check your internet speed (Cloudflare)", userLang)
+        ) { onOpen(ToolPage.SPEEDTEST) }
       }
     }
   }

@@ -53,6 +53,7 @@ class AlbumUrlEntryActivity : ComponentActivity() {
 @Composable
 private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val existing = remember { ScreensaverConfig.load(context).albumUrl.orEmpty() }
   var url by remember { mutableStateOf(existing) }
   val (_, initialFocus) = rememberInitialFocus()
@@ -72,14 +73,18 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
   ) {
     Column(modifier = Modifier.widthIn(max = 1100.dp)) {
       Text(
-          "Shared album link",
+          com.immortal.launcher.i18n.I18n.translate("Shared album link", userLang),
           color = Color.White,
           fontSize = 34.sp,
           fontWeight = FontWeight.SemiBold,
       )
       Text(
+<<<<<<< HEAD
           "Paste a public link from iCloud Shared Albums, Google Photos, or Synology Photos. " +
               "Make sure it's shared as \"anyone with the link\" — Immortal can't sign in.",
+=======
+          com.immortal.launcher.i18n.I18n.translate("Paste a public link from iCloud Shared Albums or Google Photos. Make sure it's shared as \"anyone with the link\" — Immortal can't sign in.", userLang),
+>>>>>>> 1a2865f (feat(i18n): agregar soporte completo para idioma espanol (Spanish i18n))
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -100,10 +105,9 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
 
       Text(
           when {
-            trimmed.isEmpty() ->
-                "Examples: iCloud Shared Album, Google Photos, or Synology Photos."
-            supported -> "Looks like a $provider link."
-            else -> "That doesn't look like a supported share link yet."
+            trimmed.isEmpty() -> com.immortal.launcher.i18n.I18n.translate("Examples: iCloud Shared Album, Google Photos, or Synology Photos.", userLang)
+            supported -> com.immortal.launcher.i18n.I18n.tr("Looks like a $provider link.", "Parece un enlace de $provider.", userLang)
+            else -> com.immortal.launcher.i18n.I18n.translate("That doesn't look like a supported share link yet.", userLang)
           },
           color = if (supported || trimmed.isEmpty()) Color(0xFF9A9A9A) else Color(0xFFE89090),
           fontSize = 13.sp,
@@ -121,7 +125,7 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
               },
       ) {
         Text(
-            "Use this album",
+            com.immortal.launcher.i18n.I18n.translate("Use this album", userLang),
             color = if (supported) Color.White else Color(0xFF777777),
             fontSize = 18.sp,
             fontWeight = FontWeight.SemiBold,
@@ -141,7 +145,7 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
               },
       ) {
         Text(
-            "Cancel",
+            com.immortal.launcher.i18n.I18n.translate("Cancel", userLang),
             color = Color(0xFFDDDDDD),
             fontSize = 16.sp,
             textAlign = TextAlign.Center,
@@ -152,18 +156,26 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
       Spacer(Modifier.heightIn(min = 26.dp))
 
       Text(
-          "How to get a link:",
+          com.immortal.launcher.i18n.I18n.translate("How to get a link:", userLang),
           color = Color(0xFFBBBBBB),
           fontSize = 14.sp,
           fontWeight = FontWeight.SemiBold,
           modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
       )
       Text(
+<<<<<<< HEAD
           "• iPhone Photos → a Shared Album you own → people/share button → " +
               "Share Link → Copy Link (works with the current " +
               "photos.icloud.com/shared/album/… links).\n" +
               "• Google Photos → album → Share → \"Get link\" (anyone with the link can view).\n" +
               "• Synology Photos → album → Share → enable share link → Public.",
+=======
+          com.immortal.launcher.i18n.I18n.tr(
+              "• iPhone Photos → a Shared Album you own → people/share button → Share Link → Copy Link (works with the current photos.icloud.com/shared/album/… links).\n• Google Photos → album → Share → \"Get link\" (anyone with the link can view).",
+              "• Fotos de iPhone → Álbum compartido → Compartir enlace → Copiar enlace.\n• Google Photos → Álbum → Compartir → \"Obtener enlace\" (cualquiera con el enlace puede ver).",
+              userLang
+          ),
+>>>>>>> 1a2865f (feat(i18n): agregar soporte completo para idioma espanol (Spanish i18n))
           color = Color(0xFF8A8A8A),
           fontSize = 13.sp,
           modifier = Modifier.padding(start = 4.dp),

@@ -139,9 +139,10 @@ private fun ImmortalSettingsScreen() {
               .padding(horizontal = 28.dp, vertical = 32.dp),
   ) {
     Column(modifier = Modifier.widthIn(max = 1100.dp).focusRequester(firstFocus).focusGroup()) {
+      val userLang = settings.language
       Text("Immortal", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Tune how the launcher looks and what it shows.",
+          com.immortal.launcher.i18n.I18n.translate("Tune how the launcher looks and what it shows.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -161,7 +162,7 @@ private fun ImmortalSettingsScreen() {
       WallpaperSection()
 
       Spacer(Modifier.size(26.dp))
-      SectionLabel("World clock")
+      SectionLabel(com.immortal.launcher.i18n.I18n.translate("World clock", userLang))
       Card {
         Row(
             modifier =
@@ -171,9 +172,9 @@ private fun ImmortalSettingsScreen() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(modifier = Modifier.weight(1f)) {
-            Text("World clock locations", color = Color.White, fontSize = 17.sp)
+            Text(com.immortal.launcher.i18n.I18n.translate("World clock locations", userLang), color = Color.White, fontSize = 17.sp)
             Text(
-                "Pick which cities the World Clock widget shows (first four are displayed).",
+                com.immortal.launcher.i18n.I18n.translate("Pick which cities the World Clock widget shows (first four are displayed).", userLang),
                 color = Color(0xFF9A9A9A),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 2.dp),
@@ -190,28 +191,33 @@ private fun ImmortalSettingsScreen() {
       RemoteNavRow()
 
       FeatureSettingsNavRow(
-          "Sounds", "Chimes & spoken time",
-          "Hourly chime, spoken time, golden-hour tone, quiet hours") {
+          com.immortal.launcher.i18n.I18n.translate("Sounds", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Chimes & spoken time", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Hourly chime, spoken time, golden-hour tone, quiet hours", userLang)) {
             context.startActivity(Intent(context, ChimeSettingsActivity::class.java))
           }
       FeatureSettingsNavRow(
-          "Welcome overlay", "Welcome-back greeting",
-          "A time-of-day greeting when the screensaver starts") {
+          com.immortal.launcher.i18n.I18n.translate("Welcome overlay", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Welcome-back greeting", userLang),
+          com.immortal.launcher.i18n.I18n.translate("A time-of-day greeting when the screensaver starts", userLang)) {
             context.startActivity(Intent(context, WelcomeSettingsActivity::class.java))
           }
       FeatureSettingsNavRow(
-          "Digital clock", "Clock screensaver",
-          "Show a large digital clock as the screensaver") {
+          com.immortal.launcher.i18n.I18n.translate("Digital clock", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Clock screensaver", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Show a large digital clock as the screensaver", userLang)) {
             context.startActivity(Intent(context, ClockSettingsActivity::class.java))
           }
       FeatureSettingsNavRow(
-          "Sleep & idle", "Screen-off timers",
-          "Idle timeout and the overnight sleep window") {
+          com.immortal.launcher.i18n.I18n.translate("Sleep & idle", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Screen-off timers", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Idle timeout and the overnight sleep window", userLang)) {
             context.startActivity(Intent(context, SleepSettingsActivity::class.java))
           }
       FeatureSettingsNavRow(
-          "Wake-up light", "Sunrise alarm",
-          "Brighten the screen gradually at a set time") {
+          com.immortal.launcher.i18n.I18n.translate("Wake-up light", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Sunrise alarm", userLang),
+          com.immortal.launcher.i18n.I18n.translate("Brighten the screen gradually at a set time", userLang)) {
             context.startActivity(Intent(context, SunriseSettingsActivity::class.java))
           }
 
@@ -227,7 +233,7 @@ private fun ImmortalSettingsScreen() {
       MoreFeaturesSection()
 
       Text(
-          "Changes apply as soon as you go back to the home screen.",
+          com.immortal.launcher.i18n.I18n.translate("Changes apply as soon as you go back to the home screen.", userLang),
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -293,6 +299,7 @@ private fun MultiRoomStep(n: String, text: String) {
 @Composable
 internal fun MultiRoomScreen(onBack: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var enabled by remember { mutableStateOf(ImmortalSettings.multiRoomEnabled(context)) }
   var host by remember { mutableStateOf(ImmortalSettings.snapcastHost(context)) }
   var maPort by remember { mutableStateOf(ImmortalSettings.maPort(context).toString()) }
@@ -329,7 +336,7 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
               Modifier.focusRequester(firstFocus).tvFocusable(RoundedCornerShape(12.dp)) { onBack() },
       ) {
         Text(
-            "‹  Back",
+            com.immortal.launcher.i18n.I18n.translate("‹  Back", userLang),
             color = Color.White,
             fontSize = 16.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
@@ -338,12 +345,12 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
       Spacer(Modifier.size(18.dp))
 
       Text(
-          "Multi-room audio",
+          com.immortal.launcher.i18n.I18n.translate("Multi-room audio", userLang),
           color = Color.White,
           fontSize = 34.sp,
           fontWeight = FontWeight.SemiBold)
       Text(
-          "Show the Snapcast group's track on the now-playing card, with play/pause/skip.",
+          com.immortal.launcher.i18n.I18n.translate("Show the Snapcast group's track on the now-playing card, with play/pause/skip.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -351,23 +358,21 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
       Spacer(Modifier.size(22.dp))
       Card {
         Column(modifier = Modifier.padding(18.dp)) {
-          Text("Setting it up", color = Color.White, fontSize = 17.sp)
+          Text(com.immortal.launcher.i18n.I18n.translate("Setting it up", userLang), color = Color.White, fontSize = 17.sp)
           Text(
-              "Group your Portals into one perfectly in-sync speaker system:",
+              com.immortal.launcher.i18n.I18n.translate("Group your Portals into one perfectly in-sync speaker system:", userLang),
               color = Color(0xFF9A9A9A),
               fontSize = 13.sp,
               modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
           )
           MultiRoomStep(
               "1",
-              "Install and set up Music Assistant as a server on your home network. New to Music " +
-                  "Assistant? Learn more at music-assistant.io")
+              com.immortal.launcher.i18n.I18n.translate("Install and set up Music Assistant as a server on your home network. New to Music Assistant? Learn more at music-assistant.io", userLang))
           MultiRoomStep(
               "2",
-              "Install Snapcast from the Immortal App Store, and point it at your Music Assistant " +
-                  "server.")
+              com.immortal.launcher.i18n.I18n.translate("Install Snapcast from the Immortal App Store, and point it at your Music Assistant server.", userLang))
           MultiRoomStep(
-              "3", "Turn on the toggle below, then enter your Music Assistant server's address.")
+              "3", com.immortal.launcher.i18n.I18n.translate("Turn on the toggle below, then enter your Music Assistant server's address.", userLang))
         }
       }
       Spacer(Modifier.size(26.dp))
@@ -377,17 +382,16 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(modifier = Modifier.weight(1f)) {
-            Text("Show what the group is playing", color = Color.White, fontSize = 17.sp)
+            Text(com.immortal.launcher.i18n.I18n.translate("Show what the group is playing", userLang), color = Color.White, fontSize = 17.sp)
             Text(
-                "Surfaces the Snapcast group's track on the now-playing card — even when the " +
-                    "Music Assistant app isn't open on this Portal.",
+                com.immortal.launcher.i18n.I18n.translate("Surfaces the Snapcast group's track on the now-playing card — even when the Music Assistant app isn't open on this Portal.", userLang),
                 color = Color(0xFF9A9A9A),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 2.dp),
             )
           }
           Segmented(
-              options = listOf("Off" to "off", "On" to "on"),
+              options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
               selected = if (enabled) "on" else "off",
               onSelect = {
                 val on = it == "on"
@@ -412,7 +416,7 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { portFocus.requestFocus() }),
-                label = { Text("Music Assistant / Snapcast server IP") },
+                label = { Text(com.immortal.launcher.i18n.I18n.translate("Music Assistant / Snapcast server IP", userLang)) },
                 modifier = Modifier.weight(1f),
             )
             Surface(
@@ -425,7 +429,7 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
                     },
             ) {
               Text(
-                  "Apply",
+                  com.immortal.launcher.i18n.I18n.translate("Apply", userLang),
                   color = Color.White,
                   fontSize = 15.sp,
                   modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
@@ -710,6 +714,7 @@ private fun RemoteNavRow() {
 @Composable
 internal fun MqttScreen(onBack: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var enabled by remember { mutableStateOf(MqttConfig.isEnabled(context)) }
   var host by remember { mutableStateOf(MqttConfig.host(context)) }
   var port by remember { mutableStateOf(MqttConfig.port(context).toString()) }
@@ -817,7 +822,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
               Modifier.focusRequester(firstFocus).tvFocusable(RoundedCornerShape(12.dp)) { onBack() },
       ) {
         Text(
-            "‹  Back",
+            com.immortal.launcher.i18n.I18n.translate("‹  Back", userLang),
             color = Color.White,
             fontSize = 16.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
@@ -825,10 +830,9 @@ internal fun MqttScreen(onBack: () -> Unit) {
       }
       Spacer(Modifier.size(18.dp))
 
-      Text("Home Assistant", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+      Text(com.immortal.launcher.i18n.I18n.translate("Home Assistant", userLang), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Publish this Portal to Home Assistant as auto-discovered entities — presence, " +
-              "screen, battery, now-playing, and controls — over your MQTT broker.",
+          com.immortal.launcher.i18n.I18n.translate("Publish this Portal to Home Assistant as auto-discovered entities — presence, screen, battery, now-playing, and controls — over your MQTT broker.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -836,17 +840,15 @@ internal fun MqttScreen(onBack: () -> Unit) {
       Spacer(Modifier.size(22.dp))
       Card {
         Column(modifier = Modifier.padding(18.dp)) {
-          Text("Setting it up", color = Color.White, fontSize = 17.sp)
+          Text(com.immortal.launcher.i18n.I18n.translate("Setting it up", userLang), color = Color.White, fontSize = 17.sp)
           MultiRoomStep(
               "1",
-              "In Home Assistant, add the Mosquitto broker add-on (Settings → Add-ons) and the " +
-                  "MQTT integration. New to MQTT? See home-assistant.io/integrations/mqtt")
+              com.immortal.launcher.i18n.I18n.translate("In Home Assistant, add the Mosquitto broker add-on (Settings → Add-ons) and the MQTT integration. New to MQTT? See home-assistant.io/integrations/mqtt", userLang))
           MultiRoomStep(
-              "2", "Turn on the toggle below and enter your broker's address (and login, if any).")
+              "2", com.immortal.launcher.i18n.I18n.translate("Turn on the toggle below and enter your broker's address (and login, if any).", userLang))
           MultiRoomStep(
               "3",
-              "This Portal appears automatically under Settings → Devices as a new MQTT device — " +
-                  "no YAML needed.")
+              com.immortal.launcher.i18n.I18n.translate("This Portal appears automatically under Settings → Devices as a new MQTT device — no YAML needed.", userLang))
         }
       }
       Spacer(Modifier.size(26.dp))
@@ -856,16 +858,16 @@ internal fun MqttScreen(onBack: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(modifier = Modifier.weight(1f)) {
-            Text("Publish to Home Assistant", color = Color.White, fontSize = 17.sp)
+            Text(com.immortal.launcher.i18n.I18n.translate("Publish to Home Assistant", userLang), color = Color.White, fontSize = 17.sp)
             Text(
-                "Exposes this Portal's state and controls as Home Assistant entities over MQTT.",
+                com.immortal.launcher.i18n.I18n.translate("Exposes this Portal's state and controls as Home Assistant entities over MQTT.", userLang),
                 color = Color(0xFF9A9A9A),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 2.dp),
             )
           }
           Segmented(
-              options = listOf("Off" to "off", "On" to "on"),
+              options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
               selected = if (enabled) "on" else "off",
               onSelect = {
                 val on = it == "on"
@@ -890,7 +892,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { portFocus.requestFocus() }),
-                label = { Text("MQTT broker IP / host") },
+                label = { Text(com.immortal.launcher.i18n.I18n.translate("MQTT broker IP / host", userLang)) },
                 modifier = Modifier.weight(1f),
             )
             Surface(
@@ -900,7 +902,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
                     Modifier.padding(start = 12.dp).tvFocusable(RoundedCornerShape(10.dp)) { apply() },
             ) {
               Text(
-                  "Apply",
+                  com.immortal.launcher.i18n.I18n.translate("Apply", userLang),
                   color = Color.White,
                   fontSize = 15.sp,
                   modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
@@ -917,7 +919,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
               keyboardOptions =
                   KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
               keyboardActions = KeyboardActions(onNext = { userFocus.requestFocus() }),
-              label = { Text("Port (default 1883, or 8883 for TLS)") },
+              label = { Text(com.immortal.launcher.i18n.I18n.translate("Port (default 1883, or 8883 for TLS)", userLang)) },
               modifier =
                   Modifier.fillMaxWidth()
                       .padding(start = 18.dp, end = 18.dp, top = 4.dp)
@@ -934,7 +936,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
                   KeyboardOptions(
                       capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Next),
               keyboardActions = KeyboardActions(onNext = { passFocus.requestFocus() }),
-              label = { Text("Username (optional)") },
+              label = { Text(com.immortal.launcher.i18n.I18n.translate("Username (optional)", userLang)) },
               modifier =
                   Modifier.fillMaxWidth()
                       .padding(start = 18.dp, end = 18.dp, top = 8.dp)
@@ -951,7 +953,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
               keyboardOptions =
                   KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
               keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus(); apply() }),
-              label = { Text("Password (optional)") },
+              label = { Text(com.immortal.launcher.i18n.I18n.translate("Password (optional)", userLang)) },
               modifier =
                   Modifier.fillMaxWidth()
                       .padding(start = 18.dp, end = 18.dp, top = 8.dp)
@@ -962,16 +964,16 @@ internal fun MqttScreen(onBack: () -> Unit) {
               verticalAlignment = Alignment.CenterVertically,
           ) {
             Column(modifier = Modifier.weight(1f)) {
-              Text("Use TLS / SSL", color = Color.White, fontSize = 15.sp)
+              Text(com.immortal.launcher.i18n.I18n.translate("Use TLS / SSL", userLang), color = Color.White, fontSize = 15.sp)
               Text(
-                  "Encrypt the connection (e.g. a broker behind a reverse proxy on port 8883).",
+                  com.immortal.launcher.i18n.I18n.translate("Encrypt the connection (e.g. a broker behind a reverse proxy on port 8883).", userLang),
                   color = Color(0xFF9A9A9A),
                   fontSize = 13.sp,
                   modifier = Modifier.padding(top = 2.dp),
               )
             }
             Segmented(
-                options = listOf("Off" to "off", "On" to "on"),
+                options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
                 selected = if (useTls) "on" else "off",
                 onSelect = {
                   val on = it == "on"
@@ -991,17 +993,16 @@ internal fun MqttScreen(onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
               Column(modifier = Modifier.weight(1f)) {
-                Text("Validate certificate", color = Color.White, fontSize = 15.sp)
+                Text(com.immortal.launcher.i18n.I18n.translate("Validate certificate", userLang), color = Color.White, fontSize = 15.sp)
                 Text(
-                    "Verify the broker's certificate and hostname. Turn off only for a " +
-                        "self-signed broker on a trusted network.",
+                    com.immortal.launcher.i18n.I18n.translate("Verify the broker's certificate and hostname. Turn off only for a self-signed broker on a trusted network.", userLang),
                     color = Color(0xFF9A9A9A),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 2.dp),
                 )
               }
               Segmented(
-                  options = listOf("Off" to "off", "On" to "on"),
+                  options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
                   selected = if (validateCert) "on" else "off",
                   onSelect = {
                     validateCert = it == "on"
@@ -1012,7 +1013,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
           }
           // Live connection status — gives Apply visible feedback (Connecting… → Connected).
           Text(
-              status.ifBlank { "Starting…" },
+              status.ifBlank { com.immortal.launcher.i18n.I18n.translate("Starting…", userLang) },
               color = Color(0xFF8AB4F8),
               fontSize = 13.sp,
               modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 16.dp),
@@ -1155,9 +1156,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
         }
       }
       Text(
-          "Connects to a broker on your LAN over plain MQTT or TLS. Your Portal shows up in " +
-              "Home Assistant automatically as a device with presence, screen, battery, " +
-              "now-playing and a few controls — no configuration.yaml editing.",
+          com.immortal.launcher.i18n.I18n.translate("Connects to a broker on your LAN over plain MQTT or TLS. Your Portal shows up in Home Assistant automatically as a device with presence, screen, battery, now-playing and a few controls — no configuration.yaml editing.", userLang),
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -1189,7 +1188,9 @@ private val WORLD_CLOCK_CITIES =
 @Composable
 internal fun WorldClockScreen(onBack: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var selected by remember { mutableStateOf(ImmortalSettings.worldClockZones(context)) }
+
   val firstFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
@@ -1214,16 +1215,16 @@ internal fun WorldClockScreen(onBack: () -> Unit) {
               Modifier.focusRequester(firstFocus).tvFocusable(RoundedCornerShape(12.dp)) { onBack() },
       ) {
         Text(
-            "‹  Back",
+            com.immortal.launcher.i18n.I18n.translate("‹  Back", userLang),
             color = Color.White,
             fontSize = 16.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
         )
       }
       Spacer(Modifier.size(18.dp))
-      Text("World clock", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+      Text(com.immortal.launcher.i18n.I18n.translate("World clock", userLang), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Choose locations for the World Clock widget. The first four (in the order you pick them) are shown.",
+          com.immortal.launcher.i18n.I18n.translate("Choose locations for the World Clock widget. The first four (in the order you pick them) are shown.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -1245,7 +1246,7 @@ internal fun WorldClockScreen(onBack: () -> Unit) {
               verticalAlignment = Alignment.CenterVertically,
           ) {
             Column(modifier = Modifier.weight(1f)) {
-              Text(label, color = Color.White, fontSize = 16.sp)
+              Text(com.immortal.launcher.i18n.I18n.translate(label, userLang), color = Color.White, fontSize = 16.sp)
               Text(
                   zone.replace('_', ' '),
                   color = Color(0xFF9A9A9A),
@@ -1262,14 +1263,14 @@ internal fun WorldClockScreen(onBack: () -> Unit) {
                   modifier = Modifier.padding(end = 14.dp),
               )
             } else if (on) {
-              Text("hidden", color = Color(0xFF7C7C7C), fontSize = 13.sp, modifier = Modifier.padding(end = 14.dp))
+              Text(com.immortal.launcher.i18n.I18n.tr("hidden", "oculto", userLang), color = Color(0xFF7C7C7C), fontSize = 13.sp, modifier = Modifier.padding(end = 14.dp))
             }
             Switch(checked = on, onCheckedChange = null)
           }
         }
       }
       Text(
-          "Tip: the widget shows up to four clocks. Re-pick a city to move it to the end of the order.",
+          com.immortal.launcher.i18n.I18n.translate("Tip: the widget shows up to four clocks. Re-pick a city to move it to the end of the order.", userLang),
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -1305,19 +1306,20 @@ private fun loadLaunchableApps(context: Context): List<BootAppOption> {
 @Composable
 private fun DeviceHealthNavRow(onOpen: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val issues = remember { DevicePermissions.issueCount(context) }
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Device")
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Device", userLang))
   Card {
     Row(
         modifier = Modifier.fillMaxWidth().tvFocusableRow { onOpen() }.padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
       Column(modifier = Modifier.weight(1f)) {
-        Text("Device health", color = Color.White, fontSize = 17.sp)
+        Text(com.immortal.launcher.i18n.I18n.translate("Device health", userLang), color = Color.White, fontSize = 17.sp)
         Text(
-            if (issues == 0) "All set up"
-            else "$issues setting${if (issues == 1) " needs" else "s need"} attention",
+            if (issues == 0) com.immortal.launcher.i18n.I18n.translate("All set up", userLang)
+            else com.immortal.launcher.i18n.I18n.tr("$issues setting${if (issues == 1) " needs" else "s need"} attention", "$issues ajuste${if (issues == 1) " requiere" else "s requieren"} atención", userLang),
             color = if (issues == 0) Color(0xFF9A9A9A) else Color(0xFFE0A030),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 2.dp),
@@ -1338,6 +1340,7 @@ private fun DeviceHealthNavRow(onOpen: () -> Unit) {
 @Composable
 internal fun DeviceHealthScreen(onBack: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val checks = remember { DevicePermissions.all(context) }
   val issues = checks.count { !it.granted }
   var adminActive by remember { mutableStateOf(ScreenControl.isAdminActive(context)) }
@@ -1363,7 +1366,7 @@ internal fun DeviceHealthScreen(onBack: () -> Unit) {
           modifier = Modifier.tvFocusable(RoundedCornerShape(12.dp)) { onBack() },
       ) {
         Text(
-            "‹  Back",
+            com.immortal.launcher.i18n.I18n.translate("‹  Back", userLang),
             color = Color.White,
             fontSize = 16.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
@@ -1371,9 +1374,9 @@ internal fun DeviceHealthScreen(onBack: () -> Unit) {
       }
       Spacer(Modifier.size(18.dp))
 
-      Text("Device health", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+      Text(com.immortal.launcher.i18n.I18n.translate("Device health", userLang), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "The permissions your Portal was set up with, and what each one powers.",
+          com.immortal.launcher.i18n.I18n.translate("The permissions your Portal was set up with, and what each one powers.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -1387,9 +1390,8 @@ internal fun DeviceHealthScreen(onBack: () -> Unit) {
           modifier = Modifier.fillMaxWidth(),
       ) {
         Text(
-            if (issues == 0) "✓  Everything's set up correctly."
-            else "!  $issues setting${if (issues == 1) " needs" else "s need"} attention — your Portal " +
-                "still works, but some features are limited.",
+            if (issues == 0) com.immortal.launcher.i18n.I18n.translate("✓  Everything's set up correctly.", userLang)
+            else com.immortal.launcher.i18n.I18n.tr("!  $issues settings need attention — your Portal still works, but some features are limited.", "!  $issues ajustes requieren atención — tu Portal sigue funcionando, pero algunas funciones están limitadas.", userLang),
             color = if (issues == 0) Color(0xFF7FD18B) else Color(0xFFE0A030),
             fontSize = 15.sp,
             modifier = Modifier.padding(16.dp),
@@ -1400,16 +1402,15 @@ internal fun DeviceHealthScreen(onBack: () -> Unit) {
       Card {
         checks.forEachIndexed { i, c ->
           if (i > 0) Divider()
-          HealthRow(c)
+          HealthRow(c, userLang)
         }
       }
 
       if (issues > 0) {
         Spacer(Modifier.size(22.dp))
-        SectionLabel("How to fix")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("How to fix", userLang))
         Text(
-            "Reconnect your Portal to a computer and re-run Immortal setup — it re-grants all of " +
-                "these. (Advanced: re-run provision.sh / provision.ps1 from the provisioning kit.)",
+            com.immortal.launcher.i18n.I18n.translate("Reconnect your Portal to a computer and re-run Immortal setup — it re-grants all of these. (Advanced: re-run provision.sh / provision.ps1 from the provisioning kit.)", userLang),
             color = Color(0xFFB8B8B8),
             fontSize = 14.sp,
             lineHeight = 20.sp,
@@ -1423,23 +1424,21 @@ internal fun DeviceHealthScreen(onBack: () -> Unit) {
       if (adminActive) {
         Spacer(Modifier.size(28.dp))
         Text(
-            "Allow uninstall",
+            com.immortal.launcher.i18n.I18n.translate("Allow uninstall", userLang),
             color = Color(0xFF8A8A8A),
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
         )
         Text(
-            "Disabling the screen-off device admin lets Immortal be uninstalled, but it also stops " +
-                "automatic screen-off (screensaver sleep and the Home Assistant control) until you " +
-                "re-run setup. Only do this if you know what you're doing.",
+            com.immortal.launcher.i18n.I18n.translate("Disabling the screen-off device admin lets Immortal be uninstalled, but it also stops automatic screen-off (screensaver sleep and the Home Assistant control) until you re-run setup. Only do this if you know what you're doing.", userLang),
             color = Color(0xFF7C7C7C),
             fontSize = 13.sp,
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 10.dp),
         )
         Text(
-            if (confirmingDisable) "Tap again to confirm — this stops automatic screen-off"
-            else "Disable screen-off admin",
+            if (confirmingDisable) com.immortal.launcher.i18n.I18n.translate("Tap again to confirm — this stops automatic screen-off", userLang)
+            else com.immortal.launcher.i18n.I18n.translate("Disable screen-off admin", userLang),
             color = Color(0xFFE0908A),
             fontSize = 15.sp,
             fontWeight = if (confirmingDisable) FontWeight.SemiBold else FontWeight.Normal,
@@ -1463,7 +1462,7 @@ internal fun DeviceHealthScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun HealthRow(c: DevicePermissions.Check) {
+private fun HealthRow(c: DevicePermissions.Check, userLang: String?) {
   Row(
       modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
       verticalAlignment = Alignment.Top,
@@ -1476,9 +1475,9 @@ private fun HealthRow(c: DevicePermissions.Check) {
         modifier = Modifier.padding(end = 14.dp, top = 1.dp),
     )
     Column(modifier = Modifier.weight(1f)) {
-      Text(c.title, color = Color.White, fontSize = 17.sp)
+      Text(com.immortal.launcher.i18n.I18n.translate(c.title, userLang), color = Color.White, fontSize = 17.sp)
       Text(
-          c.enables,
+          com.immortal.launcher.i18n.I18n.translate(c.enables, userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 13.sp,
           lineHeight = 18.sp,
@@ -1486,14 +1485,14 @@ private fun HealthRow(c: DevicePermissions.Check) {
       )
       if (!c.granted) {
         Text(
-            "Without it: ${c.degraded}",
+            com.immortal.launcher.i18n.I18n.tr("Without it: ${c.degraded}", "Sin esto: ${c.degraded}", userLang),
             color = Color(0xFFE0A030),
             fontSize = 13.sp,
             lineHeight = 18.sp,
             modifier = Modifier.padding(top = 6.dp),
         )
         Text(
-            c.fix,
+            com.immortal.launcher.i18n.I18n.translate(c.fix, userLang),
             color = Color(0xFF8AB4F8),
             fontSize = 13.sp,
             lineHeight = 18.sp,
@@ -1511,17 +1510,19 @@ private fun HealthRow(c: DevicePermissions.Check) {
  */
 @Composable
 private fun BootAppsNavRow(count: Int, onOpen: () -> Unit) {
-  SectionLabel("Start on boot")
+  val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Start on boot", userLang))
   Card {
     Row(
         modifier = Modifier.fillMaxWidth().tvFocusableRow { onOpen() }.padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
       Column(modifier = Modifier.weight(1f)) {
-        Text("Apps that start on boot", color = Color.White, fontSize = 17.sp)
+        Text(com.immortal.launcher.i18n.I18n.translate("Apps that start on boot", userLang), color = Color.White, fontSize = 17.sp)
         Text(
-            if (count == 0) "None — pick apps that relaunch after a reboot"
-            else "$count app${if (count == 1) "" else "s"} relaunch after a reboot",
+            if (count == 0) com.immortal.launcher.i18n.I18n.translate("None — pick apps that relaunch after a reboot", userLang)
+            else com.immortal.launcher.i18n.I18n.tr("$count app${if (count == 1) "" else "s"} relaunch after a reboot", "$count aplicación${if (count == 1) "" else "es"} se reinicia${if (count == 1) "n" else "n"} tras reiniciar", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 2.dp),
@@ -1531,7 +1532,7 @@ private fun BootAppsNavRow(count: Int, onOpen: () -> Unit) {
     }
   }
   Text(
-      "Handy for players like Music Assistant that don't restart themselves after a reboot.",
+      com.immortal.launcher.i18n.I18n.translate("Handy for players like Music Assistant that don't restart themselves after a reboot.", userLang),
       color = Color(0xFF7C7C7C),
       fontSize = 13.sp,
       modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -1552,6 +1553,7 @@ internal fun BootAppsScreen(
     onBack: () -> Unit,
 ) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var apps by remember { mutableStateOf<List<BootAppOption>?>(null) }
   LaunchedEffect(Unit) { apps = withContext(Dispatchers.IO) { loadLaunchableApps(context) } }
 
@@ -1580,7 +1582,7 @@ internal fun BootAppsScreen(
               Modifier.focusRequester(firstFocus).tvFocusable(RoundedCornerShape(12.dp)) { onBack() },
       ) {
         Text(
-            "‹  Back",
+            com.immortal.launcher.i18n.I18n.translate("‹  Back", userLang),
             color = Color.White,
             fontSize = 16.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
@@ -1588,9 +1590,9 @@ internal fun BootAppsScreen(
       }
       Spacer(Modifier.size(18.dp))
 
-      Text("Start on boot", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+      Text(com.immortal.launcher.i18n.I18n.translate("Start on boot", userLang), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Pick which installed apps Immortal relaunches after a reboot.",
+          com.immortal.launcher.i18n.I18n.translate("Pick which installed apps Immortal relaunches after a reboot.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -1601,14 +1603,14 @@ internal fun BootAppsScreen(
         val list = apps
         if (list == null) {
           Text(
-              "Loading apps…",
+              com.immortal.launcher.i18n.I18n.translate("Loading apps…", userLang),
               color = Color(0xFF9A9A9A),
               fontSize = 14.sp,
               modifier = Modifier.padding(18.dp),
           )
         } else if (list.isEmpty()) {
           Text(
-              "No other apps installed yet.",
+              com.immortal.launcher.i18n.I18n.translate("No other apps installed yet.", userLang),
               color = Color(0xFF9A9A9A),
               fontSize = 14.sp,
               modifier = Modifier.padding(18.dp),
@@ -1637,8 +1639,7 @@ internal fun BootAppsScreen(
         }
       }
       Text(
-          "These apps relaunch automatically after a reboot — handy for players like Music " +
-              "Assistant that don't restart themselves.",
+          com.immortal.launcher.i18n.I18n.translate("These apps relaunch automatically after a reboot — handy for players like Music Assistant that don't restart themselves.", userLang),
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -1650,16 +1651,17 @@ internal fun BootAppsScreen(
 @Composable
 private fun WallpaperSection() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var mode by remember { mutableStateOf(WallpaperConfig.load(context).mode) }
   var grain by remember { mutableStateOf(WallpaperConfig.load(context).grain) }
 
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Wallpaper")
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Wallpaper", userLang))
   Card {
     Column(modifier = Modifier.padding(18.dp)) {
-      Text("Background", color = Color.White, fontSize = 17.sp)
+      Text(com.immortal.launcher.i18n.I18n.translate("Background", userLang), color = Color.White, fontSize = 17.sp)
       Text(
-          "A gradient, a photo, or sync with your screensaver (shown blurred). Tap to choose.",
+          com.immortal.launcher.i18n.I18n.translate("A gradient, a photo, or sync with your screensaver (shown blurred). Tap to choose.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 2.dp),
@@ -1669,14 +1671,14 @@ private fun WallpaperSection() {
           modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
           horizontalArrangement = Arrangement.spacedBy(12.dp),
       ) {
-        WallpaperSwatch("Dark", selected = mode == WallpaperConfig.DARK, onClick = {
+        WallpaperSwatch(com.immortal.launcher.i18n.I18n.translate("Dark", userLang), selected = mode == WallpaperConfig.DARK, onClick = {
           mode = WallpaperConfig.DARK
           WallpaperConfig.setMode(context, mode)
         }) {
           Spacer(Modifier.fillMaxSize().background(Color(0xFF1A1A1A)))
         }
         WallpaperConfig.GRADIENTS.forEach { (id, colors) ->
-          WallpaperSwatch(id.removePrefix("g_").replaceFirstChar { it.uppercase() }, selected = mode == id, onClick = {
+          WallpaperSwatch(com.immortal.launcher.i18n.I18n.translate(id.removePrefix("g_").replaceFirstChar { it.uppercase() }, userLang), selected = mode == id, onClick = {
             mode = id
             WallpaperConfig.setMode(context, id)
           }) {
@@ -1693,7 +1695,7 @@ private fun WallpaperSection() {
                     }
                     .getOrNull()
               }
-          WallpaperSwatch(label, selected = mode == id, onClick = {
+          WallpaperSwatch(com.immortal.launcher.i18n.I18n.translate(label, userLang), selected = mode == id, onClick = {
             mode = id
             WallpaperConfig.setMode(context, id)
           }) {
@@ -1704,7 +1706,7 @@ private fun WallpaperSection() {
             }
           }
         }
-        WallpaperSwatch("Screensaver", selected = mode == WallpaperConfig.SCREENSAVER, onClick = {
+        WallpaperSwatch(com.immortal.launcher.i18n.I18n.translate("Screensaver", userLang), selected = mode == WallpaperConfig.SCREENSAVER, onClick = {
           mode = WallpaperConfig.SCREENSAVER
           WallpaperConfig.setMode(context, WallpaperConfig.SCREENSAVER)
         }) {
@@ -1712,7 +1714,7 @@ private fun WallpaperSection() {
               Modifier.fillMaxSize()
                   .background(Brush.verticalGradient(listOf(Color(0xFF2C3E50), Color(0xFF4CA1AF)))))
         }
-        WallpaperSwatch("Sky", selected = mode == WallpaperConfig.SKY, onClick = {
+        WallpaperSwatch(com.immortal.launcher.i18n.I18n.translate("Sky", userLang), selected = mode == WallpaperConfig.SKY, onClick = {
           mode = WallpaperConfig.SKY
           WallpaperConfig.setMode(context, WallpaperConfig.SKY)
         }) {
@@ -1720,7 +1722,7 @@ private fun WallpaperSection() {
               Modifier.fillMaxSize()
                   .background(Brush.verticalGradient(listOf(Color(0xFF3A7BD5), Color(0xFF8FD3F4)))))
         }
-        WallpaperSwatch("Star field", selected = mode == WallpaperConfig.STARFIELD, onClick = {
+        WallpaperSwatch(com.immortal.launcher.i18n.I18n.translate("Star field", userLang), selected = mode == WallpaperConfig.STARFIELD, onClick = {
           mode = WallpaperConfig.STARFIELD
           WallpaperConfig.setMode(context, WallpaperConfig.STARFIELD)
         }) {
@@ -1735,16 +1737,16 @@ private fun WallpaperSection() {
           verticalAlignment = Alignment.CenterVertically,
       ) {
         Column(modifier = Modifier.weight(1f)) {
-          Text("Film grain", color = Color.White, fontSize = 17.sp)
+          Text(com.immortal.launcher.i18n.I18n.translate("Film grain", userLang), color = Color.White, fontSize = 17.sp)
           Text(
-              "Adds a subtle grain texture over the wallpaper.",
+              com.immortal.launcher.i18n.I18n.translate("Adds a subtle grain texture over the wallpaper.", userLang),
               color = Color(0xFF9A9A9A),
               fontSize = 13.sp,
               modifier = Modifier.padding(top = 2.dp),
           )
         }
         Segmented(
-            options = listOf("Off" to "off", "On" to "on"),
+            options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
             selected = if (grain) "on" else "off",
             onSelect = {
               val on = it == "on"
@@ -1789,4 +1791,3 @@ private fun WallpaperSwatch(
     )
   }
 }
-

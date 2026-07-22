@@ -75,6 +75,7 @@ class SleepSettingsActivity : ComponentActivity() {
 @Composable
 private fun SleepSettingsScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var settings by remember { mutableStateOf(ScreensaverConfig.load(context)) }
   var remainingMs by remember { mutableLongStateOf(0L) }
   var running by remember { mutableStateOf(false) }
@@ -139,10 +140,10 @@ private fun SleepSettingsScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      Text("Sleep Timer", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+      Text(com.immortal.launcher.i18n.I18n.translate("Sleep Timer", userLang), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
       Text(
-          if (settings.sleepTimerEnabled) "Set the timer, then start the countdown."
-          else "Enable Sleep Timer below before starting.",
+          if (settings.sleepTimerEnabled) com.immortal.launcher.i18n.I18n.translate("Set the timer, then start the countdown.", userLang)
+          else com.immortal.launcher.i18n.I18n.translate("Enable Sleep Timer below before starting.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 15.sp,
           textAlign = TextAlign.Center,
@@ -159,7 +160,7 @@ private fun SleepSettingsScreen() {
               horizontalArrangement = Arrangement.SpaceBetween,
               verticalAlignment = Alignment.CenterVertically,
           ) {
-            Text("Countdown", color = Color.White, fontSize = 18.sp)
+            Text(com.immortal.launcher.i18n.I18n.translate("Countdown", userLang), color = Color.White, fontSize = 18.sp)
             Text(
                 if (remainingMs > 0) timerText else "00:00",
                 color = MaterialTheme.colorScheme.primary,
@@ -183,7 +184,7 @@ private fun SleepSettingsScreen() {
                         },
             ) {
               Text(
-                  "Start countdown",
+                  com.immortal.launcher.i18n.I18n.translate("Start countdown", userLang),
                   color = Color.White,
                   fontSize = 18.sp,
                   fontWeight = FontWeight.SemiBold,
@@ -201,7 +202,7 @@ private fun SleepSettingsScreen() {
                         },
             ) {
               Text(
-                  "Stop",
+                  com.immortal.launcher.i18n.I18n.translate("Stop timer", userLang),
                   color = Color.White,
                   fontSize = 18.sp,
                   fontWeight = FontWeight.SemiBold,

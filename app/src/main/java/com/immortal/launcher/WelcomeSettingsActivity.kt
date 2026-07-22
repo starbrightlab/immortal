@@ -57,6 +57,7 @@ class WelcomeSettingsActivity : ComponentActivity() {
 @Composable
 private fun WelcomeSettingsScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var settings by remember { mutableStateOf(WelcomeConfig.load(context)) }
 
   val activity = context as? Activity
@@ -127,9 +128,9 @@ private fun WelcomeSettingsScreen() {
                 .padding(horizontal = 28.dp, vertical = 32.dp),
     ) {
       Column(modifier = Modifier.widthIn(max = 1100.dp).focusRequester(firstFocus).focusGroup()) {
-        Text("Welcome Overlay", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+        Text(com.immortal.launcher.i18n.I18n.translate("Welcome Overlay", userLang), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            "Customize the greeting shown when the screensaver wakes up.",
+            com.immortal.launcher.i18n.I18n.translate("Customize the greeting shown when the screensaver wakes up.", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 16.sp,
             modifier = Modifier.padding(top = 6.dp),
@@ -137,22 +138,22 @@ private fun WelcomeSettingsScreen() {
         Spacer(Modifier.size(26.dp))
 
         Card {
-          ToggleRow("Show greeting message", settings.showGreeting) {
+          ToggleRow(com.immortal.launcher.i18n.I18n.translate("Show greeting message", userLang), settings.showGreeting) {
             SettingsDomains.welcome.apply(context, JSONObject().put("showGreeting", it))
             settings = WelcomeConfig.load(context)
           }
           Divider()
-          ToggleRow("Show clock", settings.showClock) {
+          ToggleRow(com.immortal.launcher.i18n.I18n.translate("Show clock", userLang), settings.showClock) {
             SettingsDomains.welcome.apply(context, JSONObject().put("showClock", it))
             settings = WelcomeConfig.load(context)
           }
           Divider()
-          ToggleRow("Show date", settings.showDate) {
+          ToggleRow(com.immortal.launcher.i18n.I18n.translate("Show date", userLang), settings.showDate) {
             SettingsDomains.welcome.apply(context, JSONObject().put("showDate", it))
             settings = WelcomeConfig.load(context)
           }
           Divider()
-          ToggleRow("Speak greeting (TTS)", settings.enableTts) {
+          ToggleRow(com.immortal.launcher.i18n.I18n.translate("Speak greeting (TTS)", userLang), settings.enableTts) {
             SettingsDomains.welcome.apply(context, JSONObject().put("enableTts", it))
             settings = WelcomeConfig.load(context)
           }
@@ -160,7 +161,7 @@ private fun WelcomeSettingsScreen() {
 
         Spacer(Modifier.size(26.dp))
 
-        SectionLabel("VOICE")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("VOICE", userLang))
         Card {
           androidVoices.forEachIndexed { i, (name, label) ->
             if (i > 0) Divider()
@@ -176,8 +177,7 @@ private fun WelcomeSettingsScreen() {
           }
         }
         Text(
-            "Voice for the spoken greeting, from the voices installed on this device. " +
-                "Tap Test to hear it. (Enable \"Speak greeting\" above for it to play on wake.)",
+            com.immortal.launcher.i18n.I18n.translate("Voice for the spoken greeting, from the voices installed on this device. Tap Test to hear it. (Enable \"Speak greeting\" above for it to play on wake.)", userLang),
             color = Color(0xFF7C7C7C),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
