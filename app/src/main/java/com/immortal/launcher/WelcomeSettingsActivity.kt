@@ -168,6 +168,7 @@ private fun WelcomeSettingsScreen() {
             AndroidVoiceRow(
                 label = label,
                 selected = settings.ttsVoice == name,
+                userLang = userLang,
                 onSelect = {
                   WelcomeConfig.setTtsVoice(context, name)
                   settings = settings.copy(ttsVoice = name)
@@ -185,29 +186,29 @@ private fun WelcomeSettingsScreen() {
 
         Spacer(Modifier.size(26.dp))
 
-        SectionLabel("GREETINGS")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("GREETINGS", userLang))
         Card {
-          EditableTextRow("Your name", settings.userName) { text ->
+          EditableTextRow(com.immortal.launcher.i18n.I18n.translate("Your name", userLang), settings.userName, userLang) { text ->
             WelcomeConfig.setUserName(context, text)
             settings = settings.copy(userName = text)
           }
           Divider()
-          EditableTextRow("Night (22:00-04:59)", settings.greetingNight) { text ->
+          EditableTextRow(com.immortal.launcher.i18n.I18n.translate("Night (22:00-04:59)", userLang), settings.greetingNight, userLang) { text ->
             WelcomeConfig.setGreetingNight(context, text)
             settings = settings.copy(greetingNight = text)
           }
           Divider()
-          EditableTextRow("Morning (05:00-11:59)", settings.greetingMorning) { text ->
+          EditableTextRow(com.immortal.launcher.i18n.I18n.translate("Morning (05:00-11:59)", userLang), settings.greetingMorning, userLang) { text ->
             WelcomeConfig.setGreetingMorning(context, text)
             settings = settings.copy(greetingMorning = text)
           }
           Divider()
-          EditableTextRow("Afternoon (12:00-16:59)", settings.greetingAfternoon) { text ->
+          EditableTextRow(com.immortal.launcher.i18n.I18n.translate("Afternoon (12:00-16:59)", userLang), settings.greetingAfternoon, userLang) { text ->
             WelcomeConfig.setGreetingAfternoon(context, text)
             settings = settings.copy(greetingAfternoon = text)
           }
           Divider()
-          EditableTextRow("Evening (17:00-21:59)", settings.greetingEvening) { text ->
+          EditableTextRow(com.immortal.launcher.i18n.I18n.translate("Evening (17:00-21:59)", userLang), settings.greetingEvening, userLang) { text ->
             WelcomeConfig.setGreetingEvening(context, text)
             settings = settings.copy(greetingEvening = text)
           }
@@ -215,16 +216,16 @@ private fun WelcomeSettingsScreen() {
 
         Spacer(Modifier.size(26.dp))
 
-        SectionLabel("TIMING")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("TIMING", userLang))
         Card {
-          DurationStepper(settings.durationMs / 1000) { sec ->
+          DurationStepper(settings.durationMs / 1000, userLang) { sec ->
             val ms = WelcomeConfig.clampDuration(sec * 1000)
             SettingsDomains.welcome.apply(context, JSONObject().put("durationMs", ms))
             settings = WelcomeConfig.load(context)
           }
         }
         Text(
-            "How long the welcome overlay displays before auto-dismissing.",
+            com.immortal.launcher.i18n.I18n.translate("How long the welcome overlay displays before auto-dismissing.", userLang),
             color = Color(0xFF7C7C7C),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -232,21 +233,21 @@ private fun WelcomeSettingsScreen() {
 
         Spacer(Modifier.size(26.dp))
 
-        SectionLabel("TEXT SIZES")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("TEXT SIZES", userLang))
         Card {
-          SizeStepper("Greeting", settings.greetingSize) { size ->
+          SizeStepper(com.immortal.launcher.i18n.I18n.translate("Greeting", userLang), settings.greetingSize, userLang) { size ->
             val clamped = WelcomeConfig.clampTextSize(size)
             WelcomeConfig.setGreetingSize(context, clamped)
             settings = settings.copy(greetingSize = clamped)
           }
           Divider()
-          SizeStepper("Clock", settings.clockSize) { size ->
+          SizeStepper(com.immortal.launcher.i18n.I18n.translate("Clock", userLang), settings.clockSize, userLang) { size ->
             val clamped = WelcomeConfig.clampTextSize(size)
             WelcomeConfig.setClockSize(context, clamped)
             settings = settings.copy(clockSize = clamped)
           }
           Divider()
-          SizeStepper("Date", settings.dateSize) { size ->
+          SizeStepper(com.immortal.launcher.i18n.I18n.translate("Date", userLang), settings.dateSize, userLang) { size ->
             val clamped = WelcomeConfig.clampTextSize(size)
             WelcomeConfig.setDateSize(context, clamped)
             settings = settings.copy(dateSize = clamped)
@@ -255,16 +256,16 @@ private fun WelcomeSettingsScreen() {
 
         Spacer(Modifier.size(26.dp))
 
-        SectionLabel("BACKGROUND")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("BACKGROUND", userLang))
         Card {
-          OpacityStepper(settings.backgroundOpacity) { opacity ->
+          OpacityStepper(settings.backgroundOpacity, userLang) { opacity ->
             val clamped = WelcomeConfig.clampOpacity(opacity)
             WelcomeConfig.setBackgroundOpacity(context, clamped)
             settings = settings.copy(backgroundOpacity = clamped)
           }
         }
         Text(
-            "Background darkness behind the welcome text (0% = transparent, 100% = opaque).",
+            com.immortal.launcher.i18n.I18n.translate("Background darkness behind the welcome text (0% = transparent, 100% = opaque).", userLang),
             color = Color(0xFF7C7C7C),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -282,7 +283,7 @@ private fun WelcomeSettingsScreen() {
                 },
         ) {
           Text(
-              "Preview welcome overlay",
+              com.immortal.launcher.i18n.I18n.translate("Preview welcome overlay", userLang),
               color = Color.White,
               fontSize = 18.sp,
               fontWeight = FontWeight.SemiBold,
@@ -294,8 +295,7 @@ private fun WelcomeSettingsScreen() {
         Spacer(Modifier.size(16.dp))
 
         Text(
-            "Tip: The welcome overlay appears when the screensaver starts from sleep. " +
-                "Tap anywhere on the overlay to dismiss it early, or wait for it to auto-fade.",
+            com.immortal.launcher.i18n.I18n.translate("Tip: The welcome overlay appears when the screensaver starts from sleep. Tap anywhere on the overlay to dismiss it early, or wait for it to auto-fade.", userLang),
             color = Color(0xFF7C7C7C),
             fontSize = 13.sp,
             modifier = Modifier.padding(start = 4.dp, end = 4.dp),
@@ -339,6 +339,7 @@ private fun ttsQualityLabel(v: android.speech.tts.Voice): String? =
 private fun AndroidVoiceRow(
     label: String,
     selected: Boolean,
+    userLang: String?,
     onSelect: () -> Unit,
     onTest: () -> Unit,
 ) {
@@ -356,7 +357,7 @@ private fun AndroidVoiceRow(
         modifier = Modifier.tvFocusable(RoundedCornerShape(10.dp), focusScale = 1f) { onTest() },
     ) {
       Text(
-          "Test",
+          com.immortal.launcher.i18n.I18n.translate("Test", userLang),
           color = Color.White,
           fontSize = 15.sp,
           textAlign = TextAlign.Center,
@@ -399,7 +400,7 @@ private fun androidVoiceLabel(v: android.speech.tts.Voice): String {
 }
 
 @Composable
-private fun EditableTextRow(label: String, value: String, onChange: (String) -> Unit) {
+private fun EditableTextRow(label: String, value: String, userLang: String?, onChange: (String) -> Unit) {
   var editing by remember { mutableStateOf(false) }
   var tempValue by remember(value) { mutableStateOf(value) }
 
@@ -433,7 +434,7 @@ private fun EditableTextRow(label: String, value: String, onChange: (String) -> 
         onChange(tempValue)
         editing = false
       }) {
-        Text("Save", color = Color(0xFF8AB4F8))
+        Text(com.immortal.launcher.i18n.I18n.translate("Save", userLang), color = Color(0xFF8AB4F8))
       }
     } else {
       Text(
@@ -447,7 +448,7 @@ private fun EditableTextRow(label: String, value: String, onChange: (String) -> 
 }
 
 @Composable
-private fun DurationStepper(seconds: Int, onChange: (Int) -> Unit) {
+private fun DurationStepper(seconds: Int, userLang: String?, onChange: (Int) -> Unit) {
   val src = remember { MutableInteractionSource() }
   val focused by src.collectIsFocusedAsState()
   Row(
@@ -467,7 +468,7 @@ private fun DurationStepper(seconds: Int, onChange: (Int) -> Unit) {
               .padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text("Display duration", color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+    Text(com.immortal.launcher.i18n.I18n.translate("Display duration", userLang), color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
     ArrowButton("◀", focused) { onChange(seconds - 1) }
     Text(
         "${seconds}s",
@@ -482,7 +483,7 @@ private fun DurationStepper(seconds: Int, onChange: (Int) -> Unit) {
 }
 
 @Composable
-private fun SizeStepper(label: String, size: Float, onChange: (Float) -> Unit) {
+private fun SizeStepper(label: String, size: Float, userLang: String?, onChange: (Float) -> Unit) {
   val src = remember { MutableInteractionSource() }
   val focused by src.collectIsFocusedAsState()
   Row(
@@ -517,7 +518,7 @@ private fun SizeStepper(label: String, size: Float, onChange: (Float) -> Unit) {
 }
 
 @Composable
-private fun OpacityStepper(opacity: Float, onChange: (Float) -> Unit) {
+private fun OpacityStepper(opacity: Float, userLang: String?, onChange: (Float) -> Unit) {
   val src = remember { MutableInteractionSource() }
   val focused by src.collectIsFocusedAsState()
   val percent = (opacity * 100).toInt()
@@ -538,7 +539,7 @@ private fun OpacityStepper(opacity: Float, onChange: (Float) -> Unit) {
               .padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text("Opacity", color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+    Text(com.immortal.launcher.i18n.I18n.translate("Opacity", userLang), color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
     ArrowButton("◀", focused) { onChange(opacity - 0.05f) }
     Text(
         "$percent%",
