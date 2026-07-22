@@ -90,6 +90,7 @@ private data class AppItem(
 @Composable
 private fun AppSwitcherScreen(onDone: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var recents by remember { mutableStateOf<List<AppItem>?>(null) }
   var allApps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
   var badges by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
@@ -116,7 +117,7 @@ private fun AppSwitcherScreen(onDone: () -> Unit) {
         value = query,
         onValueChange = { query = it },
         singleLine = true,
-        placeholder = { Text("Search apps", color = Color(0xFF777777)) },
+        placeholder = { Text(com.immortal.launcher.i18n.I18n.translate("Search apps", userLang), color = Color(0xFF777777)) },
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth(),
     )
@@ -128,7 +129,7 @@ private fun AppSwitcherScreen(onDone: () -> Unit) {
         else recents
 
     Text(
-        if (searching) "All apps" else "Recent apps",
+        com.immortal.launcher.i18n.I18n.translate(if (searching) "All apps" else "Recent apps", userLang),
         color = Color(0xFF9A9A9A),
         fontSize = 13.sp,
         fontWeight = FontWeight.SemiBold,
@@ -136,7 +137,7 @@ private fun AppSwitcherScreen(onDone: () -> Unit) {
     )
 
     when {
-      list == null -> Hint("Loading…")
+      list == null -> Hint(com.immortal.launcher.i18n.I18n.translate("Loading…", userLang))
       list.isEmpty() && searching -> Hint("No apps match “${query.trim()}”.")
       list.isEmpty() -> Hint("No recent apps yet. Open a few and they'll show up here.")
       else ->
@@ -151,6 +152,7 @@ private fun AppSwitcherScreen(onDone: () -> Unit) {
                   app = app,
                   badge = badges[app.component.packageName] ?: 0,
                   subtitle = if (searching) null else recencyLine(app),
+                  userLang = userLang,
                   onClick = {
                     switchTo(context, app.component)
                     onDone()
@@ -195,6 +197,7 @@ private fun AppTile(
     app: AppItem,
     badge: Int,
     subtitle: String?,
+    userLang: String? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
@@ -212,7 +215,7 @@ private fun AppTile(
       Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(56.dp))
     }
     Text(
-        app.label,
+        com.immortal.launcher.i18n.I18n.translate(app.label, userLang),
         color = Color.White,
         fontSize = 13.sp,
         maxLines = 1,

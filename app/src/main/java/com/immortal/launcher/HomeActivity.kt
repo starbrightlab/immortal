@@ -2123,6 +2123,8 @@ private fun BuiltInTile(
     glyph: String,
     onClick: () -> Unit,
 ) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val path = remember(glyph) { PathParser().parsePathString(glyph).toPath() }
   val tileDp = LocalTileDp.current
   Column(
@@ -2142,7 +2144,7 @@ private fun BuiltInTile(
       }
     }
     Spacer(Modifier.size(8.dp))
-    Text(label, color = Color.White, fontSize = 15.sp, maxLines = 1, textAlign = TextAlign.Center)
+    Text(com.immortal.launcher.i18n.I18n.translate(label, userLang), color = Color.White, fontSize = 15.sp, maxLines = 1, textAlign = TextAlign.Center)
   }
 }
 
@@ -2154,6 +2156,8 @@ private fun FolderTile(
     editMode: Boolean = false,
     onClick: () -> Unit,
 ) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val tileDp = LocalTileDp.current
   val scale = tileDp / 88.dp // mini-icon grid scales with the tile
   Column(
@@ -2184,7 +2188,7 @@ private fun FolderTile(
     }
     Spacer(Modifier.size(8.dp))
     Text(
-        name,
+        com.immortal.launcher.i18n.I18n.translate(name, userLang),
         color = Color.White,
         fontSize = 15.sp,
         maxLines = 1,
@@ -2203,6 +2207,8 @@ private fun FolderOverlay(
     onDismiss: () -> Unit,
     extras: List<FolderExtra> = emptyList(),
 ) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   // Rendered inside the launcher's own (immersive) window — NOT a Dialog, which
   // would spawn a separate window and momentarily reveal the system bars.
   val noRipple = remember { MutableInteractionSource() }
@@ -2268,7 +2274,7 @@ private fun FolderOverlay(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-          Text(name, color = Color.White, fontSize = 22.sp, modifier = Modifier.weight(1f))
+          Text(com.immortal.launcher.i18n.I18n.translate(name, userLang), color = Color.White, fontSize = 22.sp, modifier = Modifier.weight(1f))
           // Rename.
           Surface(
               color = Color(0x33FFFFFF),
@@ -2314,7 +2320,7 @@ private fun FolderOverlay(
         }
         Spacer(Modifier.size(6.dp))
         Text(
-            "Drag an app out to remove it",
+            com.immortal.launcher.i18n.I18n.translate("Drag an app out to remove it", userLang),
             color = Color(0xFF8A8A8A),
             fontSize = 13.sp,
             modifier = Modifier.fillMaxWidth(),
@@ -2352,6 +2358,8 @@ private fun NameOverlay(
     onConfirm: (String) -> Unit,
     onCancel: () -> Unit,
 ) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val noRipple = remember { MutableInteractionSource() }
   // Pre-select the whole name so the first keystroke replaces it (iOS-style).
   var field by remember {
@@ -2379,7 +2387,7 @@ private fun NameOverlay(
                 .clickable(interactionSource = noRipple, indication = null) {},
     ) {
       Column(modifier = Modifier.padding(24.dp)) {
-        Text(title, color = Color.White, fontSize = 20.sp)
+        Text(com.immortal.launcher.i18n.I18n.translate(title, userLang), color = Color.White, fontSize = 20.sp)
         Spacer(Modifier.size(16.dp))
         BasicTextField(
             value = field,
@@ -2396,14 +2404,14 @@ private fun NameOverlay(
         Spacer(Modifier.size(20.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
           Text(
-              "Cancel",
+              com.immortal.launcher.i18n.I18n.translate("Cancel", userLang),
               color = Color(0xFF8AB4F8),
               fontSize = 18.sp,
               modifier = Modifier.clickable { onCancel() }.padding(12.dp),
           )
           Spacer(Modifier.size(8.dp))
           Text(
-              confirmLabel,
+              com.immortal.launcher.i18n.I18n.translate(confirmLabel, userLang),
               color = Color(0xFF8AB4F8),
               fontSize = 18.sp,
               fontWeight = FontWeight.Bold,
@@ -2420,6 +2428,8 @@ private fun NameOverlay(
  * text during a check or install. */
 @Composable
 private fun UpdatesTile(update: UpdateInfo?, status: String?, onClick: () -> Unit) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val available = update != null
   val label = status ?: if (available) "Update ready" else "Up to date"
   val background = if (available) Color(0xFF2D6CDF) else Color(0xFF2B2B2B)
@@ -2453,7 +2463,7 @@ private fun UpdatesTile(update: UpdateInfo?, status: String?, onClick: () -> Uni
     }
     Spacer(Modifier.size(8.dp))
     Text(
-        label,
+        com.immortal.launcher.i18n.I18n.translate(label, userLang),
         color = Color.White,
         fontSize = 15.sp,
         maxLines = 1,
@@ -3283,6 +3293,8 @@ private fun AppTile(
     onLongPress: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   Column(
       horizontalAlignment = Alignment.CenterHorizontally,
       // In Manage mode the body tap is inert (drag to reorder, ✕ to remove); the
@@ -3317,7 +3329,7 @@ private fun AppTile(
     }
     Spacer(Modifier.size(8.dp))
     Text(
-        app.label,
+        com.immortal.launcher.i18n.I18n.translate(app.label, userLang),
         color = Color.White,
         fontSize = 15.sp,
         maxLines = 1,
