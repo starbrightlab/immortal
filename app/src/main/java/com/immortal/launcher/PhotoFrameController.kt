@@ -241,6 +241,7 @@ class PhotoFrameController(
   // that omits MOVE events): clear horizontal swipe = prev/next, clear tap = exit.
   private var downX = 0f
   private var downY = 0f
+  private var pendingTransitionDirection: Int = 0
 
   /** Hosts forward their touch events here. */
   fun onTouch(ev: MotionEvent) {
@@ -261,7 +262,13 @@ class PhotoFrameController(
           return
         }
         if (abs(dx) > 120 && abs(dx) > abs(dy) * 1.5f) {
-          if (dx < 0) next() else prev()
+          if (dx < 0) {
+            pendingTransitionDirection = +1
+            next()
+          } else {
+            pendingTransitionDirection = -1
+            prev()
+          }
         } else if (abs(dx) < 48 && abs(dy) < 48) {
           onExit?.invoke()
         }
@@ -1666,39 +1673,97 @@ class PhotoFrameController(
     // Start Ken Burns motion on incoming photo
     startKenBurns(targetLayer.photo, isPortrait)
 
-    val fadeDuration = 900L
+    val slideDir = pendingTransitionDirection
+    pendingTransitionDirection = 0
 
-    targetLayer.frameContainer.animate()
-        .alpha(1f)
-        .setDuration(fadeDuration)
-        .setInterpolator(AccelerateDecelerateInterpolator())
-        .start()
+    if (slideDir != 0) {
+      val startX = if (slideDir > 0) screenW.toFloat() else -screenW.toFloat()
+      val endX = if (slideDir > 0) -screenW.toFloat() else screenW.toFloat()
+      val slideDuration = 450L
+      val interpolator = android.view.animation.DecelerateInterpolator(1.5f)
 
-    if (isFitMode) {
-      targetLayer.blurPhoto.animate()
+      targetLayer.frameContainer.translationX = startX
+      targetLayer.blurPhoto.translationX = startX
+      targetLayer.frameContainer.alpha = 1f
+      targetLayer.blurPhoto.alpha = 1f
+
+      targetLayer.frameContainer.animate()
+          .translationX(0f)
+          .alpha(1f)
+          .setDuration(slideDuration)
+          .setInterpolator(interpolator)
+          .start()
+
+      if (isFitMode) {
+        targetLayer.blurPhoto.animate()
+            .translationX(0f)
+            .alpha(1f)
+            .setDuration(slideDuration)
+            .setInterpolator(interpolator)
+            .start()
+      }
+
+      outgoingLayer.frameContainer.animate()
+          .translationX(endX)
+          .alpha(0f)
+          .setDuration(slideDuration)
+          .setInterpolator(interpolator)
+          .withEndAction {
+            outgoingLayer.frameContainer.visibility = View.GONE
+            outgoingLayer.frameContainer.translationX = 0f
+          }
+          .start()
+
+      outgoingLayer.blurPhoto.animate()
+          .translationX(endX)
+          .alpha(0f)
+          .setDuration(slideDuration)
+          .setInterpolator(interpolator)
+          .withEndAction {
+            outgoingLayer.blurPhoto.visibility = View.GONE
+            outgoingLayer.blurPhoto.translationX = 0f
+          }
+          .start()
+    } else {
+      val fadeDuration = 900L
+
+      targetLayer.frameContainer.translationX = 0f
+      targetLayer.blurPhoto.translationX = 0f
+      outgoingLayer.frameContainer.translationX = 0f
+      outgoingLayer.blurPhoto.translationX = 0f
+
+      targetLayer.frameContainer.animate()
           .alpha(1f)
           .setDuration(fadeDuration)
           .setInterpolator(AccelerateDecelerateInterpolator())
           .start()
+
+      if (isFitMode) {
+        targetLayer.blurPhoto.animate()
+            .alpha(1f)
+            .setDuration(fadeDuration)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .start()
+      }
+
+      outgoingLayer.frameContainer.animate()
+          .alpha(0f)
+          .setDuration(fadeDuration)
+          .setInterpolator(AccelerateDecelerateInterpolator())
+          .withEndAction {
+            outgoingLayer.frameContainer.visibility = View.GONE
+          }
+          .start()
+
+      outgoingLayer.blurPhoto.animate()
+          .alpha(0f)
+          .setDuration(fadeDuration)
+          .setInterpolator(AccelerateDecelerateInterpolator())
+          .withEndAction {
+            outgoingLayer.blurPhoto.visibility = View.GONE
+          }
+          .start()
     }
-
-    outgoingLayer.frameContainer.animate()
-        .alpha(0f)
-        .setDuration(fadeDuration)
-        .setInterpolator(AccelerateDecelerateInterpolator())
-        .withEndAction {
-          outgoingLayer.frameContainer.visibility = View.GONE
-        }
-        .start()
-
-    outgoingLayer.blurPhoto.animate()
-        .alpha(0f)
-        .setDuration(fadeDuration)
-        .setInterpolator(AccelerateDecelerateInterpolator())
-        .withEndAction {
-          outgoingLayer.blurPhoto.visibility = View.GONE
-        }
-        .start()
 
     activeLayerIndex = if (activeLayerIndex == 0) 1 else 0
   }
