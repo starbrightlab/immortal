@@ -1368,6 +1368,7 @@ private fun customWidgetLabel(kind: String): String =
     when (kind) {
       HomeWidgetStore.KIND_WEATHER -> "Weather"
       HomeWidgetStore.KIND_WORLD_CLOCK -> "World Clock"
+      HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL -> "Digital World Clock"
       HomeWidgetStore.KIND_TIMERS -> "Timers"
       else -> "Widget"
     }
@@ -2568,6 +2569,7 @@ private fun ImmortalWidgetContent(widget: HomeWidgetStore.HomeWidget, modifier: 
   when (widget.kind) {
     HomeWidgetStore.KIND_WEATHER -> ImmortalWeatherWidget(modifier)
     HomeWidgetStore.KIND_WORLD_CLOCK -> ImmortalWorldClockWidget(modifier)
+    HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL -> ImmortalDigitalWorldClockWidget(modifier)
     HomeWidgetStore.KIND_TIMERS -> ImmortalTimersWidget(modifier)
     else -> UnknownImmortalWidget(widget.kind, modifier)
   }
@@ -2724,6 +2726,73 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
         ) {
           AnalogClock(zone, now, Modifier.fillMaxWidth().aspectRatio(1f))
           Spacer(Modifier.size(6.dp))
+          Text(
+              worldClockLabel(zone),
+              color = Color.White,
+              fontSize = 12.sp,
+              fontWeight = FontWeight.Medium,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+          )
+          Text(worldClockOffset(zone, now), color = Color(0xFF9A9A9A), fontSize = 10.sp, maxLines = 1)
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun ImmortalDigitalWorldClockWidget(modifier: Modifier = Modifier) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
+  var zones by remember { mutableStateOf(ImmortalSettings.worldClockZones(context)) }
+  var use24Hour by remember { mutableStateOf(ImmortalSettings.use24HourClock(context)) }
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner) {
+    val obs = LifecycleEventObserver { _, e ->
+      if (e == Lifecycle.Event.ON_RESUME) {
+        zones = ImmortalSettings.worldClockZones(context)
+        use24Hour = ImmortalSettings.use24HourClock(context)
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(obs)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+  }
+  var now by remember { mutableStateOf(Date()) }
+  LaunchedEffect(Unit) {
+    while (true) {
+      now = Date()
+      delay(1000)
+    }
+  }
+  ImmortalWidgetShell(
+      title = com.immortal.launcher.i18n.I18n.translate("Digital World Clock", userLang),
+      accent = Color(0xFFFF9500),
+      modifier = modifier,
+  ) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      zones.take(4).forEach { zone ->
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+          val timeText = remember(zone, now, use24Hour) {
+            val fmt = SimpleDateFormat(if (use24Hour) "HH:mm" else "h:mm a", Locale.getDefault())
+            fmt.timeZone = TimeZone.getTimeZone(zone)
+            fmt.format(now)
+          }
+          Text(
+              timeText,
+              color = Color.White,
+              fontSize = if (use24Hour) 20.sp else 15.sp,
+              fontWeight = FontWeight.Bold,
+              maxLines = 1,
+          )
+          Spacer(Modifier.size(4.dp))
           Text(
               worldClockLabel(zone),
               color = Color.White,
@@ -3108,7 +3177,8 @@ private fun CustomWidgetGlyph(kind: String) {
       when (kind) {
         HomeWidgetStore.KIND_WEATHER -> "☁"
         HomeWidgetStore.KIND_WORLD_CLOCK -> "◷"
-        HomeWidgetStore.KIND_TIMERS -> "⏱"
+        HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL -> "⏱"
+        HomeWidgetStore.KIND_TIMERS -> "⌛"
         else -> "+"
       }
   Text(emoji, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
@@ -3355,6 +3425,15 @@ private fun loadWidgetProviders(context: Context, tileDp: Dp): List<WidgetProvid
               spanX = 2,
               spanY = 2,
               customKind = HomeWidgetStore.KIND_WORLD_CLOCK,
+          ),
+          WidgetProviderEntry(
+              label = "Digital World Clock",
+              packageLabel = "Immortal",
+              icon = null,
+              info = null,
+              spanX = 2,
+              spanY = 2,
+              customKind = HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL,
           ),
           WidgetProviderEntry(
               label = "Timers",
