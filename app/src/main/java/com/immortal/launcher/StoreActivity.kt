@@ -206,6 +206,7 @@ private fun BrowseScreen(
     onInstall: (CatalogApp) -> Unit,
 ) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   // Initial focus goes to the FIRST APP CARD, not the search field — focusing the
   // field would pop the keyboard over the whole store on open.
   val firstCardFocus = remember { FocusRequester() }
@@ -235,24 +236,24 @@ private fun BrowseScreen(
   ) {
     item {
       Spacer(Modifier.height(64.dp))
-      Text("App Store", fontSize = 34.sp, fontWeight = FontWeight.Bold)
+      Text(com.immortal.launcher.i18n.I18n.translate("App Store", userLang), fontSize = 34.sp, fontWeight = FontWeight.Bold)
       Text(
-          "${apps.size} apps picked for Portal · community submissions welcome",
+          com.immortal.launcher.i18n.I18n.tr("${apps.size} apps picked for Portal · community submissions welcome", "${apps.size} aplicaciones seleccionadas para Portal · contribuciones de la comunidad bienvenidas", userLang),
           style = MaterialTheme.typography.bodyMedium,
           color = Color(0xFFAAAAAA),
       )
-      if (InstallDaemon.installPaused(context)) PausedBanner()
+      if (InstallDaemon.installPaused(context)) PausedBanner(userLang)
       Spacer(Modifier.height(10.dp))
       OutlinedTextField(
           value = query,
           onValueChange = onQuery,
-          placeholder = { Text("Search apps…", color = Color(0xFF777777)) },
+          placeholder = { Text(com.immortal.launcher.i18n.I18n.translate("Search apps…", userLang), color = Color(0xFF777777)) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
           shape = RoundedCornerShape(14.dp),
       )
       Text(
-          "📁  Have an APK file? Install it →",
+          com.immortal.launcher.i18n.I18n.translate("📁  Have an APK file? Install it →", userLang),
           color = Color(0xFF8AB4F8),
           fontSize = 15.sp,
           modifier =
@@ -277,15 +278,15 @@ private fun BrowseScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
           SectionHeader(
-              if (updateApps.size == 1) "1 update available"
-              else "${updateApps.size} updates available")
+              if (updateApps.size == 1) com.immortal.launcher.i18n.I18n.translate("1 update available", userLang)
+              else com.immortal.launcher.i18n.I18n.tr("${updateApps.size} updates available", "${updateApps.size} actualizaciones disponibles", userLang))
           Spacer(Modifier.weight(1f))
-          if (updateApps.size > 1) ActionButton("Update all") { updateApps.forEach(onInstall) }
+          if (updateApps.size > 1) ActionButton(com.immortal.launcher.i18n.I18n.translate("Update all", userLang)) { updateApps.forEach(onInstall) }
         }
       }
       items(updateApps, key = { "u:" + it.packageName }) { app ->
         AppCard(
-            app, status[app.packageName], updates, onOpenDetail, onInstall,
+            app, status[app.packageName], updates, onOpenDetail, onInstall, userLang,
             cardModifier(app, inFirstSection = true))
       }
     }
@@ -293,18 +294,18 @@ private fun BrowseScreen(
     if (query.isBlank()) {
       val categories = filtered.groupBy { it.category }
       categories.forEach { (cat, list) ->
-        item { SectionHeader(cat) }
+        item { SectionHeader(com.immortal.launcher.i18n.I18n.translate(cat, userLang)) }
         items(list, key = { it.packageName }) { app ->
           AppCard(
-              app, status[app.packageName], updates, onOpenDetail, onInstall,
+              app, status[app.packageName], updates, onOpenDetail, onInstall, userLang,
               cardModifier(app, inFirstSection = !showUpdates))
         }
       }
     } else {
-      item { SectionHeader(if (filtered.isEmpty()) "No matches" else "Results") }
+      item { SectionHeader(if (filtered.isEmpty()) com.immortal.launcher.i18n.I18n.translate("No matches", userLang) else com.immortal.launcher.i18n.I18n.translate("Results", userLang)) }
       items(filtered, key = { it.packageName }) { app ->
         AppCard(
-            app, status[app.packageName], updates, onOpenDetail, onInstall,
+            app, status[app.packageName], updates, onOpenDetail, onInstall, userLang,
             cardModifier(app, inFirstSection = true))
       }
     }
@@ -329,6 +330,7 @@ private fun AppCard(
     updates: Map<String, Long>,
     onOpenDetail: (CatalogApp) -> Unit,
     onInstall: (CatalogApp) -> Unit,
+    userLang: String?,
     modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
@@ -350,7 +352,7 @@ private fun AppCard(
       AppIcon(app, 52.dp)
       Column(modifier = Modifier.weight(1f).padding(start = 14.dp, end = 14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-          Text(app.name, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+          Text(com.immortal.launcher.i18n.I18n.translate(app.name, userLang), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
           app.author?.let {
             Text(
                 "  ·  $it",
@@ -362,7 +364,7 @@ private fun AppCard(
           }
         }
         Text(
-            app.description,
+            com.immortal.launcher.i18n.I18n.translate(app.description, userLang),
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFFB9B9B9),
             maxLines = 1,
@@ -370,7 +372,7 @@ private fun AppCard(
         )
         status?.let {
           Text(
-              it,
+              com.immortal.launcher.i18n.I18n.translate(it, userLang),
               style = MaterialTheme.typography.labelMedium,
               color = MaterialTheme.colorScheme.primary,
               modifier = Modifier.padding(top = 3.dp),
@@ -379,9 +381,9 @@ private fun AppCard(
       }
       when {
         !compatible -> Chip(StoreCatalog.incompatibleLabel(app.minSdk ?: 0), Color(0xFF6B6B6B))
-        hasUpdate -> ActionButton("Update") { onInstall(app) }
-        installed -> OpenButton(app)
-        else -> ActionButton("Install") { onInstall(app) }
+        hasUpdate -> ActionButton(com.immortal.launcher.i18n.I18n.translate("Update", userLang)) { onInstall(app) }
+        installed -> OpenButton(app, userLang)
+        else -> ActionButton(com.immortal.launcher.i18n.I18n.translate("Install", userLang)) { onInstall(app) }
       }
     }
   }
@@ -401,7 +403,7 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun OpenButton(app: CatalogApp) {
+private fun OpenButton(app: CatalogApp, userLang: String? = null) {
   val context = LocalContext.current
   val src = remember { MutableInteractionSource() }
   OutlinedButton(
@@ -416,7 +418,7 @@ private fun OpenButton(app: CatalogApp) {
       modifier =
           Modifier.heightIn(min = 48.dp).widthIn(min = 108.dp).focusRing(src, RoundedCornerShape(20.dp)),
   ) {
-    Text("Open")
+    Text(com.immortal.launcher.i18n.I18n.translate("Open", userLang))
   }
 }
 
@@ -480,6 +482,7 @@ private fun AppDetailScreen(
     onInstall: () -> Unit,
 ) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val installed = StoreCatalog.isInstalled(context, app.packageName)
   val compatible = StoreCatalog.isCompatible(app)
   val backFocus = remember { FocusRequester() }
@@ -494,7 +497,7 @@ private fun AppDetailScreen(
   ) {
     Spacer(Modifier.height(56.dp))
     Text(
-        "←  App Store",
+        com.immortal.launcher.i18n.I18n.translate("←  App Store", userLang),
         color = Color(0xFF8AB4F8),
         fontSize = 16.sp,
         modifier =
@@ -505,17 +508,17 @@ private fun AppDetailScreen(
     Row(verticalAlignment = Alignment.CenterVertically) {
       AppIcon(app, 96.dp)
       Column(modifier = Modifier.padding(start = 22.dp)) {
-        Text(app.name, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text(com.immortal.launcher.i18n.I18n.translate(app.name, userLang), fontSize = 30.sp, fontWeight = FontWeight.Bold)
         app.author?.let { Text(it, fontSize = 15.sp, color = Color(0xFF9A9A9A)) }
         Row(
             modifier = Modifier.padding(top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          Chip(if (app.source == "fdroid") "F-Droid" else "Direct download", Color(0xFF2E6BE6))
+          Chip(com.immortal.launcher.i18n.I18n.translate(if (app.source == "fdroid") "F-Droid" else "Direct download", userLang), Color(0xFF2E6BE6))
           if (!compatible) Chip(StoreCatalog.incompatibleLabel(app.minSdk ?: 0), Color(0xFFB9552E))
           if (app.devices.size == 1)
               Chip(
-                  if (app.devices.first() == "tv") "Portal TV" else "Touch Portals",
+                  com.immortal.launcher.i18n.I18n.translate(if (app.devices.first() == "tv") "Portal TV" else "Touch Portals", userLang),
                   Color(0xFF2E8B6B))
         }
       }
@@ -523,41 +526,41 @@ private fun AppDetailScreen(
 
     Spacer(Modifier.height(20.dp))
     status?.let {
-      Text(it, color = MaterialTheme.colorScheme.primary, fontSize = 15.sp)
+      Text(com.immortal.launcher.i18n.I18n.translate(it, userLang), color = MaterialTheme.colorScheme.primary, fontSize = 15.sp)
       Spacer(Modifier.height(10.dp))
     }
     when {
       !compatible ->
           Text(
-              "This app needs a newer Android version than this Portal has.",
+              com.immortal.launcher.i18n.I18n.translate("This app needs a newer Android version than this Portal has.", userLang),
               color = Color(0xFFCC8866),
               fontSize = 15.sp,
           )
-      hasUpdate -> ActionButton("Update") { onInstall() }
+      hasUpdate -> ActionButton(com.immortal.launcher.i18n.I18n.translate("Update", userLang)) { onInstall() }
       installed ->
           Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OpenButton(app)
-            ActionButton("Reinstall") { onInstall() }
+            OpenButton(app, userLang)
+            ActionButton(com.immortal.launcher.i18n.I18n.translate("Reinstall", userLang)) { onInstall() }
           }
-      else -> ActionButton("Install") { onInstall() }
+      else -> ActionButton(com.immortal.launcher.i18n.I18n.translate("Install", userLang)) { onInstall() }
     }
 
     Spacer(Modifier.height(24.dp))
     Text(
-        app.longDescription ?: app.description,
+        com.immortal.launcher.i18n.I18n.translate(app.longDescription ?: app.description, userLang),
         fontSize = 16.sp,
         lineHeight = 24.sp,
         color = Color(0xFFDDDDDD),
     )
 
     Spacer(Modifier.height(28.dp))
-    Text("Details", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    Text(com.immortal.launcher.i18n.I18n.translate("Details", userLang), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(8.dp))
-    DetailRow("Version", app.versionCode?.toString() ?: if (app.source == "fdroid") "Latest from F-Droid" else "Latest release")
-    DetailRow("Package", app.packageName)
+    DetailRow(com.immortal.launcher.i18n.I18n.translate("Version", userLang), app.versionCode?.toString() ?: com.immortal.launcher.i18n.I18n.translate(if (app.source == "fdroid") "Latest from F-Droid" else "Latest release", userLang))
+    DetailRow(com.immortal.launcher.i18n.I18n.translate("Package", userLang), app.packageName)
     app.homepage?.let { url ->
       Text(
-          "Website  ·  $url",
+          com.immortal.launcher.i18n.I18n.tr("Website  ·  $url", "Sitio web  ·  $url", userLang),
           color = Color(0xFF8AB4F8),
           fontSize = 14.sp,
           modifier =
@@ -566,7 +569,7 @@ private fun AppDetailScreen(
               },
       )
     }
-    app.submittedBy?.let { DetailRow("Submitted by", it) }
+    app.submittedBy?.let { DetailRow(com.immortal.launcher.i18n.I18n.translate("Submitted by", userLang), it) }
     Spacer(Modifier.height(48.dp))
   }
 }
@@ -582,22 +585,20 @@ private fun DetailRow(label: String, value: String) {
 // --- banners ----------------------------------------------------------------------
 
 @Composable
-private fun PausedBanner() {
+private fun PausedBanner(userLang: String? = null) {
   Card(
       modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
       colors = CardDefaults.cardColors(containerColor = Color(0x33FFB300)),
   ) {
     Column(modifier = Modifier.padding(16.dp)) {
       Text(
-          "Installing new apps is paused",
+          com.immortal.launcher.i18n.I18n.translate("Installing new apps is paused", userLang),
           fontSize = 16.sp,
           fontWeight = FontWeight.SemiBold,
           color = Color(0xFFFFD180),
       )
       Text(
-          "On a first-gen Portal, installing apps needs the installer-dialog fix that " +
-              "Immortal's setup applies. Connect to your computer and run the Immortal " +
-              "installer. Everything else keeps working.",
+          com.immortal.launcher.i18n.I18n.translate("On a first-gen Portal, installing apps needs the installer-dialog fix that Immortal's setup applies. Connect to your computer and run the Immortal installer. Everything else keeps working.", userLang),
           style = MaterialTheme.typography.bodySmall,
           color = Color(0xFFEEEEEE),
           modifier = Modifier.padding(top = 6.dp),
