@@ -448,14 +448,12 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
               keyboardOptions =
                   KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
               keyboardActions = KeyboardActions(onNext = { userFocus.requestFocus() }),
-              label = { Text("Music Assistant port (default 8095)") },
+              label = { Text(com.immortal.launcher.i18n.I18n.translate("Music Assistant port (default 8095)", userLang)) },
               modifier =
                   Modifier.fillMaxWidth()
                       .padding(start = 18.dp, end = 18.dp, top = 4.dp)
                       .focusRequester(portFocus),
           )
-          // Music Assistant login — only used to forward play/pause/skip to MA, and only when MA's
-          // optional authentication is enabled. Leave blank for a stock server.
           OutlinedTextField(
               value = maUser,
               onValueChange = {
@@ -463,12 +461,11 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
                 ImmortalSettings.setMaUsername(context, it)
               },
               singleLine = true,
-              // No auto-capitalize: a lowercase MA username must stay lowercase.
               keyboardOptions =
                   KeyboardOptions(
                       capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Next),
               keyboardActions = KeyboardActions(onNext = { passFocus.requestFocus() }),
-              label = { Text("Music Assistant username") },
+              label = { Text(com.immortal.launcher.i18n.I18n.translate("Music Assistant username", userLang)) },
               modifier =
                   Modifier.fillMaxWidth()
                       .padding(start = 18.dp, end = 18.dp, top = 4.dp)
@@ -485,7 +482,7 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
               keyboardOptions =
                   KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
               keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-              label = { Text("Music Assistant password") },
+              label = { Text(com.immortal.launcher.i18n.I18n.translate("Music Assistant password", userLang)) },
               modifier =
                   Modifier.fillMaxWidth()
                       .padding(start = 18.dp, end = 18.dp, top = 8.dp)
@@ -502,7 +499,7 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
                     Modifier.tvFocusable(RoundedCornerShape(10.dp)) { MaControl.testLogin(context) },
             ) {
               Text(
-                  "Sign in",
+                  com.immortal.launcher.i18n.I18n.translate("Sign in", userLang),
                   color = Color.White,
                   fontSize = 15.sp,
                   modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
@@ -519,9 +516,7 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
             }
           }
           Text(
-              "Sends play/pause/skip to Music Assistant, and shows now-playing for AirPlay " +
-                  "sources (which don't carry it over Snapcast). Library/radio now-playing works " +
-                  "without it.",
+              com.immortal.launcher.i18n.I18n.translate("Sends play/pause/skip to Music Assistant, and shows now-playing for AirPlay sources (which don't carry it over Snapcast). Library/radio now-playing works without it.", userLang),
               color = Color(0xFF7C7C7C),
               fontSize = 12.sp,
               modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 8.dp),
