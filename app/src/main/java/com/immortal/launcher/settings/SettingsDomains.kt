@@ -205,7 +205,11 @@ object SettingsDomains {
                   NavSpec(
                       "dismissTarget",
                       "Open when you tap to exit",
-                      value = { c, _ -> ScreensaverDismiss.chosenLabel(c)?.let { "Opens $it" } ?: "Immortal launcher" },
+                      value = { c, _ ->
+                        val userLang = ImmortalSettings.load(c).language
+                        ScreensaverDismiss.chosenLabel(c)?.let { com.immortal.launcher.i18n.I18n.tr("Opens $it", "Abre $it", userLang) }
+                            ?: com.immortal.launcher.i18n.I18n.translate("Immortal launcher", userLang)
+                      },
                       activity = ScreensaverDismissAppActivity::class.java,
                       help =
                           "Tapping the screensaver wakes the Portal. By default that brings you home to " +

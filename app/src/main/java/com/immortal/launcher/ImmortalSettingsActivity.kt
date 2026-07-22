@@ -250,21 +250,22 @@ private fun ImmortalSettingsScreen() {
 @Composable
 private fun MultiRoomNavRow(onOpen: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val installed = remember { StoreCatalog.isInstalled(context, MultiRoomService.SNAPCAST_PACKAGE) }
   if (!installed) return
 
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Multi-room audio")
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Multi-room audio", userLang))
   Card {
     Row(
         modifier = Modifier.fillMaxWidth().tvFocusableRow { onOpen() }.padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
       Column(modifier = Modifier.weight(1f)) {
-        Text("Multi-room audio", color = Color.White, fontSize = 17.sp)
+        Text(com.immortal.launcher.i18n.I18n.translate("Multi-room audio", userLang), color = Color.White, fontSize = 17.sp)
         Text(
-            if (ImmortalSettings.multiRoomEnabled(context)) MultiRoomStatus.text.ifBlank { "On" }
-            else "Off",
+            if (ImmortalSettings.multiRoomEnabled(context)) MultiRoomStatus.text.ifBlank { com.immortal.launcher.i18n.I18n.translate("On", userLang) }
+            else com.immortal.launcher.i18n.I18n.translate("Off", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 2.dp),
@@ -554,10 +555,11 @@ internal fun MultiRoomScreen(onBack: () -> Unit) {
 @Composable
 private fun QuickButtonsSection() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var settings by remember { mutableStateOf(QuickBarConfig.load(context)) }
 
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Quick buttons")
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Quick buttons", userLang))
   // Rendered from the `quickbar` registry domain (the same specs the phone remote uses), so the
   // toggle and its gated "Always show" can't drift from the remote's version. Apply routes through
   // the domain so its onApplied (reconcile + overlay refresh) fires here too.
@@ -566,8 +568,7 @@ private fun QuickButtonsSection() {
     settings = QuickBarConfig.load(context)
   }
   Text(
-      "Needs the accessibility-based top-bar watch enabled during setup. The switcher shows your " +
-          "recently used apps; tap one to switch.",
+      com.immortal.launcher.i18n.I18n.translate("Needs the accessibility-based top-bar watch enabled during setup. The switcher shows your recently used apps; tap one to switch.", userLang),
       color = Color(0xFF7C7C7C),
       fontSize = 13.sp,
       modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -583,22 +584,23 @@ private fun QuickButtonsSection() {
 @Composable
 private fun MoreFeaturesSection() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Almanac")
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Almanac", userLang))
   Card {
     CalendarPacks.AVAILABLE.forEach { pack ->
       var on by remember { mutableStateOf(CalendarPacks.isEnabled(context, pack.id)) }
-      ToggleRow(pack.title, on) { checked ->
+      ToggleRow(com.immortal.launcher.i18n.I18n.translate(pack.title, userLang), on) { checked ->
         on = checked
         CalendarPacks.setEnabled(context, pack.id, checked)
       }
     }
   }
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Sound & input")
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Sound & input", userLang))
   Card {
     var sounds by remember { mutableStateOf(SystemSounds.touchSoundsEnabled(context)) }
-    ToggleRow("Touch sounds", sounds) { checked ->
+    ToggleRow(com.immortal.launcher.i18n.I18n.translate("Touch sounds", userLang), sounds) { checked ->
       if (SystemSounds.canWrite(context)) {
         SystemSounds.setTouchSounds(context, checked)
         sounds = SystemSounds.touchSoundsEnabled(context)
@@ -606,7 +608,7 @@ private fun MoreFeaturesSection() {
         SystemSounds.requestWriteAccess(context)
       }
     }
-    NavRow("Back gesture", if (BackHelper.isBackServiceEnabled(context)) "On" else "Off") {
+    NavRow(com.immortal.launcher.i18n.I18n.translate("Back gesture", userLang), com.immortal.launcher.i18n.I18n.translate(if (BackHelper.isBackServiceEnabled(context)) "On" else "Off", userLang)) {
       runCatching { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
     }
   }
@@ -653,17 +655,18 @@ private fun FeatureSettingsNavRow(
 @Composable
 private fun MqttNavRow(onOpen: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Home Assistant")
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Home Assistant", userLang))
   Card {
     Row(
         modifier = Modifier.fillMaxWidth().tvFocusableRow { onOpen() }.padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
       Column(modifier = Modifier.weight(1f)) {
-        Text("Home Assistant (MQTT)", color = Color.White, fontSize = 17.sp)
+        Text(com.immortal.launcher.i18n.I18n.translate("Home Assistant (MQTT)", userLang), color = Color.White, fontSize = 17.sp)
         Text(
-            if (MqttConfig.isEnabled(context)) MqttStatus.text.ifBlank { "On" } else "Off",
+            if (MqttConfig.isEnabled(context)) MqttStatus.text.ifBlank { com.immortal.launcher.i18n.I18n.translate("On", userLang) } else com.immortal.launcher.i18n.I18n.translate("Off", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 2.dp),
@@ -678,8 +681,9 @@ private fun MqttNavRow(onOpen: () -> Unit) {
 @Composable
 private fun RemoteNavRow() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   Spacer(Modifier.size(26.dp))
-  SectionLabel("Remote")
+  SectionLabel(com.immortal.launcher.i18n.I18n.translate("Remote", userLang))
   Card {
     Row(
         modifier =
@@ -693,9 +697,9 @@ private fun RemoteNavRow() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
       Column(modifier = Modifier.weight(1f)) {
-        Text("Control from your phone", color = Color.White, fontSize = 17.sp)
+        Text(com.immortal.launcher.i18n.I18n.translate("Control from your phone", userLang), color = Color.White, fontSize = 17.sp)
         Text(
-            if (RemotePairing.isEnabled(context)) "On — pair a phone as a remote" else "Off",
+            if (RemotePairing.isEnabled(context)) com.immortal.launcher.i18n.I18n.translate("On — pair a phone as a remote", userLang) else com.immortal.launcher.i18n.I18n.translate("Off", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 2.dp),
