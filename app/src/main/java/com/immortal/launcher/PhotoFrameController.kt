@@ -211,6 +211,9 @@ class PhotoFrameController(
   private val history = ArrayList<Bitmap>()
   private var index = -1
 
+  // In-memory cache for preloaded adjacent photo Bitmaps (prev/next) for instant swipe performance.
+  private val preloadedBitmaps = android.util.LruCache<String, Bitmap>(8)
+
   // Default-feed source-chain state (see [fetchWebPhoto]).
   // Wikimedia Commons featured-landscape image list: fetched once per session, then cycled.
   private var wikimediaUrls: List<String> = emptyList()
@@ -1177,8 +1180,19 @@ class PhotoFrameController(
 
   private fun showLocalImage(path: String, g: Int) {
     stopVideo()
+    val cached = preloadedBitmaps.get(path)
+    if (cached != null) {
+      photo.visibility = View.VISIBLE
+      show(cached)
+      loadCaptionForLocal(path, g)
+      preloadAdjacentLocal(localIndex)
+      ui.postDelayed(localTick, intervalMs())
+      return
+    }
     io.execute {
-      val bmp = runCatching { decodeCorrected(path) }.getOrNull()
+      val bmp = runCatching { decodeCorrected(path) }
+          .getOrNull()
+          ?.also { preloadedBitmaps.put(path, it) }
       ui.post {
         if (g != gen) return@post // superseded by a newer advance
         if (bmp == null) {
@@ -1188,7 +1202,28 @@ class PhotoFrameController(
         photo.visibility = View.VISIBLE
         show(bmp)
         loadCaptionForLocal(path, g)
+        preloadAdjacentLocal(localIndex)
         ui.postDelayed(localTick, intervalMs())
+      }
+    }
+  }
+
+  private fun preloadAdjacentLocal(currIdx: Int) {
+    if (playlist.isEmpty()) return
+    val nextIdx = (currIdx + 1) % playlist.size
+    val prevIdx = (currIdx - 1 + playlist.size) % playlist.size
+    io.execute {
+      val nextItem = playlist[nextIdx]
+      if (!nextItem.isVideo && preloadedBitmaps.get(nextItem.path) == null) {
+        runCatching { decodeCorrected(nextItem.path) }.getOrNull()?.let {
+          preloadedBitmaps.put(nextItem.path, it)
+        }
+      }
+      val prevItem = playlist[prevIdx]
+      if (!prevItem.isVideo && preloadedBitmaps.get(prevItem.path) == null) {
+        runCatching { decodeCorrected(prevItem.path) }.getOrNull()?.let {
+          preloadedBitmaps.put(prevItem.path, it)
+        }
       }
     }
   }
@@ -1383,9 +1418,26 @@ class PhotoFrameController(
       }
       return
     }
+    showRemoteImage(url, g)
+  }
+
+  private fun showRemoteImage(url: String, g: Int) {
     stopVideo()
+    val cached = preloadedBitmaps.get(url)
+    if (cached != null) {
+      remoteFailStreak = 0
+      remoteReresolveStreak = 0
+      photo.visibility = View.VISIBLE
+      show(cached)
+      if (smbSource != null) loadCaptionForSmb(url, g) else faceRenderer.setCaption(null, null)
+      preloadAdjacentRemote(remoteIndex)
+      ui.postDelayed(remoteTick, intervalMs())
+      return
+    }
     io.execute {
-      val bmp = runCatching { fetchRemoteImage(url) }.getOrNull()
+      val bmp = runCatching { fetchRemoteImage(url) }
+          .getOrNull()
+          ?.also { preloadedBitmaps.put(url, it) }
       ui.post {
         if (g != gen) return@post // superseded by a newer advance
         if (!remoteMode) return@post // raced with startWeb() flipping us off
@@ -1398,10 +1450,29 @@ class PhotoFrameController(
         remoteReresolveStreak = 0
         photo.visibility = View.VISIBLE
         show(bmp)
-        // EXIF caption only for SMB here — it reads the user's own files. The HTTP remote sources
-        // (iCloud/Google/Immich/DAV) serve EXIF-stripped images, so they carry no caption.
         if (smbSource != null) loadCaptionForSmb(url, g) else faceRenderer.setCaption(null, null)
+        preloadAdjacentRemote(remoteIndex)
         ui.postDelayed(remoteTick, intervalMs())
+      }
+    }
+  }
+
+  private fun preloadAdjacentRemote(currIdx: Int) {
+    if (remoteUrls.isEmpty()) return
+    val nextIdx = (currIdx + 1) % remoteUrls.size
+    val prevIdx = (currIdx - 1 + remoteUrls.size) % remoteUrls.size
+    io.execute {
+      val nextUrl = remoteUrls[nextIdx]
+      if (nextUrl !in remoteVideos && preloadedBitmaps.get(nextUrl) == null) {
+        runCatching { fetchRemoteImage(nextUrl) }.getOrNull()?.let {
+          preloadedBitmaps.put(nextUrl, it)
+        }
+      }
+      val prevUrl = remoteUrls[prevIdx]
+      if (prevUrl !in remoteVideos && preloadedBitmaps.get(prevUrl) == null) {
+        runCatching { fetchRemoteImage(prevUrl) }.getOrNull()?.let {
+          preloadedBitmaps.put(prevUrl, it)
+        }
       }
     }
   }
