@@ -1836,13 +1836,19 @@ class PhotoFrameController(
     pendingTransitionDirection = 0
 
     if (slideDir != 0) {
-      val startX = if (slideDir > 0) screenW.toFloat() else -screenW.toFloat()
       val endX = if (slideDir > 0) -screenW.toFloat() else screenW.toFloat()
-      val slideDuration = 450L
+      val currentTargetX = targetLayer.frameContainer.translationX
+      val remainingDistance = if (currentTargetX != 0f) abs(currentTargetX) else screenW.toFloat()
+      val fractionRemaining = (remainingDistance / screenW.toFloat()).coerceIn(0.1f, 1.0f)
+      val slideDuration = (380L * fractionRemaining).toLong().coerceAtLeast(150L)
       val interpolator = android.view.animation.DecelerateInterpolator(1.5f)
 
-      targetLayer.frameContainer.translationX = startX
-      targetLayer.blurPhoto.translationX = startX
+      if (currentTargetX == 0f) {
+        val startX = if (slideDir > 0) screenW.toFloat() else -screenW.toFloat()
+        targetLayer.frameContainer.translationX = startX
+        targetLayer.blurPhoto.translationX = startX
+      }
+
       targetLayer.frameContainer.alpha = 1f
       targetLayer.blurPhoto.alpha = 1f
 
