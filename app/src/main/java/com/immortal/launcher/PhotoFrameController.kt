@@ -241,35 +241,65 @@ class PhotoFrameController(
   // that omits MOVE events): clear horizontal swipe = prev/next, clear tap = exit.
   private var downX = 0f
   private var downY = 0f
+  private var isDragging = false
   private var pendingTransitionDirection: Int = 0
 
   /** Hosts forward their touch events here. */
   fun onTouch(ev: MotionEvent) {
     // While the timer alarm is showing, the slide-to-stop owns the touch stream.
     if (faceRenderer.handleAlarmTouch(ev)) return
+    val screenW = context.resources.displayMetrics.widthPixels.toFloat()
+
     when (ev.actionMasked) {
       MotionEvent.ACTION_DOWN -> {
         downX = ev.x
         downY = ev.y
+        isDragging = false
       }
-      MotionEvent.ACTION_UP -> {
+      MotionEvent.ACTION_MOVE -> {
         val dx = ev.x - downX
         val dy = ev.y - downY
+        if (!isDragging && abs(dx) > 30 && abs(dx) > abs(dy) * 1.5f) {
+          isDragging = true
+        }
+        if (isDragging) {
+          currentLayer.frameContainer.translationX = dx
+          currentLayer.blurPhoto.translationX = dx
+        }
+      }
+      MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+        val dx = ev.x - downX
+        val dy = ev.y - downY
+        if (isDragging) {
+          isDragging = false
+          val threshold = screenW * 0.18f
+          if (dx < -threshold) {
+            pendingTransitionDirection = +1
+            next()
+          } else if (dx > threshold) {
+            pendingTransitionDirection = -1
+            prev()
+          } else {
+            currentLayer.frameContainer.animate()
+                .translationX(0f)
+                .setDuration(250L)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+            currentLayer.blurPhoto.animate()
+                .translationX(0f)
+                .setDuration(250L)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+          }
+          return
+        }
         // A tap while the welcome overlay is showing dismisses it early
         // rather than exiting the screensaver.
         if (welcomeVisible && abs(dx) < 48 && abs(dy) < 48) {
           dismissWelcome()
           return
         }
-        if (abs(dx) > 120 && abs(dx) > abs(dy) * 1.5f) {
-          if (dx < 0) {
-            pendingTransitionDirection = +1
-            next()
-          } else {
-            pendingTransitionDirection = -1
-            prev()
-          }
-        } else if (abs(dx) < 48 && abs(dy) < 48) {
+        if (abs(dx) < 48 && abs(dy) < 48) {
           onExit?.invoke()
         }
       }
