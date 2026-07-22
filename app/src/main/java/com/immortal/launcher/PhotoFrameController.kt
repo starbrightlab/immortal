@@ -245,7 +245,33 @@ class PhotoFrameController(
   private var downX = 0f
   private var downY = 0f
   private var isDragging = false
+  private var dragPreparedDirection = 0
   private var pendingTransitionDirection: Int = 0
+
+  private fun setupAdjacentDragBitmap(dir: Int) {
+    val bmp = when {
+      localMode && playlist.isNotEmpty() -> {
+        val targetIdx = if (dir > 0) (localIndex + 1) % playlist.size else (localIndex - 1 + playlist.size) % playlist.size
+        val item = playlist[targetIdx]
+        preloadedBitmaps.get(item.path) ?: runCatching { decodeCorrected(item.path) }.getOrNull()
+      }
+      remoteMode && remoteUrls.isNotEmpty() -> {
+        val targetIdx = if (dir > 0) (remoteIndex + 1) % remoteUrls.size else (remoteIndex - 1 + remoteUrls.size) % remoteUrls.size
+        val url = remoteUrls[targetIdx]
+        preloadedBitmaps.get(url) ?: runCatching { fetchRemoteImage(url) }.getOrNull()
+      }
+      else -> null
+    } ?: return
+
+    incomingLayer.photo.setImageBitmap(bmp)
+    incomingLayer.frameContainer.visibility = View.VISIBLE
+    incomingLayer.frameContainer.alpha = 1f
+    incomingLayer.blurPhoto.visibility = View.VISIBLE
+    incomingLayer.blurPhoto.alpha = 1f
+    incomingLayer.frameContainer.bringToFront()
+    faceRenderer.view.bringToFront()
+    welcomeOverlay?.bringToFront()
+  }
 
   /** Hosts forward their touch events here. */
   fun onTouch(ev: MotionEvent) {
@@ -258,6 +284,7 @@ class PhotoFrameController(
         downX = ev.x
         downY = ev.y
         isDragging = false
+        dragPreparedDirection = 0
       }
       MotionEvent.ACTION_MOVE -> {
         val dx = ev.x - downX
@@ -268,6 +295,16 @@ class PhotoFrameController(
         if (isDragging) {
           currentLayer.frameContainer.translationX = dx
           currentLayer.blurPhoto.translationX = dx
+
+          val targetDir = if (dx < 0) +1 else -1
+          if (dragPreparedDirection != targetDir) {
+            dragPreparedDirection = targetDir
+            setupAdjacentDragBitmap(targetDir)
+          }
+
+          val incomingX = if (targetDir > 0) screenW + dx else -screenW + dx
+          incomingLayer.frameContainer.translationX = incomingX
+          incomingLayer.blurPhoto.translationX = incomingX
         }
       }
       MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -293,7 +330,28 @@ class PhotoFrameController(
                 .setDuration(250L)
                 .setInterpolator(android.view.animation.DecelerateInterpolator())
                 .start()
+
+            val cancelTargetX = if (dx < 0) screenW else -screenW
+            incomingLayer.frameContainer.animate()
+                .translationX(cancelTargetX)
+                .setDuration(250L)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .withEndAction {
+                  incomingLayer.frameContainer.visibility = View.GONE
+                  incomingLayer.frameContainer.translationX = 0f
+                }
+                .start()
+            incomingLayer.blurPhoto.animate()
+                .translationX(cancelTargetX)
+                .setDuration(250L)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .withEndAction {
+                  incomingLayer.blurPhoto.visibility = View.GONE
+                  incomingLayer.blurPhoto.translationX = 0f
+                }
+                .start()
           }
+          dragPreparedDirection = 0
           return
         }
         // A tap while the welcome overlay is showing dismisses it early
