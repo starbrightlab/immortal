@@ -96,6 +96,12 @@ android {
     targetCompatibility = JavaVersion.VERSION_11
   }
   buildFeatures { compose = true }
+  testOptions {
+    // Let unit tests exercise code that logs: the android.jar stub used off-device throws
+    // "not mocked" for android.util.Log, which would otherwise put every logging path
+    // (e.g. FleetHttpServer's connection-error handling) out of reach of a JVM test.
+    unitTests.isReturnDefaultValues = true
+  }
 }
 
 dependencies {

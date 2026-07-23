@@ -9,11 +9,13 @@ package com.immortal.launcher
 
 import android.util.Log
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.net.URLDecoder
 import java.util.concurrent.Executors
 
@@ -36,7 +38,10 @@ class FleetHttpServer(
     private val port: Int,
     private val handler: (Request) -> Response,
 ) {
-  private val pool = Executors.newFixedThreadPool(4)
+  // Browsers fan out to ~6 parallel connections per host, and `Connection: close`
+  // means every asset and poll costs a fresh one — keep enough threads for a phone
+  // remote loading the page without queueing behind itself.
+  private val pool = Executors.newFixedThreadPool(8)
   @Volatile private var server: ServerSocket? = null
   @Volatile private var running = false
   private var acceptThread: Thread? = null
@@ -182,8 +187,29 @@ class FleetHttpServer(
                 if (running) Log.w(TAG, "accept failed", it)
                 return
               }
-      runCatching { pool.execute { serve(socket) } }
+      runCatching { pool.execute { serveSafely(socket) } }
           .onFailure { runCatching { socket.close() } }
+    }
+  }
+
+  /**
+   * A connection's failure must never leave the pool thread. Browsers open speculative
+   * connections they may never write to (and drop live ones when a tab closes), so a
+   * read here can time out or reset; a checked IOException thrown out of a pool
+   * Runnable reaches the thread's uncaught handler wrapped in [java.lang.Error] and
+   * takes the whole launcher down with it. Log and drop the connection instead.
+   */
+  private fun serveSafely(socket: Socket) {
+    try {
+      serve(socket)
+    } catch (e: SocketTimeoutException) {
+      Log.d(TAG, "idle connection timed out: ${e.message}")
+    } catch (e: IOException) {
+      Log.d(TAG, "connection dropped: ${e.message}")
+    } catch (t: Throwable) {
+      Log.w(TAG, "connection handler failed", t)
+    } finally {
+      runCatching { socket.close() }
     }
   }
 
@@ -195,7 +221,10 @@ class FleetHttpServer(
         Log.w(TAG, "rejecting non-LAN peer ${it.inetAddress?.hostAddress}")
         return
       }
-      it.soTimeout = 30_000
+      // Short fuse while waiting for a request line: a browser preconnect that never
+      // writes would otherwise pin one of the pool's few threads for the full body
+      // timeout, and enough of them make the agent unreachable from the phone remote.
+      it.soTimeout = HEAD_TIMEOUT_MS
       val input = it.getInputStream()
       val out = it.getOutputStream()
       val head = readHead(input)
@@ -211,6 +240,8 @@ class FleetHttpServer(
         runCatching { writeResponse(out, Response.preflight()) }
         return
       }
+      // A real request is in flight now — give the body (uploads) the longer budget.
+      it.soTimeout = BODY_TIMEOUT_MS
       val len = head.headers["content-length"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
       val req = Request(head.method, head.path, head.query, head.headers, input, len)
       // Honour Expect: 100-continue (curl sends it for larger uploads) so the
@@ -256,6 +287,8 @@ class FleetHttpServer(
   internal companion object {
     private const val TAG = "ImmortalFleet"
     private const val MAX_HEAD_BYTES = 64 * 1024
+    private const val HEAD_TIMEOUT_MS = 10_000
+    private const val BODY_TIMEOUT_MS = 30_000
     private const val CRLF_CRLF = 0x0D0A0D0A
 
     /** Parse the request line + headers (text up to and including the blank line). */
