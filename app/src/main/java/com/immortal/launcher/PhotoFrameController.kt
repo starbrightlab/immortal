@@ -256,6 +256,7 @@ class PhotoFrameController(
   private var isDragging = false
   private var dragPreparedDirection = 0
   private var pendingTransitionDirection: Int = 0
+  private var velocityTracker: android.view.VelocityTracker? = null
 
   private fun setupAdjacentDragBitmap(dir: Int, screenW: Float, currentDx: Float) {
     val key = when {
@@ -319,22 +320,23 @@ class PhotoFrameController(
   }
 
   private fun snapBackDragLayers(screenW: Float, dx: Float) {
+    val interpolator = android.view.animation.DecelerateInterpolator(1.8f)
     currentLayer.frameContainer.animate()
         .translationX(0f)
         .setDuration(250L)
-        .setInterpolator(android.view.animation.DecelerateInterpolator())
+        .setInterpolator(interpolator)
         .start()
     currentLayer.blurPhoto.animate()
         .translationX(0f)
         .setDuration(250L)
-        .setInterpolator(android.view.animation.DecelerateInterpolator())
+        .setInterpolator(interpolator)
         .start()
 
     val cancelTargetX = if (dx < 0) screenW else -screenW
     incomingLayer.frameContainer.animate()
         .translationX(cancelTargetX)
         .setDuration(250L)
-        .setInterpolator(android.view.animation.DecelerateInterpolator())
+        .setInterpolator(interpolator)
         .withEndAction {
           incomingLayer.frameContainer.visibility = View.GONE
           incomingLayer.frameContainer.translationX = 0f
@@ -343,7 +345,7 @@ class PhotoFrameController(
     incomingLayer.blurPhoto.animate()
         .translationX(cancelTargetX)
         .setDuration(250L)
-        .setInterpolator(android.view.animation.DecelerateInterpolator())
+        .setInterpolator(interpolator)
         .withEndAction {
           incomingLayer.blurPhoto.visibility = View.GONE
           incomingLayer.blurPhoto.translationX = 0f
@@ -378,9 +380,13 @@ class PhotoFrameController(
         downY = ev.y
         isDragging = false
         dragPreparedDirection = 0
+        velocityTracker?.recycle()
+        velocityTracker = android.view.VelocityTracker.obtain()
+        velocityTracker?.addMovement(ev)
         suspendAutoTick()
       }
       MotionEvent.ACTION_MOVE -> {
+        velocityTracker?.addMovement(ev)
         val dx = ev.x - downX
         val dy = ev.y - downY
         if (!isDragging && abs(dx) > 30 && abs(dx) > abs(dy) * 1.5f) {
@@ -403,6 +409,9 @@ class PhotoFrameController(
         }
       }
       MotionEvent.ACTION_CANCEL -> {
+        velocityTracker?.addMovement(ev)
+        velocityTracker?.recycle()
+        velocityTracker = null
         val dx = ev.x - downX
         if (isDragging) {
           isDragging = false
@@ -412,15 +421,24 @@ class PhotoFrameController(
         rescheduleAutoTick()
       }
       MotionEvent.ACTION_UP -> {
+        velocityTracker?.addMovement(ev)
+        velocityTracker?.computeCurrentVelocity(1000)
+        val velocityX = velocityTracker?.xVelocity ?: 0f
+        velocityTracker?.recycle()
+        velocityTracker = null
+
         val dx = ev.x - downX
         val dy = ev.y - downY
         if (isDragging) {
           isDragging = false
           val threshold = screenW * 0.18f
-          if (dx < -threshold) {
+          val isFlickNext = dx < -threshold || (dx < -25f && velocityX < -500f)
+          val isFlickPrev = dx > threshold || (dx > 25f && velocityX > 500f)
+
+          if (isFlickNext) {
             pendingTransitionDirection = +1
             next()
-          } else if (dx > threshold) {
+          } else if (isFlickPrev) {
             pendingTransitionDirection = -1
             prev()
           } else {
@@ -1916,8 +1934,8 @@ class PhotoFrameController(
       val currentTargetX = targetLayer.frameContainer.translationX
       val remainingDistance = if (currentTargetX != 0f) abs(currentTargetX) else screenW.toFloat()
       val fractionRemaining = (remainingDistance / screenW.toFloat()).coerceIn(0.1f, 1.0f)
-      val slideDuration = (380L * fractionRemaining).toLong().coerceAtLeast(150L)
-      val interpolator = android.view.animation.DecelerateInterpolator(1.5f)
+      val slideDuration = (350L * fractionRemaining).toLong().coerceIn(120L, 350L)
+      val interpolator = android.view.animation.DecelerateInterpolator(1.8f)
 
       if (currentTargetX == 0f) {
         val startX = if (slideDir > 0) screenW.toFloat() else -screenW.toFloat()
