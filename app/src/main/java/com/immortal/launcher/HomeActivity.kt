@@ -2777,10 +2777,12 @@ private fun ImmortalDigitalWorldClockWidget(modifier: Modifier = Modifier) {
   LaunchedEffect(Unit) {
     while (true) {
       now = Date()
-      delay(1000)
+      val millisUntilNextMinute = (60_000L - (System.currentTimeMillis() % 60_000L)).coerceAtLeast(1000L)
+      delay(millisUntilNextMinute)
     }
   }
   val activeZones = remember(zones) { zones.take(4) }
+  val minuteBucket = now.time / 60_000L
 
   ImmortalWidgetShell(
       title = com.immortal.launcher.i18n.I18n.translate("Digital World Clock", userLang),
@@ -2799,7 +2801,7 @@ private fun ImmortalDigitalWorldClockWidget(modifier: Modifier = Modifier) {
               modifier = itemModifier,
               horizontalAlignment = Alignment.CenterHorizontally,
           ) {
-            val timeText = remember(zone, now, use24Hour) {
+            val timeText = remember(zone, minuteBucket, use24Hour) {
               val fmt = SimpleDateFormat(if (use24Hour) "HH:mm" else "h:mm a", Locale.getDefault())
               fmt.timeZone = TimeZone.getTimeZone(zone)
               fmt.format(now)
@@ -2807,7 +2809,8 @@ private fun ImmortalDigitalWorldClockWidget(modifier: Modifier = Modifier) {
             val mainFontSize = when (activeZones.size) {
               1 -> if (use24Hour) 34.sp else 28.sp
               2 -> if (use24Hour) 24.sp else 20.sp
-              else -> if (use24Hour) 20.sp else 15.sp
+              3 -> if (use24Hour) 18.sp else 14.sp
+              else -> if (use24Hour) 16.sp else 13.sp
             }
             val labelFontSize = if (activeZones.size == 1) 15.sp else 12.sp
             val offsetFontSize = if (activeZones.size == 1) 12.sp else 10.sp
@@ -2818,6 +2821,7 @@ private fun ImmortalDigitalWorldClockWidget(modifier: Modifier = Modifier) {
                 fontSize = mainFontSize,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.size(4.dp))
             Text(
@@ -3205,8 +3209,8 @@ private fun CustomWidgetGlyph(kind: String) {
       when (kind) {
         HomeWidgetStore.KIND_WEATHER -> "☁"
         HomeWidgetStore.KIND_WORLD_CLOCK -> "◷"
-        HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL -> "⏱"
-        HomeWidgetStore.KIND_TIMERS -> "⌛"
+        HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL -> "🕒"
+        HomeWidgetStore.KIND_TIMERS -> "⏱"
         else -> "+"
       }
   Text(emoji, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
