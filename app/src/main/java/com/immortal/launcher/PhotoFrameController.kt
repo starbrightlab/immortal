@@ -212,7 +212,16 @@ class PhotoFrameController(
   private var index = -1
 
   // In-memory cache for preloaded adjacent photo Bitmaps (prev/next) for instant swipe performance.
-  private val preloadedBitmaps = android.util.LruCache<String, Bitmap>(8)
+  // Sized by memory byte count (max 1/8th of available max heap, capped between 16MB and 32MB) to prevent OOM.
+  private val preloadedBitmaps = run {
+    val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+    val cacheSizeKb = (maxMemoryKb / 8).coerceIn(16 * 1024, 32 * 1024)
+    object : android.util.LruCache<String, Bitmap>(cacheSizeKb) {
+      override fun sizeOf(key: String, value: Bitmap): Int {
+        return (value.byteCount / 1024).coerceAtLeast(1)
+      }
+    }
+  }
 
   // Default-feed source-chain state (see [fetchWebPhoto]).
   // Wikimedia Commons featured-landscape image list: fetched once per session, then cycled.
@@ -248,29 +257,113 @@ class PhotoFrameController(
   private var dragPreparedDirection = 0
   private var pendingTransitionDirection: Int = 0
 
-  private fun setupAdjacentDragBitmap(dir: Int) {
-    val bmp = when {
+  private fun setupAdjacentDragBitmap(dir: Int, screenW: Float, currentDx: Float) {
+    val key = when {
       localMode && playlist.isNotEmpty() -> {
         val targetIdx = if (dir > 0) (localIndex + 1) % playlist.size else (localIndex - 1 + playlist.size) % playlist.size
-        val item = playlist[targetIdx]
-        preloadedBitmaps.get(item.path) ?: runCatching { decodeCorrected(item.path) }.getOrNull()
+        playlist[targetIdx].path
       }
       remoteMode && remoteUrls.isNotEmpty() -> {
         val targetIdx = if (dir > 0) (remoteIndex + 1) % remoteUrls.size else (remoteIndex - 1 + remoteUrls.size) % remoteUrls.size
-        val url = remoteUrls[targetIdx]
-        preloadedBitmaps.get(url) ?: runCatching { fetchRemoteImage(url) }.getOrNull()
+        remoteUrls[targetIdx]
       }
       else -> null
     } ?: return
 
+    val cached = preloadedBitmaps.get(key)
+    if (cached != null) {
+      applyIncomingDragBitmap(cached, dir, screenW, currentDx)
+    } else {
+      incomingLayer.photo.setImageDrawable(null)
+      incomingLayer.frameContainer.visibility = View.GONE
+      incomingLayer.blurPhoto.visibility = View.GONE
+
+      io.execute {
+        val bmp = when {
+          localMode -> runCatching { decodeCorrected(key) }.getOrNull()
+          remoteMode -> runCatching { fetchRemoteImage(key) }.getOrNull()
+          else -> null
+        }
+        if (bmp != null) {
+          preloadedBitmaps.put(key, bmp)
+          ui.post {
+            if (isDragging && dragPreparedDirection == dir) {
+              applyIncomingDragBitmap(bmp, dir, screenW, currentDx)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private fun applyIncomingDragBitmap(bmp: Bitmap, dir: Int, screenW: Float, currentDx: Float) {
     incomingLayer.photo.setImageBitmap(bmp)
     incomingLayer.frameContainer.visibility = View.VISIBLE
     incomingLayer.frameContainer.alpha = 1f
-    incomingLayer.blurPhoto.visibility = View.VISIBLE
-    incomingLayer.blurPhoto.alpha = 1f
+    if (settings.fit == ScreensaverConfig.FIT_FIT || bmp.height > bmp.width) {
+      runCatching {
+        val blurred = createBlurredBackground(bmp)
+        incomingLayer.blurPhoto.setImageBitmap(blurred)
+      }
+      incomingLayer.blurPhoto.visibility = View.VISIBLE
+      incomingLayer.blurPhoto.alpha = 1f
+    } else {
+      incomingLayer.blurPhoto.visibility = View.GONE
+    }
+    val incomingX = if (dir > 0) screenW + currentDx else -screenW + currentDx
+    incomingLayer.frameContainer.translationX = incomingX
+    incomingLayer.blurPhoto.translationX = incomingX
     incomingLayer.frameContainer.bringToFront()
     faceRenderer.view.bringToFront()
     welcomeOverlay?.bringToFront()
+  }
+
+  private fun snapBackDragLayers(screenW: Float, dx: Float) {
+    currentLayer.frameContainer.animate()
+        .translationX(0f)
+        .setDuration(250L)
+        .setInterpolator(android.view.animation.DecelerateInterpolator())
+        .start()
+    currentLayer.blurPhoto.animate()
+        .translationX(0f)
+        .setDuration(250L)
+        .setInterpolator(android.view.animation.DecelerateInterpolator())
+        .start()
+
+    val cancelTargetX = if (dx < 0) screenW else -screenW
+    incomingLayer.frameContainer.animate()
+        .translationX(cancelTargetX)
+        .setDuration(250L)
+        .setInterpolator(android.view.animation.DecelerateInterpolator())
+        .withEndAction {
+          incomingLayer.frameContainer.visibility = View.GONE
+          incomingLayer.frameContainer.translationX = 0f
+        }
+        .start()
+    incomingLayer.blurPhoto.animate()
+        .translationX(cancelTargetX)
+        .setDuration(250L)
+        .setInterpolator(android.view.animation.DecelerateInterpolator())
+        .withEndAction {
+          incomingLayer.blurPhoto.visibility = View.GONE
+          incomingLayer.blurPhoto.translationX = 0f
+        }
+        .start()
+  }
+
+  private fun suspendAutoTick() {
+    ui.removeCallbacks(localTick)
+    ui.removeCallbacks(remoteTick)
+  }
+
+  private fun rescheduleAutoTick() {
+    if (localMode) {
+      ui.removeCallbacks(localTick)
+      ui.postDelayed(localTick, intervalMs())
+    } else if (remoteMode) {
+      ui.removeCallbacks(remoteTick)
+      ui.postDelayed(remoteTick, intervalMs())
+    }
   }
 
   /** Hosts forward their touch events here. */
@@ -285,12 +378,14 @@ class PhotoFrameController(
         downY = ev.y
         isDragging = false
         dragPreparedDirection = 0
+        suspendAutoTick()
       }
       MotionEvent.ACTION_MOVE -> {
         val dx = ev.x - downX
         val dy = ev.y - downY
         if (!isDragging && abs(dx) > 30 && abs(dx) > abs(dy) * 1.5f) {
           isDragging = true
+          suspendAutoTick()
         }
         if (isDragging) {
           currentLayer.frameContainer.translationX = dx
@@ -299,7 +394,7 @@ class PhotoFrameController(
           val targetDir = if (dx < 0) +1 else -1
           if (dragPreparedDirection != targetDir) {
             dragPreparedDirection = targetDir
-            setupAdjacentDragBitmap(targetDir)
+            setupAdjacentDragBitmap(targetDir, screenW, dx)
           }
 
           val incomingX = if (targetDir > 0) screenW + dx else -screenW + dx
@@ -307,7 +402,16 @@ class PhotoFrameController(
           incomingLayer.blurPhoto.translationX = incomingX
         }
       }
-      MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+      MotionEvent.ACTION_CANCEL -> {
+        val dx = ev.x - downX
+        if (isDragging) {
+          isDragging = false
+          snapBackDragLayers(screenW, dx)
+        }
+        dragPreparedDirection = 0
+        rescheduleAutoTick()
+      }
+      MotionEvent.ACTION_UP -> {
         val dx = ev.x - downX
         val dy = ev.y - downY
         if (isDragging) {
@@ -320,36 +424,8 @@ class PhotoFrameController(
             pendingTransitionDirection = -1
             prev()
           } else {
-            currentLayer.frameContainer.animate()
-                .translationX(0f)
-                .setDuration(250L)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
-                .start()
-            currentLayer.blurPhoto.animate()
-                .translationX(0f)
-                .setDuration(250L)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
-                .start()
-
-            val cancelTargetX = if (dx < 0) screenW else -screenW
-            incomingLayer.frameContainer.animate()
-                .translationX(cancelTargetX)
-                .setDuration(250L)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
-                .withEndAction {
-                  incomingLayer.frameContainer.visibility = View.GONE
-                  incomingLayer.frameContainer.translationX = 0f
-                }
-                .start()
-            incomingLayer.blurPhoto.animate()
-                .translationX(cancelTargetX)
-                .setDuration(250L)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
-                .withEndAction {
-                  incomingLayer.blurPhoto.visibility = View.GONE
-                  incomingLayer.blurPhoto.translationX = 0f
-                }
-                .start()
+            snapBackDragLayers(screenW, dx)
+            rescheduleAutoTick()
           }
           dragPreparedDirection = 0
           return
