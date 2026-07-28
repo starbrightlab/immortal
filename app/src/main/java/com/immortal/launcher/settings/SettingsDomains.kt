@@ -238,7 +238,7 @@ object SettingsDomains {
                       get = { it.fit },
                       set = ScreensaverConfig::setFit,
                       options =
-                          listOf(ScreensaverConfig.FIT_FILL to "fill", ScreensaverConfig.FIT_FIT to "fit"),
+                          listOf(ScreensaverConfig.FIT_FILL to "Fill", ScreensaverConfig.FIT_FIT to "Fit"),
                       coerce = { FleetScreensaver.coerceFit(it) }),
                   IntSpec(
                       "intervalSec",
