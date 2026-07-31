@@ -278,7 +278,7 @@ object RemoteHtml {
           <div class=srcf id=f_smb><input id=smbHost placeholder="Host or IP"><input id=smbShare placeholder="Share name"><input id=smbPath placeholder="Folder path (optional)"><input id=smbUser placeholder="Username (optional)"><input id=smbPass type=password placeholder="Password (optional)"></div>
           <div class=srcf id=f_dav><input id=davUrl placeholder="WebDAV URL"><input id=davUser placeholder="Username (optional)"><input id=davPass type=password placeholder="Password (optional)"></div>
           <div class=srcf id=f_web><input id=webUrl placeholder="Web page URL"></div>
-          <div class=srcf id=f_album><input id=albumUrl placeholder="iCloud or Google Photos share link"></div>
+          <div class=srcf id=f_album><input id=albumUrl placeholder="iCloud, Google, or Synology Photos share link"></div>
           <button class=primary onclick=saveSources()>Save</button>
           <div id=srcErr class=err></div>
         </div>

@@ -59,8 +59,8 @@ private const val SHERPA_VOICE_PARAM = "sherpa_voice_name"
  *    blank even with no network or a third-party outage. See [fetchWebPhoto].
  *  - **folder** — photos and videos from a folder the user picked (internal, SD, or
  *    a USB-C drive), read through the Storage Access Framework.
- *  - **url** — a public share link to an iCloud Shared Album or a Google Photos
- *    shared album. Fetched once on start; the screensaver rotates through the
+ *  - **url** — a public share link to an iCloud Shared Album, Google Photos, or
+ *    Synology Photos album. Fetched once on start; the screensaver rotates through the
  *    returned direct image URLs and silently falls back to the default feed if the
  *    album can't be resolved.
  *
@@ -148,7 +148,7 @@ class PhotoFrameController(
   // callback can tell it's been superseded and bow out.
   private var gen = 0
 
-  // Remote playback state (iCloud / Google Photos shared albums, or an Immich server).
+  // Remote playback state (shared albums, or an Immich server).
   private var remoteMode = false
   private var remoteUrls: List<String> = emptyList()
   private var remoteIndex = -1
@@ -336,7 +336,7 @@ class PhotoFrameController(
           ui.post {
             if (urls.isNotEmpty()) {
               remoteUrls = if (source.shuffle) urls.shuffled() else urls
-              remoteHeaders = emptyMap()
+              remoteHeaders = album?.headers.orEmpty()
               remoteMode = true
               remoteIndex = -1
               remoteFailStreak = 0
@@ -1202,7 +1202,7 @@ class PhotoFrameController(
     }
   }
 
-  // --- remote album playback (iCloud / Google Photos public shares) -----------
+  // --- remote album playback (public shared albums) ---------------------------
   private val remoteTick =
       object : Runnable {
         override fun run() {
@@ -1225,6 +1225,7 @@ class PhotoFrameController(
             ui.post {
               if (remoteMode && urls.isNotEmpty()) {
                 remoteUrls = urls
+                remoteHeaders = fresh?.headers.orEmpty()
                 if (remoteIndex >= remoteUrls.size) remoteIndex = -1
                 remoteFailStreak = 0
               }
@@ -1386,6 +1387,7 @@ class PhotoFrameController(
         if (!remoteMode) return@post // raced with a source change / startWeb()
         if (urls.isNotEmpty()) {
           remoteUrls = if (settings.shuffle) urls.shuffled() else urls
+          remoteHeaders = fresh?.headers.orEmpty()
           remoteIndex = -1
           remoteFailStreak = 0
           advanceRemote(+1)

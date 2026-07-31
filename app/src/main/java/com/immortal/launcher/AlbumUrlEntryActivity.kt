@@ -78,7 +78,7 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
           fontWeight = FontWeight.SemiBold,
       )
       Text(
-          "Paste a public link from iCloud Shared Albums or Google Photos. " +
+          "Paste a public link from iCloud Shared Albums, Google Photos, or Synology Photos. " +
               "Make sure it's shared as \"anyone with the link\" — Immortal can't sign in.",
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
@@ -100,7 +100,8 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
 
       Text(
           when {
-            trimmed.isEmpty() -> "Examples: iCloud Shared Album, Google Photos shared album."
+            trimmed.isEmpty() ->
+                "Examples: iCloud Shared Album, Google Photos, or Synology Photos."
             supported -> "Looks like a $provider link."
             else -> "That doesn't look like a supported share link yet."
           },
@@ -161,7 +162,8 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
           "• iPhone Photos → a Shared Album you own → people/share button → " +
               "Share Link → Copy Link (works with the current " +
               "photos.icloud.com/shared/album/… links).\n" +
-              "• Google Photos → album → Share → \"Get link\" (anyone with the link can view).",
+              "• Google Photos → album → Share → \"Get link\" (anyone with the link can view).\n" +
+              "• Synology Photos → album → Share → enable share link → Public.",
           color = Color(0xFF8A8A8A),
           fontSize = 13.sp,
           modifier = Modifier.padding(start = 4.dp),

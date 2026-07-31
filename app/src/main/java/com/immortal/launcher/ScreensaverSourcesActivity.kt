@@ -296,7 +296,7 @@ private fun folderSubtitle(usesFolder: Boolean, name: String?, count: Int?): Str
 
 private fun albumUrlSubtitle(usesUrl: Boolean, url: String?): String =
     when {
-      !usesUrl -> "Paste a public iCloud or Google Photos share link."
+      !usesUrl -> "Paste a public iCloud, Google Photos, or Synology Photos share link."
       url.isNullOrBlank() -> "No link yet — tap to paste one."
       else -> "${RemoteAlbum.providerName(url)} — ${shortUrl(url)}"
     }

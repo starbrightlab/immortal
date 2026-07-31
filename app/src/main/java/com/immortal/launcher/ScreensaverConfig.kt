@@ -31,7 +31,7 @@ enum class FrameMode {
  * The default source is Immortal's built-in photo feed; the user can instead point
  * the screensaver at a local folder of photos/videos — including one on a USB-C or
  * SD card plugged into the Portal (any folder reachable through the system file
- * picker) — or paste a public share link from iCloud or Google Photos. If the
+ * picker) — or paste a public share link from iCloud, Google Photos, or Synology Photos. If the
  * chosen source can't be read (e.g. the drive is unplugged, the album was unshared)
  * the screensaver falls back to the default feed, so it's never blank.
  */
