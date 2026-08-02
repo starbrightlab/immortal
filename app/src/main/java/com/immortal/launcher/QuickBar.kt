@@ -22,9 +22,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 
 /**
- * The quick-button cluster: a centered row of buttons pinned to the top of the screen, over any
- * app. Centered (not left/right) so it never collides with the system bar's back/home (left) or
- * status icons (right), and works on any Portal size without per-model layout.
+ * The quick-button cluster: a row of buttons pinned to the top of the screen, over any app.
+ * It begins immediately after the Portal system bar's Back/Home controls so navigation stays
+ * grouped at the left and never collides with the status icons on the right.
  *
  * Hosted by [BarWatchService] as a **TYPE_ACCESSIBILITY_OVERLAY** — that renders ABOVE the system
  * bar (a plain app overlay sits below it, so it would draw under the bar and its taps would be
@@ -64,7 +64,12 @@ object QuickBar {
                   WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                   PixelFormat.TRANSLUCENT,
               )
-              .apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }
+              .apply {
+                gravity = Gravity.TOP or Gravity.START
+                // Portal's system Back/Home pair occupies the first 224dp of the transient bar.
+                // Anchor immediately after it instead of leaving the app switcher at screen center.
+                x = (224 * service.resources.displayMetrics.density).toInt()
+              }
       runCatching { wmgr.addView(cluster, lp); view = cluster }
           .onFailure { Log.w(TAG, "addView failed", it) }
       refresh()
