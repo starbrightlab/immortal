@@ -644,7 +644,7 @@ private fun LauncherScreen(
   var dragOriginalSlots by remember { mutableStateOf<List<String?>?>(null) }
   // The drag gesture lives on a stable container that wraps the pager (not on the tile), so it
   // survives page flips — that's what lets a tile be dragged onto a different page.
-  var containerOrigin by remember { mutableStateOf(Offset.Zero) }
+  var containerBounds by remember { mutableStateOf(Rect.Zero) }
   var containerDragging by remember { mutableStateOf(false) }
   // Pending folder creation awaiting a name (source+target packages).
   var pendingPair by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -683,13 +683,30 @@ private fun LauncherScreen(
     replaceAssignments(result.assignments)
     if (result.closeFolder) openFolder = null
   }
-  fun targetSlotAt(pos: Offset): Int? =
-      slotBounds.entries.firstOrNull { it.value.contains(pos) }?.key
-
   // --- horizontal paging (iOS-style swipeable app pages) ----------------------
   var pageCapacity by remember { mutableStateOf(1) }
   val pageCount = ((gridSlots.size + pageCapacity - 1) / pageCapacity).coerceAtLeast(1)
   val pagerState = rememberPagerState { pageCount }
+  fun targetSlotAt(pos: Offset): Int? {
+    // Only the visible page may receive the drop. HorizontalPager keeps neighbouring pages
+    // composed and slotBounds can retain entries from pages that have already moved off-screen;
+    // considering those stale rectangles made a drop unpredictably swap with an unseen tile.
+    val first = pagerState.currentPage * pageCapacity
+    val lastExclusive = minOf(first + pageCapacity, gridSlots.size)
+    return slotBounds.entries
+        .firstOrNull { (index, bounds) -> index in first until lastExclusive && bounds.contains(pos) }
+        ?.key
+  }
+  fun clampToGrid(pos: Offset): Offset {
+    val bounds = containerBounds
+    val halfTile =
+        with(context.resources.displayMetrics) { tileDpFor(tileSize).value * density / 2f }
+    val minX = bounds.left + halfTile
+    val maxX = (bounds.right - halfTile).coerceAtLeast(minX)
+    val minY = bounds.top + halfTile
+    val maxY = (bounds.bottom - halfTile).coerceAtLeast(minY)
+    return Offset(pos.x.coerceIn(minX, maxX), pos.y.coerceIn(minY, maxY))
+  }
   // While dragging, drift toward the screen edge auto-advances to the next/previous page.
   var edgeDir by remember { mutableStateOf(0) }
 
@@ -698,42 +715,37 @@ private fun LauncherScreen(
     // user doesn't have to lift and press again.
     if (!editMode) editMode = true
     dragKey = key
-    dragPos = win
+    dragPos = clampToGrid(win)
     dragOriginalSlots = gridSlots
   }
   fun moveTileDrag(amount: Offset) {
-    val dm = context.resources.displayMetrics
-    val screenW = dm.widthPixels.toFloat()
-    val screenH = dm.heightPixels.toFloat()
-    // Clamp to the screen so a finger riding the very edge (or briefly off it) still maps to the
-    // edge column instead of drifting into nowhere — keeps target detection and edge-flip working.
-    dragPos =
-        Offset(
-            (dragPos.x + amount.x).coerceIn(0f, screenW),
-            (dragPos.y + amount.y).coerceIn(0f, screenH),
-        )
+    val bounds = containerBounds
+    // Keep the complete drag ghost inside the visible grid. Pointer cancellation or coordinates
+    // beyond the screen edge can no longer leave an icon stranded outside the physical display.
+    dragPos = clampToGrid(dragPos + amount)
+    val width = bounds.width.coerceAtLeast(1f)
     edgeDir =
         when {
-          dragPos.x > screenW * 0.86f -> 1
-          dragPos.x < screenW * 0.14f -> -1
+          dragPos.x > bounds.right - width * 0.14f -> 1
+          dragPos.x < bounds.left + width * 0.14f -> -1
           else -> 0
         }
     // Any movement restarts the dwell timer and drops the fold highlight; only a pause re-arms it.
     moveTick++
     foldTarget = null
     val src = dragKey ?: return
-    val srcIdx = gridSlots.indexOf(src)
-    if (srcIdx < 0) return
-    val tgtIdx = targetSlotAt(dragPos) ?: return
-    if (tgtIdx == srcIdx) return
-    // Hovering an app over a folder files it in (handled on drop) — don't live-swap into it.
+    val tgtIdx = targetSlotAt(dragPos)
+    if (tgtIdx == null) {
+      foldCandidate = null
+      return
+    }
     val tgt = gridSlots.getOrNull(tgtIdx)
     // Dwell-to-fold: remember the app we're passing directly over so a pause here can arm a new
     // folder. Anything else under the finger (folder, widget, built-in, blank) clears the candidate.
     foldCandidate = if (src.startsWith(APP_KEY) && tgt != null && tgt.startsWith(APP_KEY)) tgt else null
-    if (src.startsWith(APP_KEY) && tgt != null && tgt.startsWith(FOLDER_KEY)) return
-    val next = HomeGrid.swap(gridSlots, srcIdx, tgtIdx)
-    if (next != gridSlots) gridSlots = next
+    // Do not mutate the grid during pointer movement. The old live-swap behaviour could process
+    // dozens of overlapping targets in one gesture and visually scramble the desktop. A single
+    // deterministic swap is committed in endTileDrag only after a valid drop.
   }
   fun endTileDrag() {
     edgeDir = 0
@@ -741,9 +753,8 @@ private fun LauncherScreen(
     if (src != null) {
       val armed = foldTarget
       if (src.startsWith(APP_KEY) && armed != null && armed.startsWith(APP_KEY) && armed != src) {
-        // Dwell-to-fold: the app rested on another app — make a folder from the pair. Undo any live
-        // swaps first so the grid is back to its pre-drag order; the reconcile effect then removes
-        // both apps and drops the new folder tile in for them once it's named.
+        // Dwell-to-fold: the app rested on another app — make a folder from the pair. Restore the
+        // pre-drag slots; the reconcile effect removes both apps and adds the named folder tile.
         dragOriginalSlots?.let { gridSlots = it }
         UserLayout.saveGridSlots(context, gridSlots)
         pendingPair = src.removePrefix(APP_KEY) to armed.removePrefix(APP_KEY)
@@ -751,12 +762,18 @@ private fun LauncherScreen(
         val tgtIdx = targetSlotAt(dragPos)
         val tgt = tgtIdx?.let { gridSlots.getOrNull(it) }
         if (src.startsWith(APP_KEY) && tgt != null && tgt.startsWith(FOLDER_KEY)) {
-          // File the app into the folder; undo any live swaps so the folder stays put.
+          // File the app into the folder while leaving every other tile exactly where it was.
           dragOriginalSlots?.let { gridSlots = it }
           assignments[src.removePrefix(APP_KEY)] = tgt.removePrefix(FOLDER_KEY)
           persist()
+        } else if (tgtIdx != null) {
+          val srcIdx = gridSlots.indexOf(src)
+          gridSlots = HomeGrid.swap(gridSlots, srcIdx, tgtIdx)
+          UserLayout.saveGridSlots(context, gridSlots)
+        } else {
+          // Releasing between cells or outside a valid target is a no-op.
+          dragOriginalSlots?.let { gridSlots = it }
         }
-        UserLayout.saveGridSlots(context, gridSlots)
       }
     }
     dragKey = null
@@ -765,10 +782,9 @@ private fun LauncherScreen(
     foldCandidate = null
   }
   fun cancelTileDrag() {
-    // Don't revert — commit the tiles where they were last dragged, so a brief finger-off-screen
-    // (which the OS reports as a cancel) never snaps everything back to where it started.
+    // A cancelled gesture is transactional: restore the exact pre-drag layout and persist nothing.
     edgeDir = 0
-    if (dragKey != null) UserLayout.saveGridSlots(context, gridSlots)
+    dragOriginalSlots?.let { gridSlots = it }
     dragKey = null
     dragOriginalSlots = null
     foldTarget = null
@@ -883,7 +899,7 @@ private fun LauncherScreen(
           modifier =
               Modifier.fillMaxWidth()
                   .weight(1f)
-                  .onGloballyPositioned { containerOrigin = it.boundsInWindow().topLeft }
+                  .onGloballyPositioned { containerBounds = it.boundsInWindow() }
                   // One stable, page-flip-proof drag detector for EVERY tile (apps, folders,
                   // built-ins AND widgets). It watches for a long-press in the pointer Initial pass,
                   // so it grabs the tile under the finger before a hosted widget's AndroidView can
@@ -912,9 +928,8 @@ private fun LauncherScreen(
                             true
                           }
                       if (aborted != null) return@awaitEachGesture
-                      val win = down.position + containerOrigin
-                      val hitIdx =
-                          slotBounds.entries.firstOrNull { it.value.contains(win) }?.key
+                      val win = down.position + containerBounds.topLeft
+                      val hitIdx = targetSlotAt(win)
                       val hitKey = hitIdx?.let { gridSlots.getOrNull(it) }
                       if (hitKey == null) return@awaitEachGesture
                       containerDragging = true
