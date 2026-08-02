@@ -1,7 +1,7 @@
 <!-- Copyright (c) 2026 Starbright Lab.
      This source code is licensed under the MIT license found in the
      LICENSE file in the root directory of this source tree. -->
-<!-- App-switcher / recents glyph: three rounded vertical bars (One-UI style). -->
+<!-- Android system Recents glyph, separate from Immortal's app-switcher control. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -9,7 +9,8 @@
     android:viewportHeight="24">
   <path
       android:strokeColor="#FFFFFFFF"
-      android:strokeWidth="3"
+      android:strokeWidth="2.5"
       android:strokeLineCap="round"
-      android:pathData="M5,6 L5,18 M12,6 L12,18 M19,6 L19,18" />
+      android:strokeLineJoin="round"
+      android:pathData="M6,6 L18,6 L18,18 L6,18 Z" />
 </vector>

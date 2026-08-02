@@ -22,9 +22,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 
 /**
- * The quick-button cluster: a row of buttons pinned to the top of the screen, over any app.
- * It begins immediately after the Portal system bar's Back/Home controls so navigation stays
- * grouped at the left and never collides with the status icons on the right.
+ * Quick controls pinned to the top of the screen over any app. Immortal's app switcher stays
+ * centered, while a separate Android Recents control sits beside the system Back/Home buttons.
  *
  * Hosted by [BarWatchService] as a **TYPE_ACCESSIBILITY_OVERLAY** — that renders ABOVE the system
  * bar (a plain app overlay sits below it, so it would draw under the bar and its taps would be
@@ -40,21 +39,22 @@ object QuickBar {
 
   private var host: AccessibilityService? = null
   private var wm: WindowManager? = null
-  private var view: View? = null
+  private var switcherView: View? = null
+  private var recentsView: View? = null
   @Volatile private var barVisible = false
 
   /** Add the (initially evaluated) cluster overlay, hosted by the accessibility service. */
   fun attach(service: AccessibilityService) {
     main.post {
-      if (view != null) {
+      if (switcherView != null || recentsView != null) {
         refresh()
         return@post
       }
       host = service
       val wmgr = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
       wm = wmgr
-      val cluster = buildCluster(service)
-      val lp =
+      val switcher = buildCluster(service, appSwitcherButton(service))
+      val switcherLp =
           WindowManager.LayoutParams(
                   WindowManager.LayoutParams.WRAP_CONTENT,
                   // Span the full bar height so the button can sit vertically centered within it,
@@ -64,22 +64,36 @@ object QuickBar {
                   WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                   PixelFormat.TRANSLUCENT,
               )
+              .apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }
+      runCatching { wmgr.addView(switcher, switcherLp); switcherView = switcher }
+          .onFailure { Log.w(TAG, "addView failed", it) }
+
+      val recents = buildCluster(service, systemRecentsButton(service))
+      val recentsLp =
+          WindowManager.LayoutParams(
+                  WindowManager.LayoutParams.WRAP_CONTENT,
+                  statusBarHeight(service),
+                  WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                  WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                  PixelFormat.TRANSLUCENT,
+              )
               .apply {
                 gravity = Gravity.TOP or Gravity.START
                 // Portal's system Back/Home pair occupies the first 224dp of the transient bar.
-                // Anchor immediately after it instead of leaving the app switcher at screen center.
                 x = (224 * service.resources.displayMetrics.density).toInt()
               }
-      runCatching { wmgr.addView(cluster, lp); view = cluster }
-          .onFailure { Log.w(TAG, "addView failed", it) }
+      runCatching { wmgr.addView(recents, recentsLp); recentsView = recents }
+          .onFailure { Log.w(TAG, "add Recents view failed", it) }
       refresh()
     }
   }
 
   fun detach() {
     main.post {
-      view?.let { v -> runCatching { wm?.removeView(v) } }
-      view = null
+      switcherView?.let { v -> runCatching { wm?.removeView(v) } }
+      recentsView?.let { v -> runCatching { wm?.removeView(v) } }
+      switcherView = null
+      recentsView = null
       host = null
       wm = null
     }
@@ -95,13 +109,13 @@ object QuickBar {
   fun applyConfig() = main.post { refresh() }
 
   private fun refresh() {
-    val v = view ?: return
     val ctx = host ?: return
     // BarWatchService is baseline-enabled now (it also backs the remote + the Calls→stock-home
     // bridge), so the service being connected no longer implies the quick-button feature is on.
     // Gate the cluster on its own setting; show only when enabled AND (always-show or bar shown).
     val visible = QuickBarConfig.isEnabled(ctx) && (QuickBarConfig.alwaysShow(ctx) || barVisible)
-    v.visibility = if (visible) View.VISIBLE else View.GONE
+    switcherView?.visibility = if (visible) View.VISIBLE else View.GONE
+    recentsView?.visibility = if (visible) View.VISIBLE else View.GONE
   }
 
   private fun statusBarHeight(ctx: Context): Int {
@@ -112,12 +126,12 @@ object QuickBar {
 
   // --- UI ---------------------------------------------------------------------
 
-  private fun buildCluster(ctx: Context): View =
+  private fun buildCluster(ctx: Context, button: View): View =
       // Fills the bar-height window; CENTER keeps the button vertically centered in the bar.
       LinearLayout(ctx).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER
-        addView(appSwitcherButton(ctx))
+        addView(button)
       }
 
   /** A pill sized/shaped to match the system bar's back/home buttons, with the standard recents glyph. */
@@ -142,6 +156,28 @@ object QuickBar {
           ctx.startActivity(
               Intent(ctx, AppSwitcherActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
+      }
+    }
+  }
+
+  /** Android Recents, kept separate from Immortal's centered app-switcher Activity. */
+  private fun systemRecentsButton(service: AccessibilityService): View {
+    val d = service.resources.displayMetrics.density
+    fun dp(v: Int) = (v * d).toInt()
+    return ImageView(service).apply {
+      setImageResource(R.drawable.ic_system_recents)
+      scaleType = ImageView.ScaleType.CENTER_INSIDE
+      minimumWidth = dp(76)
+      minimumHeight = dp(44)
+      setPadding(dp(20), dp(10), dp(20), dp(10))
+      background =
+          GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(22).toFloat()
+            setColor(0x33FFFFFF)
+          }
+      setOnClickListener {
+        service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_RECENTS)
       }
     }
   }
