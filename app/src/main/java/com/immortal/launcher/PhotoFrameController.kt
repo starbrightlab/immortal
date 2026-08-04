@@ -41,6 +41,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.math.abs
+import org.json.JSONArray
 import org.json.JSONObject
 
 private const val SHERPA_VOICE_PARAM = "sherpa_voice_name"
@@ -214,6 +215,15 @@ class PhotoFrameController(
   // Wikimedia Commons featured-landscape image list: fetched once per session, then cycled.
   private var wikimediaUrls: List<String> = emptyList()
   private var wikimediaIdx = 0
+
+  // Chosen-feed session state (issue #176). Same shape as the Wikimedia pair above: the
+  // catalog fetch runs once per session, then steady state is one image download per tick.
+  private var metIds: List<Long> = emptyList()
+  private var metIdx = 0
+  private var articUrls: List<String> = emptyList()
+  private var articIdx = 0
+  private var apodUrls: List<String> = emptyList()
+  private var apodIdx = 0
   // Bundled offline photos (assets/[FALLBACK_DIR]): shuffled once, then cycled.
   private var bundledNames: List<String> = emptyList()
   private var bundledIdx = 0
@@ -1515,6 +1525,8 @@ class PhotoFrameController(
   //   4. Bundled   — CC0/public-domain photos shipped in the APK; can't fail, so a
   //                  fresh device with no network yet — or a day every web source is
   //                  down (e.g. the Picsum outage that prompted this) — is never blank.
+  // When the user picked a specific feed (Met / Art Institute / Wikimedia / NASA), that
+  // feed is prepended to this chain by [fetchWebPhoto] — see [chosenFeedSource].
   private val webSources: List<Pair<String, () -> Bitmap?>> by lazy {
     buildList {
       if (unsplashKey.isNotBlank()) add("unsplash" to ::unsplashBitmap)
@@ -1524,9 +1536,27 @@ class PhotoFrameController(
     }
   }
 
+  // The fetcher for the user's picked feed (issue #176: the picker used to be decorative —
+  // every choice silently fell through to the default chain). Null for FEED_PICSUM, which
+  // is the default chain's own leader. Re-read per fetch so a settings change mid-session
+  // takes effect on the next photo.
+  private fun chosenFeedSource(): Pair<String, () -> Bitmap?>? =
+      when (settings.feed) {
+        ScreensaverConfig.FEED_MET -> "met" to ::metBitmap
+        ScreensaverConfig.FEED_ARTIC -> "artic" to ::articBitmap
+        ScreensaverConfig.FEED_WIKIMEDIA -> "wikimedia" to ::wikimediaBitmap
+        ScreensaverConfig.FEED_APOD -> "apod" to ::apodBitmap
+        else -> null
+      }
+
   private fun fetchWebPhoto(): Bitmap? {
+    // The chosen feed leads; the default chain stays behind it as the never-blank fallback.
+    val chosen = chosenFeedSource()
+    val chain =
+        if (chosen == null) webSources
+        else listOf(chosen) + webSources.filter { it.first != chosen.first }
     val now = System.currentTimeMillis()
-    for ((name, fetch) in webSources) {
+    for ((name, fetch) in chain) {
       if ((sourceCooldownUntil[name] ?: 0L) > now) continue // dead recently; skip until cooldown
       val bmp = runCatching { fetch() }.getOrNull()
       if (bmp != null) return bmp
@@ -1536,7 +1566,7 @@ class PhotoFrameController(
     // Everything failed or is cooling down (e.g. all remotes down *and* the bundled
     // assets are unreadable). Retry the whole chain ignoring cooldowns rather than
     // leave the frame blank.
-    for ((_, fetch) in webSources) {
+    for ((_, fetch) in chain) {
       runCatching { fetch() }.getOrNull()?.let { return it }
     }
     Log.w(TAG, "screensaver: no photo source available")
@@ -1855,6 +1885,103 @@ class PhotoFrameController(
     return urls
   }
 
+  /**
+   * Keyless Met Museum feed: highlighted artworks with images. The search returns object
+   * ids only, so steady state is one small object-detail fetch plus the image download.
+   */
+  private fun metBitmap(): Bitmap? {
+    if (metIds.isEmpty()) metIds = fetchMetIds()
+    if (metIds.isEmpty()) return null
+    // Rights-restricted objects pass the hasImages search filter but return blank image
+    // URLs — skip past those rather than fail the whole source over one of them.
+    repeat(5) {
+      val id = metIds[metIdx % metIds.size]
+      metIdx++
+      val obj =
+          JSONObject(
+              httpGet("https://collectionapi.metmuseum.org/public/collection/v1/objects/$id"))
+      // primaryImageSmall is web-sized (~1200px) — plenty for the panel and far lighter
+      // than the full-resolution primaryImage scans, which can run to tens of MB.
+      val url = obj.optString("primaryImageSmall").ifBlank { obj.optString("primaryImage") }
+      if (url.isNotBlank()) return downloadBitmap(url)
+    }
+    return null
+  }
+
+  private fun fetchMetIds(): List<Long> {
+    // isHighlight keeps it to the curated masterpieces; q is a required parameter.
+    val json =
+        httpGet(
+            "https://collectionapi.metmuseum.org/public/collection/v1/search" +
+                "?hasImages=true&isHighlight=true&q=painting")
+    val ids = JSONObject(json).optJSONArray("objectIDs") ?: return emptyList()
+    val out = ArrayList<Long>()
+    for (i in 0 until ids.length()) {
+      val id = ids.optLong(i)
+      if (id > 0L) out.add(id)
+    }
+    out.shuffle()
+    return out
+  }
+
+  /**
+   * Keyless Art Institute of Chicago feed: public-domain artworks off their IIIF image
+   * CDN. Width 843 is the size their API guarantees for every listed image.
+   */
+  private fun articBitmap(): Bitmap? {
+    if (articUrls.isEmpty()) articUrls = fetchArticUrls()
+    if (articUrls.isEmpty()) return null
+    val url = articUrls[articIdx % articUrls.size]
+    articIdx++
+    return downloadBitmap(url)
+  }
+
+  private fun fetchArticUrls(): List<String> {
+    val json =
+        httpGet(
+            "https://api.artic.edu/api/v1/artworks/search" +
+                "?query%5Bterm%5D%5Bis_public_domain%5D=true&fields=image_id&limit=100")
+    val data = JSONObject(json).optJSONArray("data") ?: return emptyList()
+    val urls = ArrayList<String>()
+    for (i in 0 until data.length()) {
+      val imageId = data.optJSONObject(i)?.optString("image_id").orEmpty()
+      if (imageId.isNotBlank() && imageId != "null") {
+        urls.add("https://www.artic.edu/iiif/2/$imageId/full/843,/0/default.jpg")
+      }
+    }
+    urls.shuffle()
+    return urls
+  }
+
+  /**
+   * NASA Astronomy Picture of the Day feed. One batch call fetches [APOD_BATCH] random
+   * picture entries (video days are skipped), then steady state is plain CDN downloads —
+   * important because the shared DEMO_KEY is rate-limited to ~30 API calls/hour per IP,
+   * so the api.nasa.gov endpoint must be hit once per session, not once per photo.
+   */
+  private fun apodBitmap(): Bitmap? {
+    if (apodUrls.isEmpty()) apodUrls = fetchApodUrls()
+    if (apodUrls.isEmpty()) return null
+    val url = apodUrls[apodIdx % apodUrls.size]
+    apodIdx++
+    return downloadBitmap(url)
+  }
+
+  private fun fetchApodUrls(): List<String> {
+    val json =
+        httpGet("https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&count=$APOD_BATCH")
+    val entries = JSONArray(json)
+    val urls = ArrayList<String>()
+    for (i in 0 until entries.length()) {
+      val entry = entries.optJSONObject(i) ?: continue
+      if (entry.optString("media_type") != "image") continue
+      // `url` is the web-sized JPEG; `hdurl` originals can be enormous.
+      val url = entry.optString("url").ifBlank { entry.optString("hdurl") }
+      if (url.isNotBlank()) urls.add(url)
+    }
+    return urls
+  }
+
   /** Terminal fallback: CC0/public-domain photos bundled in the APK — never fails. */
   private fun bundledBitmap(): Bitmap? {
     if (bundledNames.isEmpty()) {
@@ -2085,6 +2212,10 @@ class PhotoFrameController(
     // How long to skip a web source after it fails, so a dead host (e.g. a Picsum
     // outage) isn't re-hammered every tick. Expires on its own so recovery self-heals.
     const val SOURCE_COOLDOWN_MS = 5 * 60_000L
+
+    // APOD entries fetched per session. Kept under DEMO_KEY's ~50-call/day budget even
+    // if the screensaver restarts a few times a day.
+    const val APOD_BATCH = 40
     // Descriptive UA — Wikimedia's API policy asks for an identifiable agent + contact.
     const val USER_AGENT = "Immortal/1.0 (+https://github.com/starbrightlab/immortal)"
   }

@@ -44,7 +44,7 @@ you don't type URLs and credentials on the Portal:
 | Network share (SMB) | A file server on your LAN. |
 | WebDAV | Any WebDAV server. |
 | Web page | Pull images from any web page. |
-| Built-in feed | Keyless (Lorem Picsum; Unsplash-ready with a key). Requests photos at the device's actual resolution/orientation so they're sharp on every model. |
+| Built-in feed | Keyless. Pick between Lorem Picsum (stock photography), the Met Museum and Art Institute of Chicago collections, Wikimedia featured landscapes, or NASA's Astronomy Picture of the Day. Unsplash-ready with a key. |
 
 ## Presence-aware behaviour
 
