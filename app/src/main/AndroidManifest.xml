@@ -361,6 +361,15 @@
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- City search for the weather-location override, reachable from the
+             "Weather location" row in Immortal settings (issue #177). -->
+        <activity
+            android:name=".WeatherLocationActivity"
+            android:exported="false"
+            android:label="Weather location"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- One-field form for pasting a public iCalendar (.ics) feed link from Google
              Calendar or Apple iCloud, reachable from the "Calendar" section in
              screensaver settings. -->

@@ -33,6 +33,8 @@ import com.immortal.launcher.MqttService
 import com.immortal.launcher.MultiRoomService
 import com.immortal.launcher.QuickBar
 import com.immortal.launcher.QuickBarConfig
+import com.immortal.launcher.Weather
+import com.immortal.launcher.WeatherLocationActivity
 import com.immortal.launcher.ScreensaverConfig
 import com.immortal.launcher.SettingsGuard
 import org.json.JSONArray
@@ -506,6 +508,15 @@ object SettingsDomains {
                               ImmortalSettings.UNIT_C to "Celsius"),
                       coerce = oneOf(ImmortalSettings.UNIT_AUTO, ImmortalSettings.UNIT_F, ImmortalSettings.UNIT_C),
                       help = "Auto follows your Portal's language & region setting."),
+                  NavSpec(
+                      "weatherLocation",
+                      "Weather location",
+                      value = { c, _ -> Weather.locationLabel(c) },
+                      activity = WeatherLocationActivity::class.java,
+                      help =
+                          "Where the weather, forecast, and sunrise times come from. Automatic " +
+                              "detection uses your internet connection, which can be off by a " +
+                              "city or two - set it manually if the forecast looks wrong."),
                   EnumSpec(
                       "tileSize",
                       "App tile size",

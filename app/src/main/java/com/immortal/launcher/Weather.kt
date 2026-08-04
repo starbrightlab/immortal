@@ -10,6 +10,7 @@ package com.immortal.launcher
 import android.content.Context
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -55,6 +56,12 @@ object Weather {
   /** Cached lat/lon, or a fresh geolocation (cached on success). Also caches the city name. */
   private fun location(context: Context): Pair<Double, Double>? {
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    // A manually chosen location always wins (issue #177): IP geolocation often lands on
+    // the ISP's city, and because the first answer is cached forever, a wrong first
+    // answer used to be permanent with no way to correct it.
+    prefs.getString("manual_lat", null)?.toDoubleOrNull()?.let { la ->
+      prefs.getString("manual_lon", null)?.toDoubleOrNull()?.let { lo -> return la to lo }
+    }
     prefs.getString("lat", null)?.toDoubleOrNull()?.let { la ->
       prefs.getString("lon", null)?.toDoubleOrNull()?.let { lo -> return la to lo }
     }
@@ -109,9 +116,92 @@ object Weather {
           }
           .getOrNull()
 
-  /** Last known city name (empty until geolocation has succeeded once). */
-  fun cachedCity(context: Context): String =
-      context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("city", "") ?: ""
+  /** Last known city name (empty until geolocation has succeeded once). A manual
+   * location's place name wins, matching [location]'s precedence. */
+  fun cachedCity(context: Context): String {
+    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    manualPlace(context)?.let { return it.substringBefore(',') }
+    return prefs.getString("city", "") ?: ""
+  }
+
+  // --- manual location override (issue #177) ----------------------------------
+
+  /** A geocoding match from Open-Meteo's keyless search endpoint. [label] is e.g.
+   * "Boston, Massachusetts, US". */
+  data class Place(val name: String, val region: String, val lat: Double, val lon: Double) {
+    val label: String
+      get() = if (region.isBlank()) name else "$name, $region"
+  }
+
+  /** The manually chosen place label, or null when the location is auto-detected. */
+  fun manualPlace(context: Context): String? {
+    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    if (prefs.getString("manual_lat", null)?.toDoubleOrNull() == null) return null
+    return prefs.getString("manual_city", null)?.ifBlank { null }
+  }
+
+  fun setManualLocation(context: Context, place: Place) {
+    context
+        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString("manual_lat", place.lat.toString())
+        .putString("manual_lon", place.lon.toString())
+        .putString("manual_city", place.label)
+        .apply()
+  }
+
+  /** Back to automatic: drops the manual choice AND the cached IP result, so the next
+   * weather refresh re-detects from scratch instead of reviving a stale first answer. */
+  fun redetectAutomatically(context: Context) {
+    context
+        .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .remove("manual_lat")
+        .remove("manual_lon")
+        .remove("manual_city")
+        .remove("lat")
+        .remove("lon")
+        .remove("city")
+        .apply()
+  }
+
+  /** Row label for the settings screen: the manual place, the detected city, or a hint. */
+  fun locationLabel(context: Context): String {
+    manualPlace(context)?.let { return it }
+    val auto =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("city", "").orEmpty()
+    return if (auto.isNotBlank()) "Auto: $auto" else "Automatic (from your internet connection)"
+  }
+
+  /** Search Open-Meteo's keyless geocoder for a city. Blocking; call off the main thread. */
+  fun searchPlaces(query: String): List<Place> =
+      runCatching {
+            parseGeocoding(
+                httpGet(
+                    "https://geocoding-api.open-meteo.com/v1/search?name=" +
+                        URLEncoder.encode(query, "UTF-8") +
+                        "&count=8&language=en&format=json"))
+          }
+          .getOrDefault(emptyList())
+
+  /** Pure parse of an Open-Meteo geocoding response (unit-tested). */
+  internal fun parseGeocoding(json: String): List<Place> {
+    val results = JSONObject(json).optJSONArray("results") ?: return emptyList()
+    val out = ArrayList<Place>(results.length())
+    for (i in 0 until results.length()) {
+      val r = results.optJSONObject(i) ?: continue
+      val name = r.optString("name", "")
+      val la = r.optDouble("latitude", Double.NaN)
+      val lo = r.optDouble("longitude", Double.NaN)
+      if (name.isBlank() || la.isNaN() || lo.isNaN()) continue
+      val region =
+          listOf(r.optString("admin1", ""), r.optString("country_code", ""))
+              .filter { it.isNotBlank() }
+              .joinToString(", ")
+      out.add(Place(name, region, la, lo))
+    }
+    return out
+  }
 
   /** Current conditions for the redesigned weather widget: city, rounded temp, and weather code. */
   data class Current(val city: String, val temp: Int, val code: Int)

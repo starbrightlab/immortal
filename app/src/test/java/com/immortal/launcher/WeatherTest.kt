@@ -135,4 +135,42 @@ class WeatherTest {
     val c = Weather.forecastUrl(1.5, -2.25, fahrenheit = false)
     assertTrue(c.contains("temperature_unit=celsius"))
   }
+
+  // --- geocoding search (manual weather location, issue #177) ---------------
+
+  @Test
+  fun `geocoding parse extracts name, region and coordinates`() {
+    val json =
+        """{"results":[
+             {"name":"Boston","latitude":42.35843,"longitude":-71.05977,
+              "country_code":"US","admin1":"Massachusetts"},
+             {"name":"Boston","latitude":52.97633,"longitude":-0.02664,
+              "country_code":"GB","admin1":"England"}
+           ]}"""
+    val places = Weather.parseGeocoding(json)
+    assertEquals(2, places.size)
+    assertEquals("Boston", places[0].name)
+    assertEquals("Boston, Massachusetts, US", places[0].label)
+    assertEquals(42.35843, places[0].lat, 1e-9)
+    assertEquals(-71.05977, places[0].lon, 1e-9)
+    assertEquals("Boston, England, GB", places[1].label)
+  }
+
+  @Test
+  fun `geocoding parse survives missing region fields and skips broken entries`() {
+    val json =
+        """{"results":[
+             {"name":"Springfield","latitude":39.8,"longitude":-89.6},
+             {"name":"","latitude":1.0,"longitude":1.0},
+             {"name":"NoCoords"}
+           ]}"""
+    val places = Weather.parseGeocoding(json)
+    assertEquals(1, places.size)
+    assertEquals("Springfield", places[0].label) // no region -> bare name, no dangling comma
+  }
+
+  @Test
+  fun `geocoding parse returns empty on a no-results or malformed body`() {
+    assertTrue(Weather.parseGeocoding("""{"generationtime_ms":0.5}""").isEmpty())
+  }
 }

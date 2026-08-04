@@ -17,7 +17,9 @@ and is fully navigable by remote on the [Portal TV](portal-tv.md).
 
 ## Header
 
-- **Clock / date / weather** — weather is keyless (Open-Meteo + IP geolocation).
+- **Clock / date / weather** — weather is keyless (Open-Meteo + IP geolocation). If the
+  detected location is wrong, pin it manually under **Settings → Weather location**
+  (city search, also keyless).
 - **Now-playing mini-player** — a compact cover-art + play/pause control that appears whenever
   something is playing on the device, sourced from the device's own media session
   (`NowPlayingHub`). It stays out of the way when nothing's playing. See
