@@ -756,10 +756,19 @@ class PhotoFrameController(
 
   private fun applyFit() {
     // Video gets the same choice via [applyVideoFit], sized per-clip once its dimensions are known.
+    // BOTH layers, not just the current one: the incoming layer keeps whatever scale type it was
+    // last given, so applying to one layer left every second photo on the old mode after a
+    // fit/fill toggle (part of issue #188's "the setting does nothing").
     val isFit = settings.fit == ScreensaverConfig.FIT_FIT
-    photo.scaleType =
-        if (isFit) ImageView.ScaleType.FIT_CENTER
-        else ImageView.ScaleType.CENTER_CROP
+    val scale = if (isFit) ImageView.ScaleType.FIT_CENTER else ImageView.ScaleType.CENTER_CROP
+    if (this::layerA.isInitialized) {
+      layerA.photo.scaleType = scale
+      layerB.photo.scaleType = scale
+      if (!isFit) {
+        layerA.blurPhoto.visibility = View.GONE
+        layerB.blurPhoto.visibility = View.GONE
+      }
+    }
     blurPhoto.visibility = if (isFit) View.VISIBLE else View.GONE
   }
 
@@ -1594,7 +1603,13 @@ class PhotoFrameController(
     }
 
     val isPortrait = displayBmp.height > displayBmp.width
-    val isFitMode = isPortrait || settings.fit == ScreensaverConfig.FIT_FIT
+    // The user's fit/fill choice applies to EVERY photo (issue #188). 1.65 forced portraits
+    // into the blurred letterbox even on "fill", which read as a regression on landscape
+    // panels (portraits stopped cropping to full-screen) and doubly so on portrait-mounted
+    // panels (where a portrait photo fills natively). The blurred letterbox belongs to fit
+    // mode only; the aspect math below is orientation-generic, so a portrait panel needs no
+    // special case.
+    val isFitMode = settings.fit == ScreensaverConfig.FIT_FIT
 
     val containerLp = targetLayer.frameContainer.layoutParams as FrameLayout.LayoutParams
     val displayMetrics = context.resources.displayMetrics
