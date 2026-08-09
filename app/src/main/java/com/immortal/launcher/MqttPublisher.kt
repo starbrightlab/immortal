@@ -11,6 +11,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.Uri
 import android.os.BatteryManager
@@ -296,9 +297,9 @@ class MqttPublisher(private val appContext: Context) {
           "mic_mute" -> {
             val on = payload.trim().equals("ON", ignoreCase = true)
             audio.isMicrophoneMute = on
-            // Echo the commanded state. isMicrophoneMute lags a set by one call,
-            // so re-reading it here desyncs the HA switch (mutes only every
-            // other press).
+            // Echo the commanded state. isMicrophoneMute can return stale state
+            // right after a set, so re-reading it here desyncs the HA switch
+            // (mutes only every other press).
             publishMicMute(on)
           }
           "notify" -> handleNotify(payload)
@@ -467,10 +468,29 @@ class MqttPublisher(private val appContext: Context) {
     client?.publish("$base/ip/state", currentIp().ifBlank { "unknown" }, retain = true)
   }
 
+  /**
+   * True when changing STREAM_MUSIC volume audibly does something on this device.
+   *
+   * The obvious gate, [AudioManager.isVolumeFixed], returns false on the Portal TV (verified on
+   * ripley via dumpsys: mUseFixedVolume=false), so it can't carry this decision alone. What
+   * actually happens there: setStreamVolume moves the STREAM_MUSIC index (and reads back
+   * correctly), but HDMI output plays at full scale whatever the index says, and
+   * adjustStreamVolume from an app is silently dropped by the firmware — the identical call from
+   * an adb shell works. The audible volume path is the IR blaster to the TV, reachable only from
+   * system volume-key events an app can't inject. So treat any device with an HDMI output as
+   * fixed-volume: tablet Portals (Portal, Portal+, Go, Mini) have none, the Portal TV always has
+   * one. isVolumeFixed stays OR-ed in for any firmware that does report fixed volume honestly.
+   */
+  private fun volumeIsControllable(): Boolean =
+      !audio.isVolumeFixed &&
+          audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).none {
+            it.type == AudioDeviceInfo.TYPE_HDMI
+          }
+
   private fun publishAudioState() {
-    // Volume/speaker state is only meaningful where the stream isn't fixed;
+    // Volume/speaker state is only meaningful where volume changes are audible;
     // on the Portal TV those entities aren't published (see publishDiscovery).
-    if (!audio.isVolumeFixed) {
+    if (volumeIsControllable()) {
       publishMediaVolume()
       publishSpeakerMute()
     }
@@ -526,11 +546,11 @@ class MqttPublisher(private val appContext: Context) {
     button(c, "media_next", "Next track", icon = "mdi:skip-next")
     button(c, "media_previous", "Previous track", icon = "mdi:skip-previous")
     // Volume and speaker mute act on STREAM_MUSIC, which only works on Portals
-    // that own their speakers (Portal, Portal+, Go, Mini). On the Portal TV
-    // audio goes out over HDMI at a fixed volume and the real volume path is an
-    // IR blaster reachable only via system key events, so these entities can't
-    // do anything there. Publish them only where the stream isn't fixed.
-    if (!audio.isVolumeFixed) {
+    // that own their speakers (Portal, Portal+, Go, Mini). On the Portal TV the
+    // index is writable but inaudible — HDMI plays at full scale regardless, and
+    // the app-side adjust path is dropped by the firmware (see
+    // volumeIsControllable). Publish these only where volume changes are audible.
+    if (volumeIsControllable()) {
       numberEntity(
           c,
           "media_volume",
