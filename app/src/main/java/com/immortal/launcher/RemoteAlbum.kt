@@ -177,7 +177,7 @@ object RemoteAlbum {
         URL("https://$firstGuess/$token/sharedstreams/webstream").openConnection()
             as HttpURLConnection
     c.connectTimeout = 8000
-    c.readTimeout = 8000
+    c.readTimeout = SLOW_READ_TIMEOUT_MS // a correct partition guess makes THIS the slow webstream call
     c.requestMethod = "POST"
     c.doOutput = true
     c.setRequestProperty("Content-Type", "application/json")
@@ -454,7 +454,7 @@ object RemoteAlbum {
   private fun postForm(spec: String, body: String): String? {
     val c = URL(spec).openConnection() as HttpURLConnection
     c.connectTimeout = 8000
-    c.readTimeout = 10000
+    c.readTimeout = SLOW_READ_TIMEOUT_MS
     c.requestMethod = "POST"
     c.doOutput = true
     c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
@@ -637,6 +637,14 @@ object RemoteAlbum {
         }
       }
 
+  // Read timeout for album-metadata calls. Apple's legacy webstream endpoint takes ~14s
+  // (measured, consistently) to BUILD its response for a 116-photo album — the response
+  // itself is small; the server is slow — and Google's continuation RPC behaves the same
+  // way on very large albums. A 10s read timeout was exactly the ">100 photos kills the
+  // album" bug (issue #175): the fetch died waiting, not paging. connectTimeout stays
+  // short, so dead hosts still fail fast; this only extends patience once connected.
+  private const val SLOW_READ_TIMEOUT_MS = 30_000
+
   private const val USER_AGENT =
       "Mozilla/5.0 (Linux; Android 9) AppleWebKit/537.36 (KHTML, like Gecko) " +
           "Chrome/120.0.0.0 Safari/537.36 PortalPhotoFrame/1.0"
@@ -676,7 +684,7 @@ object RemoteAlbum {
   ): HttpResponse? {
     val c = URL(spec).openConnection() as HttpURLConnection
     c.connectTimeout = 8000
-    c.readTimeout = 10000
+    c.readTimeout = SLOW_READ_TIMEOUT_MS
     c.instanceFollowRedirects = true
     c.setRequestProperty("User-Agent", USER_AGENT)
     c.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
@@ -696,7 +704,7 @@ object RemoteAlbum {
   private fun postJson(spec: String, body: String): String? {
     val c = URL(spec).openConnection() as HttpURLConnection
     c.connectTimeout = 8000
-    c.readTimeout = 10000
+    c.readTimeout = SLOW_READ_TIMEOUT_MS
     c.requestMethod = "POST"
     c.doOutput = true
     c.setRequestProperty("Content-Type", "application/json")
