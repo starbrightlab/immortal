@@ -28,8 +28,23 @@ object QuickBarConfig {
   fun setAlwaysShow(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("always_show", on).apply()
 
-  /** Immutable snapshot, so the settings domain renders through the generic on-device list. */
-  data class Settings(val enabled: Boolean = false, val alwaysShow: Boolean = false)
+  /** The Android Recents square beside the system Back/Home pair (issue #182 gate). */
+  fun showSystemRecents(c: Context): Boolean = prefs(c).getBoolean("show_system_recents", true)
 
-  fun load(c: Context): Settings = Settings(enabled = isEnabled(c), alwaysShow = alwaysShow(c))
+  fun setShowSystemRecents(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("show_system_recents", on).apply()
+
+  /** Immutable snapshot, so the settings domain renders through the generic on-device list. */
+  data class Settings(
+      val enabled: Boolean = false,
+      val alwaysShow: Boolean = false,
+      val showSystemRecents: Boolean = true,
+  )
+
+  fun load(c: Context): Settings =
+      Settings(
+          enabled = isEnabled(c),
+          alwaysShow = alwaysShow(c),
+          showSystemRecents = showSystemRecents(c),
+      )
 }

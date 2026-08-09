@@ -115,7 +115,12 @@ object QuickBar {
     // Gate the cluster on its own setting; show only when enabled AND (always-show or bar shown).
     val visible = QuickBarConfig.isEnabled(ctx) && (QuickBarConfig.alwaysShow(ctx) || barVisible)
     switcherView?.visibility = if (visible) View.VISIBLE else View.GONE
-    recentsView?.visibility = if (visible) View.VISIBLE else View.GONE
+    // The Recents square is positioned beside the system bar's Back/Home pair, so it only makes
+    // sense WHILE that bar is on screen — always-show floated it over whatever sat at its fixed
+    // offset, e.g. the launcher's own header icons (issue #190). Also per-setting (issue #182).
+    val recentsVisible =
+        QuickBarConfig.isEnabled(ctx) && barVisible && QuickBarConfig.showSystemRecents(ctx)
+    recentsView?.visibility = if (recentsVisible) View.VISIBLE else View.GONE
   }
 
   private fun statusBarHeight(ctx: Context): Int {

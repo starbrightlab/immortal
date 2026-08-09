@@ -731,6 +731,15 @@ object SettingsDomains {
                       set = QuickBarConfig::setAlwaysShow,
                       help = "On: always visible. Off: only while the system top bar is revealed.",
                       visible = { _, s -> s.enabled }),
+                  BoolSpec(
+                      "showSystemRecents",
+                      "Android Recents button",
+                      get = { it.showSystemRecents },
+                      set = QuickBarConfig::setShowSystemRecents,
+                      help =
+                          "Adds an Android Recents square beside the system bar's Back and Home " +
+                              "buttons while that bar is revealed.",
+                      visible = { _, s -> s.enabled }),
               ),
           defaults = { QuickBarConfig.Settings() },
           onApplied = { c, _ ->
