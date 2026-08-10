@@ -49,6 +49,18 @@ object SettingsDomains {
 
   private val CAL_SIZE_LABELS = listOf("Small", "Medium", "Large")
 
+  /** Human label for a remapped remote-button action (see RemoteKeyService). */
+  private fun keyActionLabel(action: String): String =
+      when (action) {
+        ImmortalSettings.KEY_ACTION_NONE -> "Nothing"
+        ImmortalSettings.KEY_ACTION_MIC_MUTE -> "Mute / unmute microphone"
+        ImmortalSettings.KEY_ACTION_HOME -> "Home"
+        ImmortalSettings.KEY_ACTION_SCREENSAVER -> "Screensaver"
+        ImmortalSettings.KEY_ACTION_SCREEN_OFF -> "Screen off"
+        ImmortalSettings.KEY_ACTION_BACK -> "Back"
+        else -> action
+      }
+
   private fun rangeLabel(range: String): String =
       when (range) {
         CalendarFeed.RANGE_DAY -> "Day"
@@ -592,6 +604,39 @@ object SettingsDomains {
                               "detection instead of guessing from the screensaver. Used by Home " +
                               "Assistant, the fleet tools and multi-room audio. Falls back on its " +
                               "own if the Portal isn't reporting it."),
+                  BoolSpec(
+                      "remoteKeysEnabled",
+                      "Remap remote app buttons",
+                      get = { it.remoteKeysEnabled },
+                      set = ImmortalSettings::setRemoteKeysEnabled,
+                      help =
+                          "Portal TV only. Give the remote's Netflix, Prime Video and Watch buttons a " +
+                              "job — those services are gone from the device. Also enable \"Immortal " +
+                              "Remote Buttons\" in Android Settings > Accessibility."),
+                  EnumSpec(
+                      "progRedAction",
+                      "Netflix button",
+                      get = { it.progRedAction },
+                      set = ImmortalSettings::setProgRedAction,
+                      options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
+                      coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
+                      visible = { _, s -> s.remoteKeysEnabled }),
+                  EnumSpec(
+                      "progGreenAction",
+                      "Prime Video button",
+                      get = { it.progGreenAction },
+                      set = ImmortalSettings::setProgGreenAction,
+                      options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
+                      coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
+                      visible = { _, s -> s.remoteKeysEnabled }),
+                  EnumSpec(
+                      "progBlueAction",
+                      "Watch button",
+                      get = { it.progBlueAction },
+                      set = ImmortalSettings::setProgBlueAction,
+                      options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
+                      coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
+                      visible = { _, s -> s.remoteKeysEnabled }),
                   BoolSpec(
                       "multiRoomEnabled",
                       "Multi-room audio",

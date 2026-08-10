@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2026 Starbright Lab.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<!-- Configuration for RemoteKeyService — remaps the Portal TV remote's branded app
+     buttons (Netflix / Prime / Watch) to Immortal actions. It asks for the minimum:
+       - canRequestFilterKeyEvents: the whole point — see hardware key presses before
+         apps do, so the three dead PROG_* keys can be repurposed. Every other key is
+         returned unhandled and passes straight through.
+       - canPerformGestures: only so the "Go back" action can use performGlobalAction.
+       - canRetrieveWindowContent="false": it never reads window content.
+       - no accessibilityEventTypes: onAccessibilityEvent is a no-op; the service is
+         driven purely by key events. -->
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagRequestFilterKeyEvents"
+    android:canRequestFilterKeyEvents="true"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/remote_key_service_description"
+    android:notificationTimeout="100"
+    android:settingsActivity="com.immortal.launcher.ImmortalSettingsActivity" />

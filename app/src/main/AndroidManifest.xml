@@ -504,6 +504,22 @@
               android:resource="@xml/bar_watch_service" />
         </service>
 
+        <!-- Remaps the Portal TV remote's branded app buttons (Netflix / Prime / Watch) to
+             Immortal actions. They arrive as ordinary PROG_RED/GREEN/BLUE keycodes that nothing
+             on the device handles, so filtering them steals nothing; every other key passes
+             through. Off until the user enables it in Accessibility settings. -->
+        <service
+            android:name=".RemoteKeyService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+          <intent-filter>
+            <action android:name="android.accessibilityservice.AccessibilityService" />
+          </intent-filter>
+          <meta-data
+              android:name="android.accessibilityservice"
+              android:resource="@xml/remote_key_service" />
+        </service>
+
         <!-- Multi-room now-playing relay: reads the Snapcast group's track off the
              snapserver and publishes it as a media session so the now-playing card shows
              on every Portal. Foreground so it survives backgrounding; started by
