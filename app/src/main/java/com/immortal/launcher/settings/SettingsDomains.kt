@@ -637,6 +637,18 @@ object SettingsDomains {
                       options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
                       coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
                       visible = { _, s -> s.remoteKeysEnabled }),
+                  EnumSpec(
+                      "searchAction",
+                      "Microphone button",
+                      get = { it.searchAction },
+                      set = ImmortalSettings::setSearchAction,
+                      options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
+                      coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
+                      help =
+                          "The mic button, which opened Portal's voice assistant - gone now. It " +
+                              "reports as SEARCH, so unlike the app buttons, remapping it stops apps " +
+                              "seeing the search key.",
+                      visible = { _, s -> s.remoteKeysEnabled }),
                   BoolSpec(
                       "multiRoomEnabled",
                       "Multi-room audio",

@@ -103,6 +103,10 @@ object ImmortalSettings {
       val progRedAction: String = KEY_ACTION_NONE, // Netflix button
       val progGreenAction: String = KEY_ACTION_NONE, // Amazon Prime button
       val progBlueAction: String = KEY_ACTION_NONE, // Facebook Watch button
+      // The remote's microphone button. It sends SEARCH (it opened Portal's voice assistant,
+      // which is gone). Unlike the PROG_* keys this one is a standard Android key, so remapping
+      // it stops apps receiving SEARCH — hence opt-in like the rest.
+      val searchAction: String = KEY_ACTION_NONE,
   )
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -127,6 +131,7 @@ object ImmortalSettings {
         progRedAction = p.getString("prog_red_action", KEY_ACTION_NONE) ?: KEY_ACTION_NONE,
         progGreenAction = p.getString("prog_green_action", KEY_ACTION_NONE) ?: KEY_ACTION_NONE,
         progBlueAction = p.getString("prog_blue_action", KEY_ACTION_NONE) ?: KEY_ACTION_NONE,
+        searchAction = p.getString("search_action", KEY_ACTION_NONE) ?: KEY_ACTION_NONE,
     )
   }
 
@@ -194,6 +199,9 @@ object ImmortalSettings {
 
   fun setProgBlueAction(c: Context, v: String) =
       prefs(c).edit().putString("prog_blue_action", v).apply()
+
+  fun setSearchAction(c: Context, v: String) =
+      prefs(c).edit().putString("search_action", v).apply()
 
   fun setWeatherUnit(c: Context, unit: String) =
       prefs(c).edit().putString("weather_unit", unit).apply()

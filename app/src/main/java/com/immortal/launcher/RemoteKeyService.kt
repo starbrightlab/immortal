@@ -28,9 +28,15 @@ import android.view.accessibility.AccessibilityEvent
  * | Netflix         | KEY_RED   (398)  | KEYCODE_PROG_RED    |
  * | Facebook Watch  | KEY_GREEN (399)  | KEYCODE_PROG_BLUE   |
  * | Amazon Prime    | KEY_BLUE  (401)  | KEYCODE_PROG_GREEN  |
+ * | Microphone      | KEY_SEARCH(217)  | KEYCODE_SEARCH      |
  *
  * (Meta's key layout really does cross green and blue.) Nothing on the device handles `PROG_*`, so
  * consuming them breaks no existing behaviour; every other key is passed straight through.
+ *
+ * The microphone button is the exception worth knowing about: it reports as `SEARCH` (HID usage
+ * 0x000C0221, "AC Search") because it opened Portal's voice assistant, which is gone. `SEARCH` is a
+ * standard key an app could legitimately want, so claiming it is opt-in like the rest — left at
+ * "Nothing" it passes through untouched.
  *
  * Requires `canRequestFilterKeyEvents` (see `res/xml/remote_key_service.xml`) and the user enabling
  * the service in Android Settings → Accessibility — the same one-time step as
@@ -69,6 +75,7 @@ class RemoteKeyService : AccessibilityService() {
       KeyEvent.KEYCODE_PROG_RED -> s.progRedAction
       KeyEvent.KEYCODE_PROG_GREEN -> s.progGreenAction
       KeyEvent.KEYCODE_PROG_BLUE -> s.progBlueAction
+      KeyEvent.KEYCODE_SEARCH -> s.searchAction
       else -> null
     }
   }
