@@ -2759,7 +2759,6 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
 @Composable
 private fun ImmortalDigitalWorldClockWidget(modifier: Modifier = Modifier) {
   val context = androidx.compose.ui.platform.LocalContext.current
-  val userLang = ImmortalSettings.load(context).language
   var zones by remember { mutableStateOf(ImmortalSettings.worldClockZones(context)) }
   var use24Hour by remember { mutableStateOf(ImmortalSettings.use24HourClock(context)) }
   val lifecycleOwner = LocalLifecycleOwner.current
@@ -2785,7 +2784,7 @@ private fun ImmortalDigitalWorldClockWidget(modifier: Modifier = Modifier) {
   val minuteBucket = now.time / 60_000L
 
   ImmortalWidgetShell(
-      title = com.immortal.launcher.i18n.I18n.translate("Digital World Clock", userLang),
+      title = "Digital World Clock",
       accent = Color(0xFFFF9500),
       modifier = modifier,
   ) {
