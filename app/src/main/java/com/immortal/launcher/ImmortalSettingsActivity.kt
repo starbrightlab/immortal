@@ -1166,11 +1166,17 @@ internal fun MqttScreen(onBack: () -> Unit) {
   }
 }
 
-/** A curated set of cities for the world-clock picker (label → IANA tz id). */
+/**
+ * A curated set of cities for the world-clock picker (label → IANA tz id), roughly west to east.
+ * Deliberately short — anything missing is reachable through "Add any timezone", which lists every
+ * zone the device knows about.
+ */
 private val WORLD_CLOCK_CITIES =
     listOf(
-        "Cupertino" to "America/Los_Angeles",
+        "Honolulu" to "Pacific/Honolulu",
+        "Los Angeles" to "America/Los_Angeles",
         "Denver" to "America/Denver",
+        "Chicago" to "America/Chicago",
         "New York" to "America/New_York",
         "São Paulo" to "America/Sao_Paulo",
         "London" to "Europe/London",
@@ -1182,6 +1188,7 @@ private val WORLD_CLOCK_CITIES =
         "Singapore" to "Asia/Singapore",
         "Tokyo" to "Asia/Tokyo",
         "Sydney" to "Australia/Sydney",
+        "Auckland" to "Pacific/Auckland",
     )
 
 /** The world-clock locations picker. Tapping a city toggles it; the widget shows the first four in
@@ -1190,6 +1197,20 @@ private val WORLD_CLOCK_CITIES =
 internal fun WorldClockScreen(onBack: () -> Unit) {
   val context = LocalContext.current
   var selected by remember { mutableStateOf(ImmortalSettings.worldClockZones(context)) }
+  // Re-read on resume so a rename, or a zone added from the "any timezone" screen, shows up on
+  // the way back without the user having to leave and re-enter this screen.
+  var labels by remember { mutableStateOf(ImmortalSettings.worldClockLabels(context)) }
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner) {
+    val obs = LifecycleEventObserver { _, e ->
+      if (e == Lifecycle.Event.ON_RESUME) {
+        selected = ImmortalSettings.worldClockZones(context)
+        labels = ImmortalSettings.worldClockLabels(context)
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(obs)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+  }
   val firstFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 
@@ -1229,11 +1250,21 @@ internal fun WorldClockScreen(onBack: () -> Unit) {
           modifier = Modifier.padding(top = 6.dp),
       )
       Spacer(Modifier.size(26.dp))
+      // The curated cities, plus any zone the user added from the "any timezone" screen so it can
+      // be seen, reordered, renamed and switched off from the same list.
+      val entries =
+          remember(selected) {
+            WORLD_CLOCK_CITIES +
+                selected
+                    .filter { z -> WORLD_CLOCK_CITIES.none { it.second == z } }
+                    .map { ImmortalSettings.cityFromZoneId(it) to it }
+          }
       Card {
-        WORLD_CLOCK_CITIES.forEachIndexed { i, (label, zone) ->
+        entries.forEachIndexed { i, (city, zone) ->
           if (i > 0) Divider()
           val on = zone in selected
           val rank = selected.indexOf(zone)
+          val custom = labels[zone]
           Row(
               modifier =
                   Modifier.fillMaxWidth()
@@ -1245,9 +1276,9 @@ internal fun WorldClockScreen(onBack: () -> Unit) {
               verticalAlignment = Alignment.CenterVertically,
           ) {
             Column(modifier = Modifier.weight(1f)) {
-              Text(label, color = Color.White, fontSize = 16.sp)
+              Text(custom ?: city, color = Color.White, fontSize = 16.sp)
               Text(
-                  zone.replace('_', ' '),
+                  if (custom != null) "$city · $zone" else zone,
                   color = Color(0xFF9A9A9A),
                   fontSize = 13.sp,
                   modifier = Modifier.padding(top = 2.dp),
@@ -1266,6 +1297,50 @@ internal fun WorldClockScreen(onBack: () -> Unit) {
             }
             Switch(checked = on, onCheckedChange = null)
           }
+          if (on) {
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .tvFocusableRow {
+                          context.startActivity(
+                              Intent(context, WorldClockRenameActivity::class.java)
+                                  .putExtra(WorldClockRenameActivity.EXTRA_ZONE, zone))
+                        }
+                        .padding(start = 34.dp, end = 18.dp, top = 10.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Text(
+                  if (custom != null) "Rename — showing \"$custom\"" else "Rename this clock",
+                  color = Color(0xFF8AB4F8),
+                  fontSize = 14.sp,
+                  modifier = Modifier.weight(1f),
+              )
+              Text("›", color = Color(0xFF7C7C7C), fontSize = 20.sp)
+            }
+          }
+        }
+      }
+      Spacer(Modifier.size(18.dp))
+      Card {
+        Row(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .tvFocusableRow {
+                      context.startActivity(Intent(context, TimeZonePickerActivity::class.java))
+                    }
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text("Add any timezone", color = Color.White, fontSize = 16.sp)
+            Text(
+                "Search every timezone this Portal knows about",
+                color = Color(0xFF9A9A9A),
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+          }
+          Text("›", color = Color(0xFF7C7C7C), fontSize = 26.sp)
         }
       }
       Text(

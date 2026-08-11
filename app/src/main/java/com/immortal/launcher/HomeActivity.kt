@@ -2723,10 +2723,14 @@ private fun weatherGradient(code: Int, isDay: Boolean): Pair<Color, Color> {
 private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
   val context = androidx.compose.ui.platform.LocalContext.current
   var zones by remember { mutableStateOf(ImmortalSettings.worldClockZones(context)) }
+  var labels by remember { mutableStateOf(ImmortalSettings.worldClockLabels(context)) }
   val lifecycleOwner = LocalLifecycleOwner.current
   DisposableEffect(lifecycleOwner) {
     val obs = LifecycleEventObserver { _, e ->
-      if (e == Lifecycle.Event.ON_RESUME) zones = ImmortalSettings.worldClockZones(context)
+      if (e == Lifecycle.Event.ON_RESUME) {
+        zones = ImmortalSettings.worldClockZones(context)
+        labels = ImmortalSettings.worldClockLabels(context)
+      }
     }
     lifecycleOwner.lifecycle.addObserver(obs)
     onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
@@ -2751,15 +2755,17 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
         ) {
           AnalogClock(zone, now, Modifier.fillMaxWidth().aspectRatio(1f))
           Spacer(Modifier.size(6.dp))
+          // One line: the clock's name, custom if it has one, else the city from its zone id.
+          // The offset and the underlying zone live in the world-clock settings screen, so the
+          // widget stays a row of clocks with names under them.
           Text(
-              worldClockLabel(zone),
+              labels[zone] ?: worldClockLabel(zone),
               color = Color.White,
               fontSize = 12.sp,
               fontWeight = FontWeight.Medium,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
           )
-          Text(worldClockOffset(zone, now), color = Color(0xFF9A9A9A), fontSize = 10.sp, maxLines = 1)
         }
       }
     }
@@ -2769,18 +2775,6 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
 /** Short city label from a tz id, e.g. "America/New_York" → "New York". */
 private fun worldClockLabel(zoneId: String): String =
     zoneId.substringAfterLast('/').replace('_', ' ')
-
-/** Offset of [zoneId] vs the device's zone, e.g. "+5h" / "-3h" / "same". */
-private fun worldClockOffset(zoneId: String, now: Date): String {
-  val local = TimeZone.getDefault().getOffset(now.time)
-  val there = TimeZone.getTimeZone(zoneId).getOffset(now.time)
-  val diffH = (there - local) / 3_600_000
-  return when {
-    diffH == 0 -> "same"
-    diffH > 0 -> "+${diffH}h"
-    else -> "${diffH}h"
-  }
-}
 
 /** A small analog clock face for [zoneId], white by day / dark by night, with an orange seconds hand. */
 @Composable

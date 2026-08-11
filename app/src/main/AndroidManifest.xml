@@ -194,6 +194,10 @@
         <activity android:name=".MqttActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
         <activity android:name=".DeviceHealthActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
         <activity android:name=".WorldClockActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
+        <!-- Reached from the world-clock screen: search every zone the device knows, and rename a
+             clock so it can read "Mum's" rather than "Auckland". -->
+        <activity android:name=".TimeZonePickerActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
+        <activity android:name=".WorldClockRenameActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
         <activity android:name=".BootAppsActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
 
         <!-- Countdown chips (birthdays, trips, holidays), opened from the Countdowns
