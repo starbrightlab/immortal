@@ -8,7 +8,7 @@
 package com.immortal.launcher.settings
 
 import android.content.Context
-import android.content.pm.PackageManager
+import android.os.Build
 import com.immortal.launcher.CalendarFeed
 import com.immortal.launcher.CalendarUrlEntryActivity
 import com.immortal.launcher.SunriseConfig
@@ -51,18 +51,19 @@ object SettingsDomains {
   private val CAL_SIZE_LABELS = listOf("Small", "Medium", "Large")
 
   /**
-   * True on a remote-driven Portal (the Portal TV), false on the touch models. The remote-button
-   * remapping rows are meaningless without the remote, so they're hidden on a touchscreen Portal —
-   * on both the on-device screen and the phone remote, since `visible` drives them both.
+   * True on the Portal TV, false on the touch models. The remote-button remapping rows are
+   * meaningless without the remote, so they stay hidden on a touchscreen Portal — on the on-device
+   * screen and the phone remote alike, since `visible` drives both.
    *
-   * Gated on the leanback feature rather than `Build.DEVICE == "ripley"` (the approach
-   * [com.immortal.launcher.Curation] uses) because it describes the actual distinction: the Portal
-   * TV declares `android.software.leanback` (and `android.hardware.type.television`, the flag
-   * leanback replaced) with no touchscreen feature at all, while the touch models are ordinary
-   * touchscreen devices.
+   * Keyed on `ro.product.device` the same way [com.immortal.launcher.Curation] hides Chrome on the
+   * TV. The hardware is discontinued and will get no further firmware, so the device id can't drift
+   * out from under us. (The Portal TV also declares `android.software.leanback` with no touchscreen
+   * feature, which would work as a capability check, but matching the existing convention keeps
+   * per-device gating in one recognisable shape.)
    */
-  private fun isRemoteDriven(c: Context): Boolean =
-      c.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+  private fun isPortalTv(): Boolean = Build.DEVICE == PORTAL_TV_DEVICE
+
+  private const val PORTAL_TV_DEVICE = "ripley"
 
   /** Human label for a remapped remote-button action (see RemoteKeyService). */
   private fun keyActionLabel(action: String): String =
@@ -628,7 +629,7 @@ object SettingsDomains {
                           "Give the remote's Netflix, Prime Video, Watch and Voice buttons a job - " +
                               "those services and the voice assistant are gone from the device. Also " +
                               "enable \"Immortal Remote Buttons\" in Android Settings > Accessibility.",
-                      visible = { c, _ -> isRemoteDriven(c) }),
+                      visible = { _, _ -> isPortalTv() }),
                   EnumSpec(
                       "progRedAction",
                       "Netflix button",
@@ -636,7 +637,7 @@ object SettingsDomains {
                       set = ImmortalSettings::setProgRedAction,
                       options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
                       coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
-                      visible = { c, s -> s.remoteKeysEnabled && isRemoteDriven(c) }),
+                      visible = { _, s -> s.remoteKeysEnabled && isPortalTv() }),
                   EnumSpec(
                       "progGreenAction",
                       "Prime Video button",
@@ -644,7 +645,7 @@ object SettingsDomains {
                       set = ImmortalSettings::setProgGreenAction,
                       options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
                       coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
-                      visible = { c, s -> s.remoteKeysEnabled && isRemoteDriven(c) }),
+                      visible = { _, s -> s.remoteKeysEnabled && isPortalTv() }),
                   EnumSpec(
                       "progBlueAction",
                       "Watch button",
@@ -652,7 +653,7 @@ object SettingsDomains {
                       set = ImmortalSettings::setProgBlueAction,
                       options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
                       coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
-                      visible = { c, s -> s.remoteKeysEnabled && isRemoteDriven(c) }),
+                      visible = { _, s -> s.remoteKeysEnabled && isPortalTv() }),
                   EnumSpec(
                       "searchAction",
                       "Voice button",
@@ -664,7 +665,7 @@ object SettingsDomains {
                           "The mic-icon button Meta labels \"voice input\", which opened Portal's " +
                               "voice assistant - gone now. It reports as SEARCH, so unlike the app " +
                               "buttons, remapping it stops apps seeing the search key.",
-                      visible = { c, s -> s.remoteKeysEnabled && isRemoteDriven(c) }),
+                      visible = { _, s -> s.remoteKeysEnabled && isPortalTv() }),
                   BoolSpec(
                       "multiRoomEnabled",
                       "Multi-room audio",
