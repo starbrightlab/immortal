@@ -55,14 +55,14 @@ object SettingsDomains {
    * remapping rows are meaningless without the remote, so they're hidden on a touchscreen Portal —
    * on both the on-device screen and the phone remote, since `visible` drives them both.
    *
-   * Gated on the leanback/TV feature rather than `Build.DEVICE == "ripley"` (the approach
+   * Gated on the leanback feature rather than `Build.DEVICE == "ripley"` (the approach
    * [com.immortal.launcher.Curation] uses) because it describes the actual distinction: the Portal
-   * TV declares `android.software.leanback` and `android.hardware.type.television` and has no
-   * touchscreen feature at all, while the touch models are ordinary touchscreen devices.
+   * TV declares `android.software.leanback` (and `android.hardware.type.television`, the flag
+   * leanback replaced) with no touchscreen feature at all, while the touch models are ordinary
+   * touchscreen devices.
    */
   private fun isRemoteDriven(c: Context): Boolean =
-      c.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
-          c.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
+      c.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
 
   /** Human label for a remapped remote-button action (see RemoteKeyService). */
   private fun keyActionLabel(action: String): String =
