@@ -18,6 +18,9 @@ and the voice assistant are gone. Immortal can give them a job instead.
 Nothing is remapped by default. The feature is off, and every button is set to "Nothing" until you
 choose otherwise, so a fresh install leaves the remote behaving as it always has.
 
+These settings only appear on the Portal TV. The touch models have no remote, so the rows stay
+hidden there, on the device and on the phone remote alike.
+
 ### Turning it on
 
 1. Open **Settings → Immortal** and switch on **Remap remote app buttons**. Four button rows

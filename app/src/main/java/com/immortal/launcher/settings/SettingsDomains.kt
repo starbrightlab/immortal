@@ -8,6 +8,7 @@
 package com.immortal.launcher.settings
 
 import android.content.Context
+import android.content.pm.PackageManager
 import com.immortal.launcher.CalendarFeed
 import com.immortal.launcher.CalendarUrlEntryActivity
 import com.immortal.launcher.SunriseConfig
@@ -48,6 +49,20 @@ import org.json.JSONArray
 object SettingsDomains {
 
   private val CAL_SIZE_LABELS = listOf("Small", "Medium", "Large")
+
+  /**
+   * True on a remote-driven Portal (the Portal TV), false on the touch models. The remote-button
+   * remapping rows are meaningless without the remote, so they're hidden on a touchscreen Portal —
+   * on both the on-device screen and the phone remote, since `visible` drives them both.
+   *
+   * Gated on the leanback/TV feature rather than `Build.DEVICE == "ripley"` (the approach
+   * [com.immortal.launcher.Curation] uses) because it describes the actual distinction: the Portal
+   * TV declares `android.software.leanback` and `android.hardware.type.television` and has no
+   * touchscreen feature at all, while the touch models are ordinary touchscreen devices.
+   */
+  private fun isRemoteDriven(c: Context): Boolean =
+      c.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+          c.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
 
   /** Human label for a remapped remote-button action (see RemoteKeyService). */
   private fun keyActionLabel(action: String): String =
@@ -610,9 +625,10 @@ object SettingsDomains {
                       get = { it.remoteKeysEnabled },
                       set = ImmortalSettings::setRemoteKeysEnabled,
                       help =
-                          "Portal TV only. Give the remote's Netflix, Prime Video and Watch buttons a " +
-                              "job — those services are gone from the device. Also enable \"Immortal " +
-                              "Remote Buttons\" in Android Settings > Accessibility."),
+                          "Give the remote's Netflix, Prime Video, Watch and Voice buttons a job - " +
+                              "those services and the voice assistant are gone from the device. Also " +
+                              "enable \"Immortal Remote Buttons\" in Android Settings > Accessibility.",
+                      visible = { c, _ -> isRemoteDriven(c) }),
                   EnumSpec(
                       "progRedAction",
                       "Netflix button",
@@ -620,7 +636,7 @@ object SettingsDomains {
                       set = ImmortalSettings::setProgRedAction,
                       options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
                       coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
-                      visible = { _, s -> s.remoteKeysEnabled }),
+                      visible = { c, s -> s.remoteKeysEnabled && isRemoteDriven(c) }),
                   EnumSpec(
                       "progGreenAction",
                       "Prime Video button",
@@ -628,7 +644,7 @@ object SettingsDomains {
                       set = ImmortalSettings::setProgGreenAction,
                       options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
                       coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
-                      visible = { _, s -> s.remoteKeysEnabled }),
+                      visible = { c, s -> s.remoteKeysEnabled && isRemoteDriven(c) }),
                   EnumSpec(
                       "progBlueAction",
                       "Watch button",
@@ -636,7 +652,7 @@ object SettingsDomains {
                       set = ImmortalSettings::setProgBlueAction,
                       options = ImmortalSettings.KEY_ACTIONS.map { it to keyActionLabel(it) },
                       coerce = oneOf(*ImmortalSettings.KEY_ACTIONS.toTypedArray()),
-                      visible = { _, s -> s.remoteKeysEnabled }),
+                      visible = { c, s -> s.remoteKeysEnabled && isRemoteDriven(c) }),
                   EnumSpec(
                       "searchAction",
                       "Voice button",
@@ -648,7 +664,7 @@ object SettingsDomains {
                           "The mic-icon button Meta labels \"voice input\", which opened Portal's " +
                               "voice assistant - gone now. It reports as SEARCH, so unlike the app " +
                               "buttons, remapping it stops apps seeing the search key.",
-                      visible = { _, s -> s.remoteKeysEnabled }),
+                      visible = { c, s -> s.remoteKeysEnabled && isRemoteDriven(c) }),
                   BoolSpec(
                       "multiRoomEnabled",
                       "Multi-room audio",
