@@ -769,7 +769,7 @@ class PhotoFrameController(
         layerB.blurPhoto.visibility = View.GONE
       }
     }
-    blurPhoto.visibility = if (isFit) View.VISIBLE else View.GONE
+    blurPhoto.visibility = if (isFit && settings.blurBackground) View.VISIBLE else View.GONE
   }
 
   /**
@@ -1634,9 +1634,13 @@ class PhotoFrameController(
       containerLp.gravity = Gravity.CENTER
       targetLayer.frameContainer.layoutParams = containerLp
 
-      runCatching {
-        val blurred = createBlurredBackground(displayBmp)
-        targetLayer.blurPhoto.setImageBitmap(blurred)
+      if (settings.blurBackground) {
+        runCatching {
+          val blurred = createBlurredBackground(displayBmp)
+          targetLayer.blurPhoto.setImageBitmap(blurred)
+        }
+      } else {
+        targetLayer.blurPhoto.setImageDrawable(null)
       }
     } else {
       containerLp.width = MATCH
@@ -1649,7 +1653,7 @@ class PhotoFrameController(
 
     // Prepare incoming layer at 0 alpha and bring to front
     targetLayer.blurPhoto.alpha = 0f
-    targetLayer.blurPhoto.visibility = if (isFitMode) View.VISIBLE else View.GONE
+    targetLayer.blurPhoto.visibility = if (isFitMode && settings.blurBackground) View.VISIBLE else View.GONE
 
     targetLayer.frameContainer.alpha = 0f
     targetLayer.frameContainer.visibility = View.VISIBLE

@@ -215,6 +215,9 @@ object ScreensaverConfig {
       val dismissHaDashboard: String? = null,
       // Crop vertical (portrait) photos by ~20% (top & bottom) so they look less tall/panoramic.
       val cropVertical: Boolean = false,
+      // Fill letterbox sidebars in fit mode with a blurred copy of the photo. On by default.
+      // Turn off to show clean solid black bars (issue #199).
+      val blurBackground: Boolean = true,
   ) {
     /** True when the idle screen-off timeout is active. */
     val idleSleepOn: Boolean
@@ -316,11 +319,15 @@ object ScreensaverConfig {
         dismissAppComponent = p.getString("dismiss_app_component", null),
         dismissHaDashboard = p.getString("dismiss_ha_dashboard", null),
         cropVertical = p.getBoolean("crop_vertical", false),
+        blurBackground = p.getBoolean("blur_background", true),
     )
   }
 
   fun setCropVertical(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("crop_vertical", on).apply()
+
+  fun setBlurBackground(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("blur_background", on).apply()
 
   fun setSoundscape(c: Context, s: String) = prefs(c).edit().putString("soundscape", s).apply()
 

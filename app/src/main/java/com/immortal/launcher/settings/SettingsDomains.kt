@@ -263,6 +263,12 @@ object SettingsDomains {
                       get = { it.cropVertical },
                       set = ScreensaverConfig::setCropVertical,
                       help = "Trims ~20% off the top and bottom of portrait photos so they look less tall and narrow."),
+                  BoolSpec(
+                      "blurBackground",
+                      "Blur photo background",
+                      get = { it.blurBackground },
+                      set = ScreensaverConfig::setBlurBackground,
+                      help = "Fills letterbox sidebars in fit mode with a blurred copy of the photo instead of solid black."),
                   // On-device cache: only meaningful for a network source that re-fetches the same
                   // assets every loop (Immich / WebDAV). Hidden for a local folder or the built-in
                   // feed, where there's nothing to save a round-trip on.
