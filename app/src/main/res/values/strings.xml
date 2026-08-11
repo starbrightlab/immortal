@@ -9,5 +9,5 @@
     <string name="back_gesture_service_label">Immortal Back</string>
     <string name="back_gesture_service_description">Swipe from the right edge of the screen to go back in any app. Immortal must be enabled in Accessibility settings for this to work.</string>
     <string name="remote_key_service_label">Immortal Remote Buttons</string>
-    <string name="remote_key_service_description">Remaps the Portal TV remote\'s Netflix, Prime Video and Watch buttons to actions you choose, like muting the microphone. It only reads those three keys — every other button is passed straight through, and it doesn\'t read screen content.</string>
+    <string name="remote_key_service_description">Remaps the Portal TV remote\'s Netflix, Prime Video, Watch and voice buttons to actions you choose, like muting the microphone. It only reads those four keys — every other button is passed straight through, and it doesn\'t read screen content.</string>
 </resources>

@@ -103,9 +103,10 @@ object ImmortalSettings {
       val progRedAction: String = KEY_ACTION_NONE, // Netflix button
       val progGreenAction: String = KEY_ACTION_NONE, // Amazon Prime button
       val progBlueAction: String = KEY_ACTION_NONE, // Facebook Watch button
-      // The remote's microphone button. It sends SEARCH (it opened Portal's voice assistant,
-      // which is gone). Unlike the PROG_* keys this one is a standard Android key, so remapping
-      // it stops apps receiving SEARCH — hence opt-in like the rest.
+      // The remote's voice button (Meta's firmware calls it BUTTON_VOICE; their help page says
+      // only "press for voice input"). It sends SEARCH, because it opened Portal's voice
+      // assistant, which is gone. Unlike the PROG_* keys this one is a standard Android key, so
+      // remapping it stops apps receiving SEARCH — hence opt-in like the rest.
       val searchAction: String = KEY_ACTION_NONE,
   )
 
