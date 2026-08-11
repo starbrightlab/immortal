@@ -79,12 +79,11 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
           fontWeight = FontWeight.SemiBold,
       )
       Text(
-<<<<<<< HEAD
-          "Paste a public link from iCloud Shared Albums, Google Photos, or Synology Photos. " +
-              "Make sure it's shared as \"anyone with the link\" — Immortal can't sign in.",
-=======
-          com.immortal.launcher.i18n.I18n.translate("Paste a public link from iCloud Shared Albums or Google Photos. Make sure it's shared as \"anyone with the link\" — Immortal can't sign in.", userLang),
->>>>>>> 1a2865f (feat(i18n): agregar soporte completo para idioma espanol (Spanish i18n))
+          com.immortal.launcher.i18n.I18n.translate(
+              "Paste a public link from iCloud Shared Albums, Google Photos, or Synology Photos. " +
+                  "Make sure it's shared as \"anyone with the link\" — Immortal can't sign in.",
+              userLang
+          ),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -163,19 +162,15 @@ private fun AlbumUrlEntryScreen(onSave: (String) -> Unit, onCancel: () -> Unit) 
           modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
       )
       Text(
-<<<<<<< HEAD
-          "• iPhone Photos → a Shared Album you own → people/share button → " +
-              "Share Link → Copy Link (works with the current " +
-              "photos.icloud.com/shared/album/… links).\n" +
-              "• Google Photos → album → Share → \"Get link\" (anyone with the link can view).\n" +
-              "• Synology Photos → album → Share → enable share link → Public.",
-=======
           com.immortal.launcher.i18n.I18n.tr(
-              "• iPhone Photos → a Shared Album you own → people/share button → Share Link → Copy Link (works with the current photos.icloud.com/shared/album/… links).\n• Google Photos → album → Share → \"Get link\" (anyone with the link can view).",
-              "• Fotos de iPhone → Álbum compartido → Compartir enlace → Copiar enlace.\n• Google Photos → Álbum → Compartir → \"Obtener enlace\" (cualquiera con el enlace puede ver).",
+              "• iPhone Photos → a Shared Album you own → people/share button → Share Link → Copy Link (works with the current photos.icloud.com/shared/album/… links).\n" +
+                  "• Google Photos → album → Share → \"Get link\" (anyone with the link can view).\n" +
+                  "• Synology Photos → album → Share → enable share link → Public.",
+              "• Fotos de iPhone → Álbum compartido → Compartir enlace → Copiar enlace.\n" +
+                  "• Google Photos → Álbum → Compartir → \"Obtener enlace\" (cualquiera con el enlace puede ver).\n" +
+                  "• Synology Photos → Álbum → Compartir → Activar enlace de uso compartido → Público.",
               userLang
           ),
->>>>>>> 1a2865f (feat(i18n): agregar soporte completo para idioma espanol (Spanish i18n))
           color = Color(0xFF8A8A8A),
           fontSize = 13.sp,
           modifier = Modifier.padding(start = 4.dp),
