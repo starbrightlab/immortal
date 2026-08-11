@@ -12,11 +12,11 @@ D-pad. There's nothing touch-only that you can't reach with the remote.
 ## Remapping the remote's dead buttons
 
 Four buttons on the Portal TV remote no longer do anything: **Netflix**, **Prime Video**,
-**Watch**, and the **voice** button (the mic-icon one Meta labels "voice input"). Those services
+**Watch**, and the **Voice** button (the mic-icon one Meta labels "voice input"). Those services
 and the voice assistant are gone. Immortal can give them a job instead.
 
-**Nothing is remapped by default.** The feature is off, and every button is set to "Nothing" until
-you choose otherwise, so a fresh install leaves the remote behaving exactly as it does today.
+Nothing is remapped by default. The feature is off, and every button is set to "Nothing" until you
+choose otherwise, so a fresh install leaves the remote behaving as it always has.
 
 ### Turning it on
 
@@ -37,15 +37,15 @@ you choose otherwise, so a fresh install leaves the remote behaving exactly as i
 Available actions: **Mute / unmute microphone**, **Home**, **Screensaver**, **Screen off**,
 **Back**, or **Nothing** to leave the button alone.
 
-You can also set all of this from the [phone remote](remote.md), which is easier than typing on a
-TV — the same settings appear there automatically.
+The same settings appear on the [phone remote](remote.md), which is easier than picking values with
+a D-pad.
 
 ### Muting a video call
 
-**Mute / unmute microphone** is the reason most people will want this. It toggles the same
-microphone mute the [Home Assistant integration](smart-home.md) exposes, and it works while a call
-app is in the foreground, so one press mutes a Zoom or Messenger call without leaving the call
-screen. Home Assistant sees the change too, so a dashboard or automation stays in step.
+**Mute / unmute microphone** is the action most people want here. It toggles the same microphone
+mute the [Home Assistant integration](smart-home.md) exposes, and it works while a call app is in
+the foreground, so one press mutes a Zoom or Messenger call without leaving the call screen. Home
+Assistant sees the change too, so a dashboard or automation stays in step.
 
 !!! note "The voice button is a slightly different case"
     The three app buttons send keycodes (`PROG_RED`, `PROG_GREEN`, `PROG_BLUE`) that nothing else
