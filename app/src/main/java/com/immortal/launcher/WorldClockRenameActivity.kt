@@ -44,7 +44,7 @@ import com.immortal.launcher.ui.theme.SampleAppTheme
  * the IANA id stays visible on the widget's second line, so a renamed clock is still identifiable.
  *
  * Its own Activity because entering text on the Portal TV means summoning the on-screen keyboard,
- * which wants a screen of its own — the same shape as [CalendarUrlEntryActivity].
+ * which wants a screen of its own, the same shape as [CalendarUrlEntryActivity].
  */
 class WorldClockRenameActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {

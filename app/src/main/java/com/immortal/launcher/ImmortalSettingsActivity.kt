@@ -1168,8 +1168,8 @@ internal fun MqttScreen(onBack: () -> Unit) {
 
 /**
  * A curated set of cities for the world-clock picker (label → IANA tz id), roughly west to east.
- * Deliberately short — anything missing is reachable through "Add any timezone", which lists every
- * zone the device knows about.
+ * Deliberately short. Anything missing is reachable through "Add any timezone", which searches
+ * every zone the device knows about.
  */
 private val WORLD_CLOCK_CITIES =
     listOf(
@@ -1310,7 +1310,7 @@ internal fun WorldClockScreen(onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
               Text(
-                  if (custom != null) "Rename — showing \"$custom\"" else "Rename this clock",
+                  if (custom != null) "Rename (showing \"$custom\")" else "Rename this clock",
                   color = Color(0xFF8AB4F8),
                   fontSize = 14.sp,
                   modifier = Modifier.weight(1f),

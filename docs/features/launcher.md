@@ -45,6 +45,21 @@ and is fully navigable by remote on the [Portal TV](portal-tv.md).
 Countdown events you add in [Tools → Countdowns](tools.md) also appear on the grid as chips
 (`🎂 Birthday · 12 days`).
 
+## World clock
+
+A widget of up to four analogue clocks, each labelled with its city. Choose the locations under
+**Settings → Immortal → World clock locations**; the first four you pick are the ones shown.
+
+Sixteen common cities are listed for quick picking, and **Add any timezone** covers the rest.
+Search it by city or by country, and it looks past the timezone names themselves, which is what
+makes places like Seattle findable. Seattle has no timezone of its own (it keeps Los Angeles
+time), so searching the raw list would never find it. Same for Manchester, Hanoi, and the
+Falkland Islands, which hide behind Europe/London, Asia/Ho_Chi_Minh and Atlantic/Stanley. Pick a
+city found this way and the clock is named after the city you searched for, not the timezone.
+
+Any clock can be renamed. Select it, choose **Rename this clock**, and call it whatever is useful
+to you, such as "Mum's" instead of "Auckland". Clear the box to go back to the city name.
+
 ## Wallpaper
 
 The background behind the grid is a wallpaper mode you pick in Settings (`WallpaperConfig`):

@@ -2744,7 +2744,7 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
   }
   ImmortalWidgetShell(title = "World Clock", accent = Color(0xFFFFC857), modifier = modifier) {
     // The row takes whatever height the shell has left after its title, and inside each column the
-    // name is measured first — the clock gets the space that remains. Sizing the clock off the
+    // name is measured first, so the clock gets the space that remains. Sizing the clock off the
     // column's *width* instead (fillMaxWidth().aspectRatio(1f)) pushed the names past the bottom of
     // the card, where they were clipped.
     Row(
