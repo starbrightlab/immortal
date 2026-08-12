@@ -2743,17 +2743,23 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
     }
   }
   ImmortalWidgetShell(title = "World Clock", accent = Color(0xFFFFC857), modifier = modifier) {
+    // The row takes whatever height the shell has left after its title, and inside each column the
+    // name is measured first — the clock gets the space that remains. Sizing the clock off the
+    // column's *width* instead (fillMaxWidth().aspectRatio(1f)) pushed the names past the bottom of
+    // the card, where they were clipped.
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().weight(1f),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
       zones.take(4).forEach { zone ->
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-          AnalogClock(zone, now, Modifier.fillMaxWidth().aspectRatio(1f))
+          Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            AnalogClock(zone, now, Modifier.fillMaxHeight().aspectRatio(1f))
+          }
           Spacer(Modifier.size(6.dp))
           // One line: the clock's name, custom if it has one, else the city from its zone id.
           // The offset and the underlying zone live in the world-clock settings screen, so the
