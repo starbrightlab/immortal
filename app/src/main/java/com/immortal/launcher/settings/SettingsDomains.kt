@@ -694,6 +694,37 @@ object SettingsDomains {
                       get = { MqttConfig.validateCert(it) },
                       set = MqttConfig::setValidateCert,
                       visible = { c, _ -> MqttConfig.isEnabled(c) && MqttConfig.useTls(c) }),
+                  BoolSpec(
+                      "portalPresence",
+                      "Use the Portal's own detector",
+                      get = { MqttConfig.portalPresence(it) },
+                      set = MqttConfig::setPortalPresence,
+                      help =
+                          "Report presence from Meta's own camera detection instead of guessing " +
+                              "from the screensaver. Falls back on its own if the Portal isn't " +
+                              "reporting it.",
+                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  BoolSpec(
+                      "ambientSensors",
+                      "Ambient sensors",
+                      get = { MqttConfig.ambientSensors(it) },
+                      set = MqttConfig::setAmbientSensors,
+                      help =
+                          "Publish this Portal's ambient sensors (temperature, light) to Home " +
+                              "Assistant. Only sensors this model actually has will appear.",
+                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  IntSpec(
+                      "tempOffset",
+                      "Temperature offset",
+                      get = { MqttConfig.tempOffset(it) },
+                      set = MqttConfig::setTempOffset,
+                      min = MqttConfig.TEMP_OFFSET_MIN,
+                      max = MqttConfig.TEMP_OFFSET_MAX,
+                      format = { "${if (it > 0) "+" else ""}$it °C" },
+                      help =
+                          "Correct the temperature reading. A sensor inside a powered device " +
+                              "reads its own heat, so it usually runs a few degrees warm.",
+                      visible = { c, _ -> MqttConfig.isEnabled(c) && MqttConfig.ambientSensors(c) }),
               ),
           sections =
               mapOf(
@@ -702,7 +733,10 @@ object SettingsDomains {
                   "username" to "Broker",
                   "password" to "Broker",
                   "useTls" to "Security",
-                  "validateCert" to "Security"),
+                  "validateCert" to "Security",
+                  "portalPresence" to "Sensors",
+                  "ambientSensors" to "Sensors",
+                  "tempOffset" to "Sensors"),
           onApplied = { c, keys ->
             // TLS<->port convenience hop, lifted out of the bespoke on-device screen so the phone
             // remote gets it too (it didn't before — a real drift): flipping TLS moves the port to
@@ -713,7 +747,10 @@ object SettingsDomains {
               if (tls && port == MqttConfig.DEFAULT_PORT) MqttConfig.setPort(c, MqttConfig.DEFAULT_TLS_PORT)
               else if (!tls && port == MqttConfig.DEFAULT_TLS_PORT) MqttConfig.setPort(c, MqttConfig.DEFAULT_PORT)
             }
-            MqttService.sync(c)
+            // These are read by the running publisher, not just at connect time, so tell it to
+            // re-read them — a plain sync() would no-op against an already-running service.
+            val live = keys.any { it in setOf("portalPresence", "ambientSensors", "tempOffset") }
+            MqttService.sync(c, reconfigure = live)
           },
       )
 

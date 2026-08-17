@@ -356,7 +356,17 @@ class SettingsDomainTest {
     // tripwire to enumerate. Pin the spec-key set: a new MqttConfig setting forces a conscious update
     // here (and a spec) rather than silently shipping with no remote/registry exposure.
     assertEquals(
-        setOf("enabled", "host", "port", "username", "password", "useTls", "validateCert"),
+        setOf(
+            "enabled",
+            "host",
+            "port",
+            "username",
+            "password",
+            "useTls",
+            "validateCert",
+            "portalPresence",
+            "ambientSensors",
+            "tempOffset"),
         SettingsDomains.mqtt.specs.map { it.key }.toSet())
   }
 

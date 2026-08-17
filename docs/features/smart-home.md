@@ -8,9 +8,67 @@ as something you can see and control.
 
 The publisher reuses the state Immortal already holds and surfaces it to Home Assistant:
 
-- **Presence** and **screen** state (`PresenceHub`).
+- **Presence** and **screen** state (`PresenceHub`) — see [Presence](#presence) below.
+- **Ambient sensors** — temperature and light, where the model has them. See
+  [Ambient sensors](#ambient-sensors).
 - **Now-playing** media (`NowPlayingHub`) — see [Multi-room audio](multi-room-audio.md).
 - **Battery** (on models that have one).
+- **IP address** (a diagnostic sensor).
+
+## Presence
+
+The **Presence** entity reads Meta's own camera detection. Portal's presence service logs a
+heartbeat about every 30 seconds *while it can see someone*, and goes quiet when the room
+empties — so Immortal tails the system log and reports presence from whether that beat is still
+arriving (`PortalPresenceMonitor`). It's the real signal, not an inference, and it keeps working
+while the photo frame is pinned on.
+
+This needs the `READ_LOGS` permission, which the [provisioning kit](../provisioning.md) already
+grants for the fleet agent — so on a provisioned Portal there's nothing to do. If your Portal was
+set up before that grant existed, re-run the provisioner.
+
+Where the detector can't be read — no grant, or a Portal that doesn't log it — the entity falls
+back to inferring presence from the screensaver's dream/sleep lifecycle. The entity's
+`source` attribute says which you're getting:
+
+| `source` | Meaning |
+| --- | --- |
+| `portal` | Meta's own camera detection. Direct observation of the room. |
+| `proxy` | Inferred from the dream/sleep lifecycle. Blind while the frame is pinned on — see the `confident` attribute. |
+| `screen` | Last resort: whether the panel is on. Used only before the proxy has seen a transition. |
+
+Silence is never read as an empty room: until a first heartbeat arrives the log reader says
+nothing at all and the proxy stays in charge, so a Portal that never reports presence doesn't sit
+in Home Assistant claiming the room is permanently empty.
+
+Turn it off with **Use the Portal's own detector** under Settings → Home Assistant (MQTT) to go
+back to the proxy.
+
+## Ambient sensors
+
+Immortal publishes the Portal's ambient sensors as Home Assistant entities:
+
+| Entity | Unit | Notes |
+| --- | --- | --- |
+| Temperature | °C | Has a calibration offset — see below. |
+| Ambient light | lx | |
+| Humidity | % | Only if the model has the hardware. |
+| Pressure | hPa | Only if the model has the hardware. |
+
+**Sensors are auto-detected**, so only the ones your Portal physically has ever appear — no entity
+is advertised for hardware that isn't there, and switching the feature off clears the entities from
+Home Assistant rather than leaving them behind as "unavailable".
+
+!!! tip "Calibrate the temperature"
+    A temperature sensor inside a powered device reads its own waste heat, so it runs a few degrees
+    warm. Put a thermometer next to the Portal, then set **Temperature offset** (Settings → Home
+    Assistant (MQTT)) to the difference — it applies immediately, without waiting for the room to
+    change.
+
+Readings are rate-limited rather than forwarded raw: a value has to move by a meaningful amount and
+wait out an interval before it's published, so a twitchy light sensor doesn't bury the broker. A
+large jump — someone switching a lamp on — skips most of that wait, because that's the event an
+automation is actually waiting for.
 
 ## What it can control
 

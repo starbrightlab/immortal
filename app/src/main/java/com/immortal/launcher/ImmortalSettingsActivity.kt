@@ -711,6 +711,9 @@ internal fun MqttScreen(onBack: () -> Unit) {
   var pass by remember { mutableStateOf(MqttConfig.password(context)) }
   var useTls by remember { mutableStateOf(MqttConfig.useTls(context)) }
   var validateCert by remember { mutableStateOf(MqttConfig.validateCert(context)) }
+  var portalPresence by remember { mutableStateOf(MqttConfig.portalPresence(context)) }
+  var ambientSensors by remember { mutableStateOf(MqttConfig.ambientSensors(context)) }
+  var tempOffset by remember { mutableStateOf(MqttConfig.tempOffset(context)) }
   // MqttStatus is a plain holder updated off the main thread, so poll it for live
   // "Connecting… → Connected" feedback (Compose won't recompose on its writes).
   var status by remember { mutableStateOf(MqttStatus.text) }
@@ -736,6 +739,17 @@ internal fun MqttScreen(onBack: () -> Unit) {
     MqttConfig.setUseTls(context, useTls)
     MqttConfig.setValidateCert(context, validateCert)
     MqttService.sync(context)
+  }
+
+  /**
+   * The sensor toggles are read by the running publisher rather than only at connect time, so
+   * they apply with `reconfigure` — a plain sync would no-op against a service already running.
+   */
+  fun applySensors() {
+    MqttConfig.setPortalPresence(context, portalPresence)
+    MqttConfig.setAmbientSensors(context, ambientSensors)
+    MqttConfig.setTempOffset(context, tempOffset)
+    MqttService.sync(context, reconfigure = true)
   }
 
   Column(
@@ -959,6 +973,81 @@ internal fun MqttScreen(onBack: () -> Unit) {
               fontSize = 13.sp,
               modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 16.dp),
           )
+        }
+      }
+      if (enabled) {
+        Spacer(Modifier.size(26.dp))
+        SectionLabel("Sensors")
+        Card {
+          Row(
+              modifier = Modifier.fillMaxWidth().padding(18.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text("Use the Portal's own detector", color = Color.White, fontSize = 15.sp)
+              Text(
+                  "Report presence from Meta's own camera detection instead of guessing from " +
+                      "the screensaver. Falls back on its own if the Portal isn't reporting it.",
+                  color = Color(0xFF9A9A9A),
+                  fontSize = 13.sp,
+                  modifier = Modifier.padding(top = 2.dp),
+              )
+            }
+            Segmented(
+                options = listOf("Off" to "off", "On" to "on"),
+                selected = if (portalPresence) "on" else "off",
+                onSelect = {
+                  portalPresence = it == "on"
+                  applySensors()
+                },
+            )
+          }
+          Divider()
+          Row(
+              modifier = Modifier.fillMaxWidth().padding(18.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text("Ambient sensors", color = Color.White, fontSize = 15.sp)
+              Text(
+                  "Publish this Portal's ambient sensors (temperature, light) to Home Assistant. " +
+                      "Only sensors this model actually has will appear.",
+                  color = Color(0xFF9A9A9A),
+                  fontSize = 13.sp,
+                  modifier = Modifier.padding(top = 2.dp),
+              )
+            }
+            Segmented(
+                options = listOf("Off" to "off", "On" to "on"),
+                selected = if (ambientSensors) "on" else "off",
+                onSelect = {
+                  ambientSensors = it == "on"
+                  applySensors()
+                },
+            )
+          }
+          if (ambientSensors) {
+            Divider()
+            Stepper(
+                label = "Temperature offset",
+                valueText = "${if (tempOffset > 0) "+" else ""}$tempOffset °C",
+                onMinus = {
+                  tempOffset = (tempOffset - 1).coerceAtLeast(MqttConfig.TEMP_OFFSET_MIN)
+                  applySensors()
+                },
+                onPlus = {
+                  tempOffset = (tempOffset + 1).coerceAtMost(MqttConfig.TEMP_OFFSET_MAX)
+                  applySensors()
+                },
+            )
+            Text(
+                "Correct the temperature reading. A sensor inside a powered device reads its own " +
+                    "heat, so it usually runs a few degrees warm.",
+                color = Color(0xFF7C7C7C),
+                fontSize = 13.sp,
+                modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+            )
+          }
         }
       }
       Text(

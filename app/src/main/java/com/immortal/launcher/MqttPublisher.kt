@@ -54,6 +54,21 @@ class MqttPublisher(private val appContext: Context) {
   private val base = "immortal/$id"
   private val audio by lazy { appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
+  /**
+   * The Portal's ambient sensors, and Meta's own presence detector. Both are owned by the
+   * publisher rather than the app: they exist to feed Home Assistant, so they run exactly while
+   * a broker is connected and cost an un-configured device nothing. (The presence monitor also
+   * improves [PresenceHub] for the screensaver as a side effect, for as long as it's running.)
+   */
+  private val ambient by lazy {
+    AmbientSensors(appContext) { kind, value ->
+      client?.publish("$base/${kind.key}/state", value, retain = true)
+    }
+  }
+  private val portalPresence by lazy {
+    PortalPresenceMonitor(appContext) { PresenceHub.onPortalPresence(appContext, it) }
+  }
+
   private val presenceListener = PresenceHub.Listener { st -> runCatching { publishPresence(st) } }
   private val nowPlayingListener = NowPlayingHub.Listener { st -> runCatching { publishMedia(st) } }
   private var batteryReceiver: BroadcastReceiver? = null
@@ -105,6 +120,35 @@ class MqttPublisher(private val appContext: Context) {
     worker?.interrupt()
     worker = null
     MqttStatus.text = "Off"
+  }
+
+  /**
+   * Re-read the feature toggles and republish, without dropping the broker connection. Called
+   * when the user changes a sensor/presence setting: [MqttService.sync] alone would not do it,
+   * because starting an already-running service re-enters `onStartCommand` and touches nothing.
+   *
+   * The sensors are restarted rather than left alone so that a changed temperature offset shows
+   * up at once — re-registering replays each sensor's current reading — instead of waiting for
+   * the room to move.
+   */
+  fun reconfigure() {
+    val c = client ?: return
+    Thread {
+          runCatching {
+                if (MqttConfig.portalPresence(appContext)) portalPresence.start()
+                else portalPresence.stop()
+                ambient.stop()
+                if (MqttConfig.ambientSensors(appContext)) ambient.start()
+                publishDiscovery(c)
+                publishPresence(PresenceHub.current)
+              }
+              .onFailure { Log.w(TAG, "reconfigure failed", it) }
+        }
+        .apply {
+          isDaemon = true
+          name = "mqtt-reconfigure"
+          start()
+        }
   }
 
   // --- connection lifecycle ---------------------------------------------------
@@ -227,9 +271,13 @@ class MqttPublisher(private val appContext: Context) {
     publishScreen()
     publishIp()
     publishAudioState()
+    if (MqttConfig.portalPresence(appContext)) portalPresence.start()
+    if (MqttConfig.ambientSensors(appContext)) ambient.start()
   }
 
   private fun detach() {
+    runCatching { portalPresence.stop() }
+    runCatching { ambient.stop() }
     runCatching { PresenceHub.removeListener(presenceListener) }
     runCatching { NowPlayingHub.removeListener(nowPlayingListener) }
     batteryReceiver?.let { r -> runCatching { appContext.unregisterReceiver(r) } }
@@ -408,13 +456,25 @@ class MqttPublisher(private val appContext: Context) {
         "$base/presence/attributes",
         JSONObject()
             .put("confident", st.confident)
-            .put("source", if (st.presence == Presence.UNKNOWN) "screen" else "proxy")
+            .put("source", presenceSource(st))
             .put("raw", st.presence.name.lowercase())
             .toString(),
         retain = true,
     )
     publishScreen()
   }
+
+  /**
+   * How much to trust the presence entity, for the `source` attribute: `portal` is Meta's own
+   * camera detector (direct observation), `proxy` the dream/sleep inference, and `screen` the
+   * last-resort "is the panel on" fallback used while the proxy has no reading at all.
+   */
+  private fun presenceSource(st: PresenceState): String =
+      when {
+        st.source == PresenceSource.PORTAL -> "portal"
+        st.presence == Presence.UNKNOWN -> "screen"
+        else -> "proxy"
+      }
 
   /**
    * Publish the screen-state sensor from the LIVE display state. immortal's PresenceHub
@@ -539,6 +599,25 @@ class MqttPublisher(private val appContext: Context) {
       binarySensor(c, "charging", "Charging", deviceClass = "battery_charging")
     }
 
+    // Ambient sensors, auto-detected. A Portal without the hardware never advertises the entity;
+    // one that has it but with the feature switched off gets its retained config cleared, so a
+    // previously-published entity doesn't linger in HA as "unavailable".
+    val ambientKinds = if (MqttConfig.ambientSensors(appContext)) ambient.available() else emptyList()
+    AmbientKind.values().forEach { kind ->
+      if (kind in ambientKinds) {
+        sensor(
+            c,
+            kind.key,
+            kind.title,
+            deviceClass = kind.deviceClass,
+            unit = kind.unit,
+            stateClass = "measurement",
+        )
+      } else {
+        publishConfig(c, "sensor", kind.key, null)
+      }
+    }
+
     sensor(c, "media_state", "Media", icon = "mdi:music")
     sensor(c, "media_title", "Media title", icon = "mdi:music-note")
     sensor(c, "media_artist", "Media artist", icon = "mdi:account-music")
@@ -607,7 +686,7 @@ class MqttPublisher(private val appContext: Context) {
           "button" to "identify",
           "sensor" to "ip",
           "button" to "screen_off", // legacy (pre-1.41)
-      )
+      ) + AmbientKind.values().map { "sensor" to it.key }
 
   /** Remove this device's entities from HA by clearing their retained discovery configs. */
   private fun clearDiscovery(c: MqttClient) {

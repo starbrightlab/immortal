@@ -29,9 +29,19 @@ storage stack doesn't bind it, so it doesn't appear as a folder. Put
 [screensaver photos](features/screensaver.md) on the device's own storage instead (e.g. copy
 them across while it's plugged into your computer), or use a network/self-hosted photo source.
 
-## Can't read Meta's presence signal directly
+## Can't *ask* for Meta's presence signal
 
 The Portal won't let an unprivileged app read Meta's camera-based presence detection — it's
-front-camera computer vision behind a platform-signature permission. Immortal instead infers
-presence from the system's own dream/sleep lifecycle, which *is* derived from that signal. See
-the [multi-room design notes](design/multi-room-audio.md) for how this is used.
+front-camera computer vision behind a platform-signature permission, and that door stays shut.
+
+Immortal gets at it another way. Portal's own detector logs a heartbeat roughly every 30 seconds
+**while it sees someone**, and goes quiet when the room empties, so Immortal tails the system log
+and reads presence from whether that beat is still arriving. That needs the `READ_LOGS` permission,
+which the [provisioning kit](provisioning.md) already grants, and it powers the **Presence** entity
+in the [Home Assistant integration](features/smart-home.md#presence).
+
+Where that isn't available — no `READ_LOGS` grant, or a Portal whose firmware doesn't log it —
+Immortal falls back to inferring presence from the system's own dream/sleep lifecycle, which *is*
+derived from the same signal. That fallback can't see the room while the photo frame is pinned on
+(a held screen never times out), which is what the `confident` attribute reports. See the
+[multi-room design notes](design/multi-room-audio.md) for how this is used.

@@ -83,7 +83,8 @@ The Kotlin package is flat; files are grouped by name prefix:
   `FleetConfig`, `FleetFs`, `FleetDiag`, `FleetCalendar`, `FleetScreensaver`
 - **Multi-room audio / now playing:** `MultiRoom*`, `NowPlaying*`, `Snapcast*`, `Ma*`,
   `MediaSession*`, `MediaNotificationListenerService`
-- **Smart home (MQTT):** `Mqtt*`
+- **Smart home (MQTT):** `Mqtt*`; ambient sensor entities `AmbientSensors`; presence read from
+  Meta's own detector `PortalPresence` (feeds `PresenceHub`)
 - **Remote / Portal TV:** `Remote*`, `TvFocus`
 - **Boot / lifecycle:** `ImmortalApp`, `BootReceiver`, `BootLaunch`, `Sleep*`, `ScreenControl`
 - **Settings (the registry — read [Settings infrastructure](#settings-infrastructure) before

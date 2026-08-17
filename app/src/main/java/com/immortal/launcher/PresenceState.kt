@@ -19,7 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * One source of truth for "is someone here, and what's the screen doing" — shared by the
  * photo-frame screensaver (in-process) and the Snapcast music companion (cross-process).
  *
- * Why this exists: the Portal won't let an unprivileged app read Meta's presence signal
+ * Why this exists: the Portal won't let an unprivileged app *ask* for Meta's presence signal
  * (it's front-camera CV behind a platform-signature permission — see docs/design/multi-room-audio.md),
  * but the system's own dream/sleep lifecycle is DERIVED from that signal, and we DO receive
  * it. So the dream coming up means "someone's around"; the device sleeping at a screen
@@ -27,10 +27,16 @@ import java.util.concurrent.CopyOnWriteArrayList
  * [PresenceState] that both the screensaver and the music react to, instead of each guessing
  * from raw screen on/off and drifting apart.
  *
- * The honest caveat lives in one field: [PresenceState.confident]. It's false exactly when the
- * frame is pinned on (Always-on mode), because a held screen never times out, so the
- * empty-room transition is hidden and presence is genuinely UNKNOWN. Consumers read that as
- * "fall back to Home Assistant or the manual override."
+ * That proxy is the floor, not the ceiling. [PortalPresenceMonitor] reads the same detector's
+ * heartbeat out of the system log and, whenever it's talking, its verdict OVERRIDES the proxy
+ * (see [onPortalPresence]) — which is what [PresenceState.source] reports. The proxy remains the
+ * fallback for devices without the `READ_LOGS` grant, or where those log tags never appear.
+ *
+ * The honest caveat lives in one field: [PresenceState.confident]. On the proxy it's false
+ * exactly when the frame is pinned on (Always-on mode), because a held screen never times out,
+ * so the empty-room transition is hidden and presence is genuinely UNKNOWN. Consumers read that
+ * as "fall back to Home Assistant or the manual override." A reading sourced from the Portal's
+ * own detector is always confident — it watches the room, not the screen.
  */
 
 enum class Presence {
@@ -51,18 +57,28 @@ enum class ScreenState {
   OFF,
 }
 
+/** Where a [PresenceState.presence] reading came from — see [PresenceHub.onPortalPresence]. */
+enum class PresenceSource {
+  /** Meta's own camera detector, read off the system log. Direct observation of the room. */
+  PORTAL,
+  /** The dream/sleep lifecycle proxy — inferred, and blind while the frame is pinned on. */
+  PROXY,
+}
+
 /**
  * Immutable snapshot of the shared signal.
  *
  * @param confident false when the Always-on frame masks the proxy → treat [presence] as
  *   advisory only and defer to an authoritative source (HA occupancy / manual override).
  * @param sinceMs wall-clock millis when this state began (for grace-period timing downstream).
+ * @param source which detector produced [presence]; [PresenceSource.PORTAL] outranks the proxy.
  */
 data class PresenceState(
     val presence: Presence,
     val screen: ScreenState,
     val confident: Boolean,
     val sinceMs: Long,
+    val source: PresenceSource = PresenceSource.PROXY,
 )
 
 /**
@@ -122,6 +138,7 @@ object PresenceHub {
   const val EXTRA_SCREEN = "screen" // ScreenState.name
   const val EXTRA_CONFIDENT = "confident" // Boolean
   const val EXTRA_SINCE_MS = "sinceMs" // Long
+  const val EXTRA_SOURCE = "source" // PresenceSource.name
 
   fun interface Listener {
     fun onPresenceChanged(state: PresenceState)
@@ -129,6 +146,19 @@ object PresenceHub {
 
   private val listeners = CopyOnWriteArrayList<Listener>()
   private var app: Context? = null
+
+  /**
+   * Meta's own detector's latest verdict, or null when it isn't talking (no `READ_LOGS`, tags
+   * absent, or the monitor is off). Non-null overrides the proxy in [set].
+   */
+  @Volatile private var portalPresence: Boolean? = null
+
+  /**
+   * The proxy's own last opinion, kept separately from [current] so that when the Portal
+   * detector drops out we fall back to what the dream lifecycle last said rather than freezing
+   * on the override's value.
+   */
+  @Volatile private var proxyPresence: Presence = Presence.UNKNOWN
 
   @Volatile
   var current: PresenceState = PresenceState(Presence.UNKNOWN, ScreenState.OFF, confident = false, sinceMs = 0L)
@@ -197,6 +227,17 @@ object PresenceHub {
         DreamStopVerdict.SUPPRESSED -> Unit // a call handoff — presence is unknowable here
       }
 
+  /**
+   * A verdict from Meta's own detector ([PortalPresenceMonitor]): true present, false empty, or
+   * null when it has nothing to say. Non-null takes precedence over the dream/sleep proxy for as
+   * long as it lasts; null hands control straight back, re-deriving from the proxy's last word.
+   */
+  fun onPortalPresence(c: Context, present: Boolean?) {
+    if (portalPresence == present) return
+    portalPresence = present
+    set(proxyPresence, current.screen, isConfident(c), c)
+  }
+
   /** Screen blanked outside the dream path (our own lockNow, power button). */
   private fun onScreenOff(c: Context) {
     // If we were confidently following the proxy, a screen-off means the room emptied or the
@@ -227,13 +268,30 @@ object PresenceHub {
   }
 
   private fun set(presence: Presence, screen: ScreenState, confident: Boolean, context: Context) {
-    val next = PresenceState(presence, screen, confident, System.currentTimeMillis())
+    proxyPresence = presence
+    // Meta's detector outranks the proxy whenever it's talking: it watches the room directly, so
+    // it stays right in the very case the proxy is blind to — a pinned frame that never times out.
+    val portal = portalPresence
+    val next =
+        PresenceState(
+            presence = if (portal == null) presence else if (portal) Presence.PRESENT else Presence.ABSENT,
+            screen = screen,
+            confident = if (portal == null) confident else true,
+            sinceMs = System.currentTimeMillis(),
+            source = if (portal == null) PresenceSource.PROXY else PresenceSource.PORTAL,
+        )
     val prev = current
-    if (prev.presence == next.presence && prev.screen == next.screen && prev.confident == next.confident) {
+    if (prev.presence == next.presence &&
+        prev.screen == next.screen &&
+        prev.confident == next.confident &&
+        prev.source == next.source) {
       return // no meaningful change; don't churn listeners/broadcasts
     }
     current = next
-    Log.i(TAG, "presence ${prev.presence}/${prev.screen} -> ${next.presence}/${next.screen} confident=${next.confident}")
+    Log.i(
+        TAG,
+        "presence ${prev.presence}/${prev.screen} -> ${next.presence}/${next.screen} " +
+            "confident=${next.confident} source=${next.source}")
     listeners.forEach { runCatching { it.onPresenceChanged(next) } }
     publish(context, next)
   }
@@ -246,7 +304,8 @@ object PresenceHub {
               .putExtra(EXTRA_PRESENCE, state.presence.name)
               .putExtra(EXTRA_SCREEN, state.screen.name)
               .putExtra(EXTRA_CONFIDENT, state.confident)
-              .putExtra(EXTRA_SINCE_MS, state.sinceMs))
+              .putExtra(EXTRA_SINCE_MS, state.sinceMs)
+              .putExtra(EXTRA_SOURCE, state.source.name))
     }
         .onFailure { Log.w(TAG, "presence broadcast failed", it) }
   }

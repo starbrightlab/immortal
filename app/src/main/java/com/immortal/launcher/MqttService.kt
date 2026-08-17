@@ -35,7 +35,12 @@ class MqttService : Service() {
     publisher = MqttPublisher(applicationContext).also { it.start() }
   }
 
-  override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+  override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    // Starting an already-running service only re-enters here, so a settings change needs an
+    // explicit nudge to reach the live publisher — [sync] with reconfigure = true sends it.
+    if (intent?.action == ACTION_RECONFIGURE) runCatching { publisher?.reconfigure() }
+    return START_STICKY
+  }
 
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -72,10 +77,18 @@ class MqttService : Service() {
   companion object {
     private const val CHANNEL = "mqtt_publisher"
     private const val NOTIF_ID = 4712
+    private const val ACTION_RECONFIGURE = "com.immortal.launcher.MQTT_RECONFIGURE"
 
-    /** Start the publisher when enabled+configured, stop it otherwise. Safe to call repeatedly. */
-    fun sync(context: Context) {
+    /**
+     * Start the publisher when enabled+configured, stop it otherwise. Safe to call repeatedly.
+     *
+     * Pass [reconfigure] when a setting the publisher reads at runtime has changed (sensors,
+     * presence source, temperature offset) so a service that's ALREADY running re-reads it and
+     * republishes; without it the change would only take effect on the next reconnect.
+     */
+    fun sync(context: Context, reconfigure: Boolean = false) {
       val intent = Intent(context, MqttService::class.java)
+      if (reconfigure) intent.action = ACTION_RECONFIGURE
       if (MqttConfig.isEnabled(context) && MqttConfig.isConfigured(context)) {
         if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent)
         else context.startService(intent)

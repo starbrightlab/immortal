@@ -23,6 +23,8 @@ object MqttConfig {
   private const val PREFS = "mqtt_publisher"
   const val DEFAULT_PORT = 1883
   const val DEFAULT_TLS_PORT = 8883
+  const val TEMP_OFFSET_MIN = -20
+  const val TEMP_OFFSET_MAX = 20
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -61,6 +63,32 @@ object MqttConfig {
 
   fun setValidateCert(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("validate_cert", on).apply()
+
+  /**
+   * Publish the presence sensor from Meta's own camera detector ([PortalPresenceMonitor]) rather
+   * than the dream/sleep proxy. On by default: it needs no permission the provisioning kit
+   * doesn't already grant, and it degrades to the proxy on its own when the log stays quiet.
+   */
+  fun portalPresence(c: Context): Boolean = prefs(c).getBoolean("portal_presence", true)
+
+  fun setPortalPresence(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("portal_presence", on).apply()
+
+  /** Publish the Portal's ambient sensors (temperature, light, …) as Home Assistant entities. */
+  fun ambientSensors(c: Context): Boolean = prefs(c).getBoolean("ambient_sensors", true)
+
+  fun setAmbientSensors(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("ambient_sensors", on).apply()
+
+  /**
+   * Calibration for the ambient temperature sensor, in whole °C. A sensor inside a powered
+   * device reads its own waste heat, so the raw value runs warm; this is how you make it agree
+   * with a thermometer in the same room.
+   */
+  fun tempOffset(c: Context): Int = prefs(c).getInt("temp_offset", 0)
+
+  fun setTempOffset(c: Context, v: Int) =
+      prefs(c).edit().putInt("temp_offset", v.coerceIn(TEMP_OFFSET_MIN, TEMP_OFFSET_MAX)).apply()
 
   /** True once a broker host is set — the publisher stays idle until then. */
   fun isConfigured(c: Context): Boolean = host(c).isNotBlank()
