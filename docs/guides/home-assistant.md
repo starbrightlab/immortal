@@ -104,6 +104,10 @@ automation:
   the provisioner on a Portal set up before that grant existed.
 - **No Camera entity** — it's off by default. Turn on **Camera snapshots** under Settings →
   Home Assistant (MQTT) on the device; Home Assistant can't enable it remotely, by design.
+- **The stream dies when you open another app** — the on-screen *camera live* badge is what
+  keeps camera access alive on Android 9, so check Immortal has the "display over other apps"
+  permission (the [provisioning kit](../provisioning.md) grants it). `ImmortalStream` logs
+  `CAMERA_DISABLED — app not in the foreground` when this is what happened.
 - **Camera streaming won't stay on** — check `adb logcat -s ImmortalStream:V`. A
   `MediaCodec ... configure` failure means the encoder refused our settings; Immortal retries
   without the profile hint, so this should now start anyway. `no record-audio permission` means

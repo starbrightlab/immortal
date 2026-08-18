@@ -132,8 +132,10 @@ Points worth knowing:
   within the consent given on the device.
 - **While it runs, the camera is held.** Snapshots, the photo frame's wave-to-advance gesture and
   a Portal call all want the same camera, so they can't overlap with streaming.
-- **The notification is deliberate.** A permanent one shows while the camera is live — a
-  system-level signal alongside the on-screen one.
+- **A "camera live" badge sits on screen** the whole time the stream runs, on top of whatever
+  app is in front, alongside a permanent notification. It isn't only a courtesy: Android 9 only
+  lets a foreground app use the camera, and that badge is what keeps the stream alive when you
+  open something else on the Portal. Streaming stops without it.
 
 ## What it can control
 

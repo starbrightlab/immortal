@@ -174,12 +174,18 @@ None of these are answerable from the source, and all of them can invalidate par
   phase 1: real capture, real JPEG, camera indicator lit. This was the question the whole design
   hung on.
 - What resolutions does Camera2 actually offer per model, for stills and for an encoder surface?
-- Does Portal firmware permit camera access from a background service, or only in the
-  foreground? The bridge needed `SYSTEM_ALERT_WINDOW` for this, which we already hold.
-- Is there a usable hardware `MediaCodec` H.264 encoder on API 28 Portal, and does it offer
-  Constrained Baseline? (The encoder asks for it; the SDP reports what the SPS actually says, so
-  a device that ignores the request describes itself honestly rather than silently failing in a
-  browser.)
+- ~~Does Portal firmware permit camera access from a background service?~~ **No, not on its
+  own.** Confirmed on a Portal Go: the stream runs happily until another app comes to the front,
+  then dies with `ERROR_CAMERA_DISABLED`. A foreground service is not sufficient on Android 9.
+  Holding a visible overlay window (`SYSTEM_ALERT_WINDOW`, already granted) is what keeps camera
+  access alive — the same lever the bridge documents. That overlay is [`StreamIndicator`], which
+  doubles as the "camera is live" signal this note requires for continuous capture. **The two
+  requirements are the same object: removing the badge would silently break streaming.**
+- ~~Is there a usable hardware `MediaCodec` H.264 encoder on API 28 Portal, and does it offer
+  Constrained Baseline?~~ **Yes, with a caveat.** Confirmed encoding 640×480 at 15fps on a Portal
+  Go and producing SPS/PPS. It rejects a profile hint given *without* a level
+  (`CodecException 0x80001001` out of `configure()`), so both are set together, with a
+  no-hint fallback behind it.
 - Does `com.millennium` block microphone capture on the Portal+ models, and on which?
 - Thermal behaviour of a sustained encode — the device is fanless and often wall-powered in a
   warm room.

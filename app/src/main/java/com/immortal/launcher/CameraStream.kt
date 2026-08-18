@@ -284,7 +284,7 @@ class CameraStream(
           override fun onDisconnected(camera: CameraDevice) = stop()
 
           override fun onError(camera: CameraDevice, error: Int) {
-            Log.w(TAG, "camera error $error")
+            Log.w(TAG, "camera error $error (${cameraErrorName(error)})")
             stop()
           }
         },
@@ -318,6 +318,22 @@ class CameraStream(
         },
         handler)
   }
+
+  /**
+   * Camera2's error codes in words. `CAMERA_DISABLED` in particular reads as a mystery otherwise:
+   * on Android 9 it's what you get when the app is no longer in the foreground, which is why the
+   * stream holds an overlay badge ([StreamIndicator]) for as long as it runs.
+   */
+  private fun cameraErrorName(error: Int): String =
+      when (error) {
+        CameraDevice.StateCallback.ERROR_CAMERA_IN_USE -> "IN_USE — another app has the camera"
+        CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE -> "MAX_CAMERAS_IN_USE"
+        CameraDevice.StateCallback.ERROR_CAMERA_DISABLED ->
+            "CAMERA_DISABLED — app not in the foreground, or disabled by policy"
+        CameraDevice.StateCallback.ERROR_CAMERA_DEVICE -> "CAMERA_DEVICE — fatal device error"
+        CameraDevice.StateCallback.ERROR_CAMERA_SERVICE -> "CAMERA_SERVICE — fatal service error"
+        else -> "unknown"
+      }
 
   private companion object {
     const val TAG = "ImmortalStream"

@@ -80,6 +80,9 @@ class CameraStreamService : Service() {
       stopSelf()
     } else {
       running = true
+      // Load-bearing as well as honest: the badge is what keeps the camera open when another app
+      // comes to the front. See StreamIndicator.
+      StreamIndicator.show(this)
       Log.i(TAG, "streaming service up on :${RtspServer.DEFAULT_PORT}")
     }
     notifyState()
@@ -92,6 +95,7 @@ class CameraStreamService : Service() {
   override fun onDestroy() {
     running = false
     notifyState()
+    StreamIndicator.hide(this)
     runCatching { stream?.stop() }
     runCatching { audio?.stop() }
     runCatching { server?.stop() }
