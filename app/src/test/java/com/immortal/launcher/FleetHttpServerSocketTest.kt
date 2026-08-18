@@ -125,18 +125,40 @@ class FleetHttpServerSocketTest {
     val server = serverOn(port) { FleetHttpServer.Response(200, """{"ok":true}""") }
     assertEquals("HTTP/1.1 200 OK", ok(port))
     server.stop()
-    // Prove the port was released by binding it ourselves: if stop() had left the listener open,
-    // this throws BindException.
+    // Prove the port was released by binding it ourselves — but give the OS a moment to get
+    // there, because "bindable" is not instantaneous and asserting it once is a coin flip.
     //
-    // The obvious alternative — assert that a fresh connect() fails — is the same claim but it
-    // races, and it flaked on CI while passing locally every time. Once stop() frees the port the
-    // OS is free to hand that number to anything else asking for an ephemeral port, including
-    // another test in this suite calling freePort(). If something else binds it first, the connect
-    // succeeds and the test fails while stop() did its job perfectly.
-    ServerSocket().use { probe ->
-      probe.reuseAddress = true
-      probe.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port))
-      assertTrue("stop() should release the listening port", probe.isBound)
+    // Asserting that a fresh connect() fails is the same claim and races the other way: once the
+    // port is free the OS may hand that number to anything asking for an ephemeral one, including
+    // another test calling freePort(), and then the connect succeeds while stop() did its job.
+    //
+    // Binding is the right claim, but stop() closes the LISTENING socket while the connection the
+    // request above accepted is still winding down (pool.shutdownNow() interrupts the pool, it
+    // doesn't close accepted sockets), so for a moment the port can still be unbindable. Retrying
+    // to a deadline keeps the assertion honest — a leaked listener never becomes bindable and
+    // still fails — without failing on the wind-down. Measured at ~44% failure without this.
+    assertTrue(
+        "stop() should release the listening port",
+        awaitBindable(port, timeoutMs = 5_000),
+    )
+  }
+
+  /** True once [port] can be bound, retrying until [timeoutMs] elapses. */
+  private fun awaitBindable(port: Int, timeoutMs: Long): Boolean {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (true) {
+      val bound =
+          runCatching {
+                ServerSocket().use { probe ->
+                  probe.reuseAddress = true
+                  probe.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port))
+                  probe.isBound
+                }
+              }
+              .getOrDefault(false)
+      if (bound) return true
+      if (System.currentTimeMillis() >= deadline) return false
+      Thread.sleep(50)
     }
   }
 }
