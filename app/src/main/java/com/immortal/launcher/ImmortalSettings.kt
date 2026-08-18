@@ -44,6 +44,24 @@ object ImmortalSettings {
   const val CLOCK_12 = "12" // force 12-hour (e.g. 1:05, 1 PM)
   const val CLOCK_24 = "24" // force 24-hour (e.g. 13:05, 13)
 
+  // What the Portal TV remote's branded app buttons do once remapped (see RemoteKeyService).
+  const val KEY_ACTION_NONE = "none" // leave the key alone (default)
+  const val KEY_ACTION_MIC_MUTE = "mic_mute" // toggle the software microphone mute
+  const val KEY_ACTION_HOME = "home"
+  const val KEY_ACTION_SCREENSAVER = "screensaver"
+  const val KEY_ACTION_SCREEN_OFF = "screen_off"
+  const val KEY_ACTION_BACK = "back"
+
+  val KEY_ACTIONS =
+      listOf(
+          KEY_ACTION_NONE,
+          KEY_ACTION_MIC_MUTE,
+          KEY_ACTION_HOME,
+          KEY_ACTION_SCREENSAVER,
+          KEY_ACTION_SCREEN_OFF,
+          KEY_ACTION_BACK,
+      )
+
   data class Settings(
       val weatherUnit: String = UNIT_AUTO,
       val tileSize: String = SIZE_STANDARD,
@@ -78,6 +96,18 @@ object ImmortalSettings {
       // itself needs no credentials. Leave blank for a stock server with auth disabled.
       val maUsername: String = "",
       val maPassword: String = "",
+      // Portal TV remote button remapping (RemoteKeyService). Off until the user turns it on and
+      // enables the service in Accessibility settings; the per-button actions default to "none"
+      // so enabling the service alone changes nothing.
+      val remoteKeysEnabled: Boolean = false,
+      val progRedAction: String = KEY_ACTION_NONE, // Netflix button
+      val progGreenAction: String = KEY_ACTION_NONE, // Amazon Prime button
+      val progBlueAction: String = KEY_ACTION_NONE, // Facebook Watch button
+      // The remote's voice button (Meta's firmware calls it BUTTON_VOICE; their help page says
+      // only "press for voice input"). It sends SEARCH, because it opened Portal's voice
+      // assistant, which is gone. Unlike the PROG_* keys this one is a standard Android key, so
+      // remapping it stops apps receiving SEARCH — hence opt-in like the rest.
+      val searchAction: String = KEY_ACTION_NONE,
   )
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -98,6 +128,11 @@ object ImmortalSettings {
         maPort = p.getInt("ma_port", DEFAULT_MA_PORT),
         maUsername = p.getString("ma_username", "") ?: "",
         maPassword = p.getString("ma_password", "") ?: "",
+        remoteKeysEnabled = p.getBoolean("remote_keys_enabled", false),
+        progRedAction = p.getString("prog_red_action", KEY_ACTION_NONE) ?: KEY_ACTION_NONE,
+        progGreenAction = p.getString("prog_green_action", KEY_ACTION_NONE) ?: KEY_ACTION_NONE,
+        progBlueAction = p.getString("prog_blue_action", KEY_ACTION_NONE) ?: KEY_ACTION_NONE,
+        searchAction = p.getString("search_action", KEY_ACTION_NONE) ?: KEY_ACTION_NONE,
     )
   }
 
@@ -153,6 +188,21 @@ object ImmortalSettings {
       prefs(c).edit().putString("ma_username", v.trim()).apply()
 
   fun setMaPassword(c: Context, v: String) = prefs(c).edit().putString("ma_password", v).apply()
+
+  fun setRemoteKeysEnabled(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("remote_keys_enabled", on).apply()
+
+  fun setProgRedAction(c: Context, v: String) =
+      prefs(c).edit().putString("prog_red_action", v).apply()
+
+  fun setProgGreenAction(c: Context, v: String) =
+      prefs(c).edit().putString("prog_green_action", v).apply()
+
+  fun setProgBlueAction(c: Context, v: String) =
+      prefs(c).edit().putString("prog_blue_action", v).apply()
+
+  fun setSearchAction(c: Context, v: String) =
+      prefs(c).edit().putString("search_action", v).apply()
 
   fun setWeatherUnit(c: Context, unit: String) =
       prefs(c).edit().putString("weather_unit", unit).apply()
