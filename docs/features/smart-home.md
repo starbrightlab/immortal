@@ -116,6 +116,10 @@ Some things worth knowing before relying on it:
 Immortal renders a Portal-native bottom toast in response to MQTT-driven notify messages from
 Home Assistant. Two ways to fire one — pick whichever fits the automation:
 
+![Immortal's settings page showing the Notifications section with "Accept notifications from your
+network" switched on, and a "Backup complete" toast card at the bottom of the
+screen](../img/notifications.png)
+
 ### Simple alerts: `notify.send_message`
 
 Each configured Portal shows up in HA's notify picker. For a plain text alert, use the
@@ -156,6 +160,20 @@ data:
 All fields are optional. Full behavior rules in
 [`docs/design/mqtt-notifications.md`](../design/mqtt-notifications.md).
 
+### Without Home Assistant: `POST /notify`
+
+The same payload reaches the same renderer over the fleet agent's HTTP API, so any script on
+the LAN can raise a toast or speak a line with no broker in the picture:
+
+```bash
+./fleetctl notify "Backup finished" --speak "Backup finished" --device "Kitchen"
+```
+
+It is **off by default** — turn on *Accept notifications from your network* in
+**Settings > Notifications** (the row appears once the fleet agent is enabled), or the route
+answers `403 notify_disabled`.
+See [Fleet management](fleet.md#pushing-a-notification).
+
 ### Payload fields
 
 | Field         | Type   | Default    | Notes                                                                                                                          |
@@ -169,6 +187,7 @@ All fields are optional. Full behavior rules in
 | `volume`      | float  | `1.0`      | Sound volume `0.0`–`1.0` of the alarm-stream max. Bounded by the user's system alarm-volume slider.                              |
 | `wake_screen` | bool   | `true`     | If the screen is off when the notify arrives, wake it so the toast is visible. Set `false` for low-priority chimes that shouldn't wake a sleeping room. |
 | `on_tap`      | string | `null`     | Tap target. URL, installed package name, or HA dashboard path. See *Tap targets* below.                                          |
+| `speak`       | string | `null`     | Spoken aloud through the device's TTS voice (the one picked in Sounds settings). Independent of `message` — a payload with only `speak` says its line and renders no toast. Suppressed under Do Not Disturb, like `sound`. |
 
 ### Special cases
 

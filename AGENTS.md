@@ -85,6 +85,10 @@ The Kotlin package is flat; files are grouped by name prefix:
   `MediaSession*`, `MediaNotificationListenerService`
 - **Smart home (MQTT):** `Mqtt*`; ambient sensor entities `AmbientSensors`; presence read from
   Meta's own detector `PortalPresence` (feeds `PresenceHub`)
+- **Pushed notifications (toast / sound / TTS):** `NotifyDispatch` is the single renderer for
+  both producers — MQTT (`MqttPublisher.handleNotify`) and the fleet agent's `POST /notify`;
+  payload `MqttNotifyPayload`, surfaces `NotificationOverlay` / `SoundPlayer` /
+  `ChimePlayer.announce`
 - **Remote / Portal TV:** `Remote*`, `TvFocus`
 - **Boot / lifecycle:** `ImmortalApp`, `BootReceiver`, `BootLaunch`, `Sleep*`, `ScreenControl`
 - **Settings (the registry — read [Settings infrastructure](#settings-infrastructure) before

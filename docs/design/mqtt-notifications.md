@@ -58,7 +58,8 @@ The canonical interface is a JSON document published to
   "duration": 8,
   "volume": 1.0,
   "wake_screen": true,
-  "on_tap": "lovelace/security"
+  "on_tap": "lovelace/security",
+  "speak": "Someone is at the front door"
 }
 ```
 
@@ -75,6 +76,7 @@ Field semantics:
 | `volume`      | float  | `1.0`      | Sound volume `0.0`–`1.0` of the alarm-stream max. Bounded by the user's system alarm-volume slider (so `1.0` ≠ "loudest possible," it's "loudest the alarm slider is set to"). On Portal, alarm is the only stream independent from the "media volume" group — see *Sound → Portal volume quirk*. |
 | `wake_screen` | bool   | `true`     | If the screen is off when the notify arrives, call `ScreenControl.wake` so the toast is visible. Set `false` for low-priority chimes that shouldn't wake a sleeping room. |
 | `on_tap`      | string | `null`     | Same string grammar as the existing `open` entity: full URL, installed package name, or bare HA dashboard path. |
+| `speak`       | string | `null`     | Spoken through the platform TTS engine (the voice chosen in Sounds settings) via `ChimePlayer.announce`, at `volume`. Independent of `message`: a `speak`-only payload is audible with no toast. DND-suppressed like `sound`. |
 
 ### Special cases
 
@@ -82,6 +84,9 @@ Field semantics:
   silently produce a "ghost" toast by forgetting a template field.
 - **Sound-only**: `sound` present, both `title` and `message` empty → no visual,
   just audio. Covers "chime when the package arrives, don't touch the screen."
+- **Speak-only**: `speak` present with no `title` / `message` → the device says its
+  line and renders nothing. The screen is not woken (audio doesn't need it), so this
+  is the "announce it into the room" payload.
 - **No `on_tap`**: tap dismisses the toast early. Auto-dismiss still fires
   after `duration`.
 - **Acknowledgement-required (`duration: 0`)**: the toast renders and stays.
@@ -306,7 +311,7 @@ regardless of which track produced the payload.
 
 ## Implementation
 
-Four new pieces; everything else extends existing code.
+Five pieces; everything else extends existing code.
 
 ### 1. `NotificationOverlay` (new)
 
@@ -391,19 +396,47 @@ spec-nuance on mid-session retained publishes. The check covers every command
 (notify, open, screen_power, etc.), not just notify — none of the command
 topics should ever be retained.
 
-`handleNotify(json)`:
+`handleNotify(json)` parses (gracefully — malformed → drop) and hands the spec to
+`NotifyDispatch.deliver`, which does the work:
 
-1. Parses the JSON (gracefully — malformed → log + drop).
-2. If `title` or `message` non-empty:
+1. If `title` or `message` non-empty:
    a. If the screen is off and `wake_screen != false`, call `ScreenControl.wake`.
    b. `NotificationOverlay.show(spec)` regardless of DND (visual is always
       allowed; DND silences audio only).
-3. If `sound` non-empty: check DND — if `getCurrentInterruptionFilter()` is
+2. If `sound` non-empty: check DND — if `getCurrentInterruptionFilter()` is
    `INTERRUPTION_FILTER_ALL`, `SoundPlayer.play(context, sound, volume)`;
    otherwise skip the sound. (`STREAM_VOICE_CALL` focus from an active call
    naturally denies our focus request — sound is then a silent no-op.)
+3. If `speak` non-empty: same DND gate, then `ChimePlayer.announce(context, speak,
+   volume)` — the platform engine and the voice already chosen for spoken time, posted
+   to the main looper so a non-UI caller (the HTTP route) is safe.
 
-The empty-payload no-op falls out naturally — neither branch fires.
+The empty-payload no-op falls out naturally — no branch fires.
+
+### 5. `NotifyDispatch` + `POST /notify` (the HTTP surface)
+
+Delivery lives in `NotifyDispatch`, not in `MqttPublisher`, because there are two
+producers: Home Assistant over MQTT, and anything on the LAN over the fleet agent's
+`POST /notify`. One parser and one renderer is the whole point — a fix to DND handling
+or wake behaviour can't land on one surface and miss the other. `MqttPublisher` keeps
+only its topic plumbing; `routeTarget` (the `on_tap` grammar) moved across with it so
+notify taps behave identically from either producer.
+
+The HTTP route differs from MQTT in exactly two ways, both deliberate:
+
+- **It answers.** `{"ok":true,"shown":…,"sound":…,"spoke":…}`, and it separates
+  `400 bad_json` from `400 empty_payload` — over MQTT both are a silent drop, but a
+  caller that gets a response should be able to tell "I sent garbage" from "that parsed
+  to nothing."
+- **It is opt-in.** `FleetConfig.notifyEnabled`, off by default, surfaced as *Accept
+  notifications from your network* — a Notifications section on the device's settings page,
+  and a row in the `fleet` domain on the phone remote. Both hidden until the agent is on.
+  The bearer token already gates the agent, but managing a device and being able to make
+  it talk in someone's living room are different powers — the second one the owner grants
+  on purpose. Disabled → `403 notify_disabled`.
+
+The MQTT path is untouched by that flag: it has its own enable switch in MQTT settings,
+and gating it here would silently break existing automations.
 
 ### 4. `MqttPublisher.publishDiscovery` — register the entity
 
@@ -441,10 +474,13 @@ local wake-word path. Both fit cleanly on the same pipeline:
 
 - `MqttPublisher.handleCommand "timer"` — start/cancel a named timer on the
   device; ring on completion via the same `SoundPlayer`.
-- `MqttPublisher.handleCommand "speak"` — local TTS via Android's built-in
-  engine.
 - A `wake_active` binary sensor — exposes the device's mic-listening state to
   HA so the Assist conversation agent can be gated on it.
+
+**Shipped since:** local TTS. It landed as the payload's `speak` field rather than a
+separate `speak` command — bundling it into `notify` is what the "keep the JSON shape
+uniform" note below was asking for, and it means one automation can post a toast and say
+it out loud in a single publish.
 
 Keep the JSON-payload shape consistent across these so HA automations feel
 uniform; bundle new fields under the same `data:` dict that `notify` already uses.

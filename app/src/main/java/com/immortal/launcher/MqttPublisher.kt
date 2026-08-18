@@ -13,7 +13,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
-import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -422,56 +421,21 @@ class MqttPublisher(private val appContext: Context) {
    * Dispatch a target string without touching any entity state. Same grammar as [openTarget]
    * (full URL, installed package name, or bare HA dashboard path). Returns true when a target
    * was launched, false for a blank or unroutable input (e.g. no HA app installed for a path).
+   * The grammar itself lives in [NotifyDispatch] so notify taps and the fleet agent route the
+   * same way.
    */
-  private fun routeTarget(payload: String): Boolean {
-    val t = payload.trim()
-    if (t.isBlank()) return false
-    val pm = appContext.packageManager
-    when {
-      t.startsWith("http://") || t.startsWith("https://") || t.startsWith("homeassistant://") ->
-          appContext.startActivity(
-              Intent(Intent.ACTION_VIEW, Uri.parse(t)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-      pm.getLaunchIntentForPackage(t) != null ->
-          appContext.startActivity(pm.getLaunchIntentForPackage(t)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-      else -> {
-        val pkg = ScreensaverDismiss.installedHaPackage(appContext) ?: return false
-        appContext.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(ScreensaverDismiss.haDeepLink(t)))
-                .setPackage(pkg)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-      }
-    }
-    return true
-  }
+  private fun routeTarget(payload: String): Boolean =
+      NotifyDispatch.routeTarget(appContext, payload)
 
   /**
-   * Render a notify payload (toast + optional sound). Schema: [NotifyPayload]; behavior
-   * rules: `docs/design/mqtt-notifications.md`. The handler is forgiving — malformed JSON
-   * is a silent no-op; partial payloads use defaults.
+   * Render a notify payload (toast + optional sound + optional speech). Schema:
+   * [NotifyPayload]; delivery: [NotifyDispatch]; behavior rules:
+   * `docs/design/mqtt-notifications.md`. The handler is forgiving — malformed JSON is a
+   * silent no-op; partial payloads use defaults.
    */
   private fun handleNotify(raw: String) {
     val spec = NotifyPayload.parse(raw) ?: return // empty/malformed/no-op
-    if (spec.hasVisual) {
-      // wake_screen defaults to true. Always call wake when requested — idempotent if the
-      // device is already interactive, dismisses the photo dream if it's in front (PowerManager
-      // reports isInteractive=true while dreaming, so a screen-on check alone misses it; and
-      // PresenceHub.current.screen only reflects THIS process's dream service, which doesn't
-      // help if a sibling package owns the active dream). 3s auto-release wake lock, no harm.
-      if (spec.wakeScreen) ScreenControl.wake(appContext)
-      val tap: (() -> Unit)? = spec.onTap?.let { target -> { routeTarget(target) } }
-      NotificationOverlay.show(spec, tap)
-    }
-    if (!spec.sound.isNullOrBlank()) {
-      val nm =
-          appContext.getSystemService(Context.NOTIFICATION_SERVICE)
-              as? android.app.NotificationManager
-      val dndOff =
-          nm == null ||
-              nm.currentInterruptionFilter ==
-                  android.app.NotificationManager.INTERRUPTION_FILTER_ALL
-      if (dndOff) SoundPlayer.play(appContext, spec.sound, spec.volume)
-      else Log.i(TAG, "DND active; suppressing notify sound")
-    }
+    NotifyDispatch.deliver(appContext, spec)
   }
 
   // --- state (device → broker) ------------------------------------------------
