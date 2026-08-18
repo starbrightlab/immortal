@@ -1021,24 +1021,23 @@ internal fun MqttScreen(onBack: () -> Unit) {
       }
       if (enabled) {
         Spacer(Modifier.size(26.dp))
-        SectionLabel("Sensors")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("Sensors", userLang))
         Card {
           Row(
               modifier = Modifier.fillMaxWidth().padding(18.dp),
               verticalAlignment = Alignment.CenterVertically,
           ) {
             Column(modifier = Modifier.weight(1f)) {
-              Text("Ambient sensors", color = Color.White, fontSize = 15.sp)
+              Text(com.immortal.launcher.i18n.I18n.translate("Ambient sensors", userLang), color = Color.White, fontSize = 15.sp)
               Text(
-                  "Publish this Portal's ambient sensors (temperature, light) to Home Assistant. " +
-                      "Only sensors this model actually has will appear.",
+                  com.immortal.launcher.i18n.I18n.translate("Publish this Portal's ambient sensors (temperature, light) to Home Assistant. Only sensors this model actually has will appear.", userLang),
                   color = Color(0xFF9A9A9A),
                   fontSize = 13.sp,
                   modifier = Modifier.padding(top = 2.dp),
               )
             }
             Segmented(
-                options = listOf("Off" to "off", "On" to "on"),
+                options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
                 selected = if (ambientSensors) "on" else "off",
                 onSelect = {
                   ambientSensors = it == "on"
@@ -1049,7 +1048,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
           if (ambientSensors) {
             Divider()
             Stepper(
-                label = "Temperature offset",
+                label = com.immortal.launcher.i18n.I18n.translate("Temperature offset", userLang),
                 valueText = "${if (tempOffset > 0) "+" else ""}$tempOffset °C",
                 onMinus = {
                   tempOffset = (tempOffset - 1).coerceAtLeast(MqttConfig.TEMP_OFFSET_MIN)
@@ -1061,8 +1060,7 @@ internal fun MqttScreen(onBack: () -> Unit) {
                 },
             )
             Text(
-                "Correct the temperature reading. A sensor inside a powered device reads its own " +
-                    "heat, so it usually runs a few degrees warm.",
+                com.immortal.launcher.i18n.I18n.translate("Correct the temperature reading. A sensor inside a powered device reads its own heat, so it usually runs a few degrees warm.", userLang),
                 color = Color(0xFF7C7C7C),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
@@ -1070,25 +1068,23 @@ internal fun MqttScreen(onBack: () -> Unit) {
           }
         }
         Spacer(Modifier.size(26.dp))
-        SectionLabel("Camera")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("Camera", userLang))
         Card {
           Row(
               modifier = Modifier.fillMaxWidth().padding(18.dp),
               verticalAlignment = Alignment.CenterVertically,
           ) {
             Column(modifier = Modifier.weight(1f)) {
-              Text("Camera", color = Color.White, fontSize = 15.sp)
+              Text(com.immortal.launcher.i18n.I18n.translate("Camera", userLang), color = Color.White, fontSize = 15.sp)
               Text(
-                  "Let Home Assistant use this Portal's camera. Only switchable here - Home " +
-                      "Assistant can't turn it on - and a badge stays on screen the whole time " +
-                      "the camera is live.",
+                  com.immortal.launcher.i18n.I18n.translate("Let Home Assistant use this Portal's camera. Only switchable here - Home Assistant can't turn it on - and a badge stays on screen the whole time the camera is live.", userLang),
                   color = Color(0xFF9A9A9A),
                   fontSize = 13.sp,
                   modifier = Modifier.padding(top = 2.dp),
               )
             }
             Segmented(
-                options = listOf("Off" to "off", "On" to "on"),
+                options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
                 selected = if (cameraEnabled) "on" else "off",
                 onSelect = {
                   cameraEnabled = it == "on"
@@ -1103,17 +1099,16 @@ internal fun MqttScreen(onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
               Column(modifier = Modifier.weight(1f)) {
-                Text("Camera sound", color = Color.White, fontSize = 15.sp)
+                Text(com.immortal.launcher.i18n.I18n.translate("Camera sound", userLang), color = Color.White, fontSize = 15.sp)
                 Text(
-                    "Include sound in the video stream. Muting the microphone silences it, and " +
-                        "an intercom announcement takes the microphone back.",
+                    com.immortal.launcher.i18n.I18n.translate("Include sound in the video stream. Muting the microphone silences it, and an intercom announcement takes the microphone back.", userLang),
                     color = Color(0xFF9A9A9A),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 2.dp),
                 )
               }
               Segmented(
-                  options = listOf("Off" to "off", "On" to "on"),
+                  options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
                   selected = if (cameraAudio) "on" else "off",
                   onSelect = {
                     cameraAudio = it == "on"
@@ -1132,18 +1127,16 @@ internal fun MqttScreen(onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
               Column(modifier = Modifier.weight(1f)) {
-                Text("Stream video now", color = Color.White, fontSize = 15.sp)
+                Text(com.immortal.launcher.i18n.I18n.translate("Stream video now", userLang), color = Color.White, fontSize = 15.sp)
                 Text(
-                    "Start the live RTSP stream from here as well as from Home Assistant. " +
-                        "Play it at rtsp://127.0.0.1:8554/ on this Portal, or at the Portal's " +
-                        "own address from elsewhere. Stops on reboot.",
+                    com.immortal.launcher.i18n.I18n.translate("Start the live RTSP stream from here as well as from Home Assistant. Play it at rtsp://127.0.0.1:8554/ on this Portal, or at the Portal's own address from elsewhere. Stops on reboot.", userLang),
                     color = Color(0xFF9A9A9A),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 2.dp),
                 )
               }
               Segmented(
-                  options = listOf("Off" to "off", "On" to "on"),
+                  options = listOf(com.immortal.launcher.i18n.I18n.translate("Off", userLang) to "off", com.immortal.launcher.i18n.I18n.translate("On", userLang) to "on"),
                   selected = if (streaming) "on" else "off",
                   onSelect = {
                     streaming = it == "on"
