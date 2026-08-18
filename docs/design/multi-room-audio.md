@@ -162,7 +162,7 @@ precise about *where* the occupancy signal comes from. There are two viable sour
 **Portal-local proxy** (good enough for the common case, free) and **Home Assistant occupancy
 sensors** (authoritative, decoupled) — and one that's genuinely closed to us.
 
-### What's closed: reading Meta's presence directly
+### What's closed: *asking* for Meta's presence directly
 
 We tore apart the native `Photos_superframe.apk` (and the `aloha-gen1` system dump) to settle
 this. Meta's presence is **front-camera computer vision**, not a discrete sensor:
@@ -184,8 +184,21 @@ Access is **platform-signature-gated**. The provider/service require
 presence; an unprivileged, non-root third-party app **cannot** — directly. That part of the
 old `DreamPolicy` comment was right.
 
-What was *overstated* was concluding presence is therefore unachievable. We can't read Meta's
-signal, but we already receive events **derived** from it, and that's enough for the baseline.
+What was *overstated* was concluding presence is therefore unachievable. Two ways round it, and
+we now use both:
+
+- **The detector talks even though it won't answer.** `PresenceManager` (Aloha) logs a heartbeat
+  roughly every 30s *while it sees a person*, and goes quiet when the room empties. Tailing that
+  with `READ_LOGS` — a development permission the provisioning kit already grants for the fleet
+  agent — gives the real signal, liveness-of-beat rather than any API. That's
+  `PortalPresenceMonitor`, owned app-wide by `PortalPresenceDetector`, and its verdict overrides
+  the proxy below in `PresenceHub` whenever it's talking. `PresenceState.source` reports which
+  answered.
+- **The events derived from it.** The proxy below, which remains the fallback for devices without
+  the grant, or where those log tags never appear.
+
+So the signature gate is real and unchanged — nothing here reads the provider or the CV service.
+What it gates is the *interface*, not the information.
 
 ### What's open: the presence-derived proxy (Portal-local, free)
 

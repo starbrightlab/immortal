@@ -64,16 +64,6 @@ object MqttConfig {
   fun setValidateCert(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("validate_cert", on).apply()
 
-  /**
-   * Publish the presence sensor from Meta's own camera detector ([PortalPresenceMonitor]) rather
-   * than the dream/sleep proxy. On by default: it needs no permission the provisioning kit
-   * doesn't already grant, and it degrades to the proxy on its own when the log stays quiet.
-   */
-  fun portalPresence(c: Context): Boolean = prefs(c).getBoolean("portal_presence", true)
-
-  fun setPortalPresence(c: Context, on: Boolean) =
-      prefs(c).edit().putBoolean("portal_presence", on).apply()
-
   /** Publish the Portal's ambient sensors (temperature, light, …) as Home Assistant entities. */
   fun ambientSensors(c: Context): Boolean = prefs(c).getBoolean("ambient_sensors", true)
 

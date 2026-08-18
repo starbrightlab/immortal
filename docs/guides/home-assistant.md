@@ -94,9 +94,9 @@ automation:
   host/port/login on the Portal are correct; watch the status line for a connection error.
 - **Screen control does nothing** — the screen-off **device admin** must be granted (the
   [provisioning kit](../provisioning.md) does this; you can also enable it in Immortal settings).
-- **Presence says `proxy`, not `portal`** — the log-reading detector needs the `READ_LOGS`
-  permission. The provisioning kit grants it, so re-run the provisioner on a Portal set up before
-  that grant existed.
+- **Presence says `proxy`, not `portal`** — check **Use the Portal's own detector** is on under
+  Settings → Immortal, then the `READ_LOGS` permission. The provisioning kit grants it, so re-run
+  the provisioner on a Portal set up before that grant existed.
 - **No temperature entity** — not every Portal has an ambient temperature sensor. Entities are only
   advertised for hardware the device actually reports, so a missing one means the sensor isn't
   there.

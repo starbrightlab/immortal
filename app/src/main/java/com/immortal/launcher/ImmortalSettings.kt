@@ -52,6 +52,12 @@ object ImmortalSettings {
       // Mini-player in the home header (cover art + controls), shown only while
       // something is actually playing. Defaults on — useful to everyone, unobtrusive.
       val showMiniPlayer: Boolean = true,
+      // Read presence from Meta's own camera detector (PortalPresenceMonitor) rather than
+      // inferring it from the screensaver's dream/sleep lifecycle. App-wide, not Home
+      // Assistant-specific: the fleet agent and the multi-room companion read the same
+      // PresenceHub. On by default — it needs no permission provisioning doesn't already
+      // grant, and falls back to the proxy on its own when the detector stays quiet.
+      val portalPresence: Boolean = true,
       // Hide the system status bar (immersive). Default on — the clean wall-frame look,
       // and what provisioning seeds; swipe from the top still reveals it transiently.
       val hideStatusBar: Boolean = true,
@@ -84,6 +90,7 @@ object ImmortalSettings {
         weatherWidget = p.getString("weather_widget", WIDGET_OFF) ?: WIDGET_OFF,
         clockFormat = p.getString("clock_format", CLOCK_AUTO) ?: CLOCK_AUTO,
         showMiniPlayer = p.getBoolean("show_mini_player", true),
+        portalPresence = p.getBoolean("portal_presence", true),
         hideStatusBar = p.getBoolean("hide_status_bar", true),
         constrainPageWidth = p.getBoolean("constrain_page_width", false),
         multiRoomEnabled = p.getBoolean("multiroom_enabled", false),
@@ -93,6 +100,11 @@ object ImmortalSettings {
         maPassword = p.getString("ma_password", "") ?: "",
     )
   }
+
+  fun portalPresence(c: Context): Boolean = prefs(c).getBoolean("portal_presence", true)
+
+  fun setPortalPresence(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("portal_presence", on).apply()
 
   fun multiRoomEnabled(c: Context): Boolean = prefs(c).getBoolean("multiroom_enabled", false)
 

@@ -711,7 +711,6 @@ internal fun MqttScreen(onBack: () -> Unit) {
   var pass by remember { mutableStateOf(MqttConfig.password(context)) }
   var useTls by remember { mutableStateOf(MqttConfig.useTls(context)) }
   var validateCert by remember { mutableStateOf(MqttConfig.validateCert(context)) }
-  var portalPresence by remember { mutableStateOf(MqttConfig.portalPresence(context)) }
   var ambientSensors by remember { mutableStateOf(MqttConfig.ambientSensors(context)) }
   var tempOffset by remember { mutableStateOf(MqttConfig.tempOffset(context)) }
   // MqttStatus is a plain holder updated off the main thread, so poll it for live
@@ -746,7 +745,6 @@ internal fun MqttScreen(onBack: () -> Unit) {
    * they apply with `reconfigure` — a plain sync would no-op against a service already running.
    */
   fun applySensors() {
-    MqttConfig.setPortalPresence(context, portalPresence)
     MqttConfig.setAmbientSensors(context, ambientSensors)
     MqttConfig.setTempOffset(context, tempOffset)
     MqttService.sync(context, reconfigure = true)
@@ -979,30 +977,6 @@ internal fun MqttScreen(onBack: () -> Unit) {
         Spacer(Modifier.size(26.dp))
         SectionLabel("Sensors")
         Card {
-          Row(
-              modifier = Modifier.fillMaxWidth().padding(18.dp),
-              verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Column(modifier = Modifier.weight(1f)) {
-              Text("Use the Portal's own detector", color = Color.White, fontSize = 15.sp)
-              Text(
-                  "Report presence from Meta's own camera detection instead of guessing from " +
-                      "the screensaver. Falls back on its own if the Portal isn't reporting it.",
-                  color = Color(0xFF9A9A9A),
-                  fontSize = 13.sp,
-                  modifier = Modifier.padding(top = 2.dp),
-              )
-            }
-            Segmented(
-                options = listOf("Off" to "off", "On" to "on"),
-                selected = if (portalPresence) "on" else "off",
-                onSelect = {
-                  portalPresence = it == "on"
-                  applySensors()
-                },
-            )
-          }
-          Divider()
           Row(
               modifier = Modifier.fillMaxWidth().padding(18.dp),
               verticalAlignment = Alignment.CenterVertically,

@@ -96,6 +96,34 @@ object PortalPresenceLog {
 }
 
 /**
+ * Owns the one [PortalPresenceMonitor] for the process, so presence improves for everything that
+ * reads [PresenceHub] — the Home Assistant entity, the fleet agent's `/info`, and the multi-room
+ * companion — rather than only while a broker happens to be connected.
+ *
+ * Started from [ImmortalApp] and re-synced when the setting changes. [sync] is the whole API:
+ * call it, and the monitor runs iff the user wants it (and `READ_LOGS` allows it).
+ */
+object PortalPresenceDetector {
+  private var monitor: PortalPresenceMonitor? = null
+
+  /** Start or stop the detector to match the setting. Safe to call repeatedly. */
+  @Synchronized
+  fun sync(context: Context) {
+    val app = context.applicationContext
+    if (!ImmortalSettings.portalPresence(app)) {
+      monitor?.stop()
+      monitor = null
+      return
+    }
+    if (monitor != null) return
+    val m = PortalPresenceMonitor(app) { PresenceHub.onPortalPresence(app, it) }
+    // start() returns false without READ_LOGS; drop the instance so a later sync retries (the
+    // grant can arrive between runs, when the provisioning kit is re-run).
+    if (m.start()) monitor = m
+  }
+}
+
+/**
  * Runs [PortalPresenceLog] against a live `logcat` process and reports transitions to
  * [PresenceHub]. Owns two daemon threads — one blocked on the log stream, one on a timer that
  * ages the last beat out — mirroring the shape of [MqttPublisher]'s worker/pinger pair.

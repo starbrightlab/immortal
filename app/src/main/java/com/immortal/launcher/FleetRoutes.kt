@@ -91,7 +91,11 @@ class FleetRoutes(private val context: Context) {
                 JSONObject()
                     .put("presence", p.presence.name)
                     .put("screen", p.screen.name)
-                    .put("confident", p.confident))
+                    .put("confident", p.confident)
+                    // Which detector answered: "PORTAL" is Meta's own camera detection, "PROXY"
+                    // the dream/sleep inference. Without it a fleet operator can't tell a real
+                    // reading from an inferred one.
+                    .put("source", p.source.name))
             .put(
                 "install",
                 JSONObject()

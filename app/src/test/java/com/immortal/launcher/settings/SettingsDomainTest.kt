@@ -364,7 +364,6 @@ class SettingsDomainTest {
             "password",
             "useTls",
             "validateCert",
-            "portalPresence",
             "ambientSensors",
             "tempOffset"),
         SettingsDomains.mqtt.specs.map { it.key }.toSet())

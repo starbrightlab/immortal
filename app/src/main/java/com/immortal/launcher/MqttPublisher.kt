@@ -55,18 +55,15 @@ class MqttPublisher(private val appContext: Context) {
   private val audio by lazy { appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
   /**
-   * The Portal's ambient sensors, and Meta's own presence detector. Both are owned by the
-   * publisher rather than the app: they exist to feed Home Assistant, so they run exactly while
-   * a broker is connected and cost an un-configured device nothing. (The presence monitor also
-   * improves [PresenceHub] for the screensaver as a side effect, for as long as it's running.)
+   * The Portal's ambient sensors. Owned by the publisher rather than the app because they exist
+   * only to feed Home Assistant entities: they run exactly while a broker is connected, and cost
+   * an un-configured device nothing. (Presence is the opposite case — every [PresenceHub] reader
+   * wants it — so that one lives in [PortalPresenceDetector], app-wide.)
    */
   private val ambient by lazy {
     AmbientSensors(appContext) { kind, value ->
       client?.publish("$base/${kind.key}/state", value, retain = true)
     }
-  }
-  private val portalPresence by lazy {
-    PortalPresenceMonitor(appContext) { PresenceHub.onPortalPresence(appContext, it) }
   }
 
   private val presenceListener = PresenceHub.Listener { st -> runCatching { publishPresence(st) } }
@@ -135,8 +132,6 @@ class MqttPublisher(private val appContext: Context) {
     val c = client ?: return
     Thread {
           runCatching {
-                if (MqttConfig.portalPresence(appContext)) portalPresence.start()
-                else portalPresence.stop()
                 ambient.stop()
                 if (MqttConfig.ambientSensors(appContext)) ambient.start()
                 publishDiscovery(c)
@@ -271,12 +266,10 @@ class MqttPublisher(private val appContext: Context) {
     publishScreen()
     publishIp()
     publishAudioState()
-    if (MqttConfig.portalPresence(appContext)) portalPresence.start()
     if (MqttConfig.ambientSensors(appContext)) ambient.start()
   }
 
   private fun detach() {
-    runCatching { portalPresence.stop() }
     runCatching { ambient.stop() }
     runCatching { PresenceHub.removeListener(presenceListener) }
     runCatching { NowPlayingHub.removeListener(nowPlayingListener) }

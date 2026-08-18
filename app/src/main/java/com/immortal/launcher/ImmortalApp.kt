@@ -37,6 +37,10 @@ class ImmortalApp : Application() {
     // (broadcast). DREAMING_STOPPED stays here because it also drives the frame relaunch, and
     // we feed its verdict into the hub from DreamPolicy.
     PresenceHub.init(this)
+    // Meta's own camera detector, read off the system log. Overrides the dream/sleep proxy above
+    // whenever it's talking, so every PresenceHub reader gets the real signal — not just Home
+    // Assistant. No-op without the READ_LOGS grant or with the setting off.
+    PortalPresenceDetector.sync(this)
     // Read the device's native media session (whatever's playing) into NowPlayingHub
     // for the screensaver card + header mini-player. Dormant until our notification
     // listener is enabled — done at provisioning (`cmd notification allow_listener`);

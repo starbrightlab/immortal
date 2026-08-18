@@ -24,6 +24,7 @@ import com.immortal.launcher.FleetConfig
 import com.immortal.launcher.FleetScreensaver
 import com.immortal.launcher.FrameMode
 import com.immortal.launcher.PhotoFramePreviewActivity
+import com.immortal.launcher.PortalPresenceDetector
 import com.immortal.launcher.ScreensaverDismiss
 import com.immortal.launcher.ScreensaverDismissAppActivity
 import com.immortal.launcher.ScreensaverSourcesActivity
@@ -576,6 +577,16 @@ object SettingsDomains {
                       help =
                           "Cap the home screen width on large landscape displays instead of filling the whole panel. Off by default."),
                   BoolSpec(
+                      "portalPresence",
+                      "Use the Portal's own detector",
+                      get = { it.portalPresence },
+                      set = ImmortalSettings::setPortalPresence,
+                      help =
+                          "Detect whether anyone's in the room using the Portal's own camera " +
+                              "detection instead of guessing from the screensaver. Used by Home " +
+                              "Assistant, the fleet tools and multi-room audio. Falls back on its " +
+                              "own if the Portal isn't reporting it."),
+                  BoolSpec(
                       "multiRoomEnabled",
                       "Multi-room audio",
                       get = { it.multiRoomEnabled },
@@ -619,6 +630,7 @@ object SettingsDomains {
                   "hideStatusBar" to "Home screen",
                   "constrainPageWidth" to "Home screen",
                   "clockFormat" to "Clock",
+                  "portalPresence" to "Presence",
                   "multiRoomEnabled" to "Audio",
                   "snapcastHost" to "Audio",
                   "maPort" to "Audio",
@@ -627,6 +639,7 @@ object SettingsDomains {
           defaults = { ImmortalSettings.Settings() },
           onApplied = { c, keys ->
             if ("hideStatusBar" in keys) SettingsGuard.applyStatusBar(c)
+            if ("portalPresence" in keys) PortalPresenceDetector.sync(c)
             if (keys.any { it in setOf("multiRoomEnabled", "snapcastHost", "maPort", "maUsername", "maPassword") })
                 MultiRoomService.sync(c)
           },
@@ -695,16 +708,6 @@ object SettingsDomains {
                       set = MqttConfig::setValidateCert,
                       visible = { c, _ -> MqttConfig.isEnabled(c) && MqttConfig.useTls(c) }),
                   BoolSpec(
-                      "portalPresence",
-                      "Use the Portal's own detector",
-                      get = { MqttConfig.portalPresence(it) },
-                      set = MqttConfig::setPortalPresence,
-                      help =
-                          "Report presence from Meta's own camera detection instead of guessing " +
-                              "from the screensaver. Falls back on its own if the Portal isn't " +
-                              "reporting it.",
-                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
-                  BoolSpec(
                       "ambientSensors",
                       "Ambient sensors",
                       get = { MqttConfig.ambientSensors(it) },
@@ -734,7 +737,6 @@ object SettingsDomains {
                   "password" to "Broker",
                   "useTls" to "Security",
                   "validateCert" to "Security",
-                  "portalPresence" to "Sensors",
                   "ambientSensors" to "Sensors",
                   "tempOffset" to "Sensors"),
           onApplied = { c, keys ->
@@ -749,7 +751,7 @@ object SettingsDomains {
             }
             // These are read by the running publisher, not just at connect time, so tell it to
             // re-read them — a plain sync() would no-op against an already-running service.
-            val live = keys.any { it in setOf("portalPresence", "ambientSensors", "tempOffset") }
+            val live = keys.any { it in setOf("ambientSensors", "tempOffset") }
             MqttService.sync(c, reconfigure = live)
           },
       )

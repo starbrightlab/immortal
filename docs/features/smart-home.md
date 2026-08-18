@@ -41,8 +41,10 @@ Silence is never read as an empty room: until a first heartbeat arrives the log 
 nothing at all and the proxy stays in charge, so a Portal that never reports presence doesn't sit
 in Home Assistant claiming the room is permanently empty.
 
-Turn it off with **Use the Portal's own detector** under Settings → Home Assistant (MQTT) to go
-back to the proxy.
+Turn it off with **Use the Portal's own detector** under **Settings → Immortal** to go back to the
+proxy. It lives there rather than under Home Assistant because it isn't MQTT-specific: the
+[fleet agent](fleet.md) and [multi-room audio](multi-room-audio.md) read the same presence signal,
+so they get the better reading too — whether or not Home Assistant is set up.
 
 ## Ambient sensors
 
