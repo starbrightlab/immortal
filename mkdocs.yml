@@ -86,3 +86,4 @@ nav:
       - Submitting an app: submitting-apps.md
   - Design notes:
       - Multi-room audio: design/multi-room-audio.md
+      - Camera streaming: design/camera-streaming.md
