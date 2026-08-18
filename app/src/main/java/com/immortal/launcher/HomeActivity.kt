@@ -657,6 +657,9 @@ private fun LauncherScreen(
   var foldCandidate by remember { mutableStateOf<String?>(null) }
   var foldTarget by remember { mutableStateOf<String?>(null) }
   var moveTick by remember { mutableStateOf(0) }
+  // Where the current dwell started. Movement within HomeFold.TOLERANCE_DP of this doesn't count
+  // as the user moving on, so a resting finger's jitter can't keep restarting the timer.
+  var dwellAnchor by remember { mutableStateOf<Offset?>(null) }
 
   fun persist() = UserLayout.save(context, assignments.toMap())
   fun replaceAssignments(next: Map<String, String>) {
@@ -716,6 +719,7 @@ private fun LauncherScreen(
     if (!editMode) editMode = true
     dragKey = key
     dragPos = clampToGrid(win)
+    dwellAnchor = dragPos
     dragOriginalSlots = gridSlots
   }
   fun moveTileDrag(amount: Offset) {
@@ -730,34 +734,52 @@ private fun LauncherScreen(
           dragPos.x < bounds.left + width * 0.14f -> -1
           else -> 0
         }
-    // Any movement restarts the dwell timer and drops the fold highlight; only a pause re-arms it.
-    moveTick++
-    foldTarget = null
-    val src = dragKey ?: return
-    val tgtIdx = targetSlotAt(dragPos)
-    if (tgtIdx == null) {
-      foldCandidate = null
-      return
+    // Real movement restarts the dwell timer and drops the fold highlight; only a pause re-arms
+    // it. "Real" is the operative word: pointer changes are reported for a single pixel, so
+    // restarting on every sample meant a held finger's tremor reset the timer forever and a fold
+    // could never arm. See HomeFold.movedEnough.
+    val tolerancePx =
+        with(context.resources.displayMetrics) { HomeFold.TOLERANCE_DP * density }
+    val anchor = dwellAnchor
+    if (HomeFold.movedEnough(anchor?.x, anchor?.y, dragPos.x, dragPos.y, tolerancePx)) {
+      dwellAnchor = dragPos
+      moveTick++
+      foldTarget = null
     }
-    val tgt = gridSlots.getOrNull(tgtIdx)
+    val src = dragKey ?: return
     // Dwell-to-fold: remember the app we're passing directly over so a pause here can arm a new
-    // folder. Anything else under the finger (folder, widget, built-in, blank) clears the candidate.
-    foldCandidate = if (src.startsWith(APP_KEY) && tgt != null && tgt.startsWith(APP_KEY)) tgt else null
+    // folder. Anything else under the finger (folder, widget, built-in, blank) clears the
+    // candidate — but the gutter BETWEEN tiles doesn't, since it hit-tests as nothing and says
+    // nothing about intent. Clearing there is what broke folder creation.
+    val tgtIdx = targetSlotAt(dragPos)
+    foldCandidate =
+        HomeFold.nextCandidate(src, tgtIdx, tgtIdx?.let { gridSlots.getOrNull(it) }, foldCandidate)
     // Do not mutate the grid during pointer movement. The old live-swap behaviour could process
     // dozens of overlapping targets in one gesture and visually scramble the desktop. A single
     // deterministic swap is committed in endTileDrag only after a valid drop.
+  }
+  /**
+   * Commit an armed dwell-to-fold, if there is one, and report whether it took. Shared by the
+   * normal drop AND the cancel path: the Portal reports a cancel for a brief finger-off-screen,
+   * and discarding a fold the user already held a second for is indistinguishable from "folders
+   * don't work".
+   */
+  fun commitArmedFold(src: String?): Boolean {
+    val armed = foldTarget
+    if (src == null || armed == null || !HomeFold.canFold(src, armed)) return false
+    // Restore the pre-drag slots; the reconcile effect removes both apps and adds the named
+    // folder tile once the name overlay is confirmed.
+    dragOriginalSlots?.let { gridSlots = it }
+    UserLayout.saveGridSlots(context, gridSlots)
+    pendingPair = src.removePrefix(APP_KEY) to armed.removePrefix(APP_KEY)
+    return true
   }
   fun endTileDrag() {
     edgeDir = 0
     val src = dragKey
     if (src != null) {
-      val armed = foldTarget
-      if (src.startsWith(APP_KEY) && armed != null && armed.startsWith(APP_KEY) && armed != src) {
-        // Dwell-to-fold: the app rested on another app — make a folder from the pair. Restore the
-        // pre-drag slots; the reconcile effect removes both apps and adds the named folder tile.
-        dragOriginalSlots?.let { gridSlots = it }
-        UserLayout.saveGridSlots(context, gridSlots)
-        pendingPair = src.removePrefix(APP_KEY) to armed.removePrefix(APP_KEY)
+      if (commitArmedFold(src)) {
+        // Folded — nothing else to do with this drop.
       } else {
         val tgtIdx = targetSlotAt(dragPos)
         val tgt = tgtIdx?.let { gridSlots.getOrNull(it) }
@@ -780,15 +802,19 @@ private fun LauncherScreen(
     dragOriginalSlots = null
     foldTarget = null
     foldCandidate = null
+    dwellAnchor = null
   }
   fun cancelTileDrag() {
     // A cancelled gesture is transactional: restore the exact pre-drag layout and persist nothing.
+    // The exception is an armed fold, which survives — see commitArmedFold.
     edgeDir = 0
-    dragOriginalSlots?.let { gridSlots = it }
+    val src = dragKey
+    if (!commitArmedFold(src)) dragOriginalSlots?.let { gridSlots = it }
     dragKey = null
     dragOriginalSlots = null
     foldTarget = null
     foldCandidate = null
+    dwellAnchor = null
   }
   // Debounced page flip while a drag rests against a screen edge.
   LaunchedEffect(edgeDir) {
@@ -804,12 +830,14 @@ private fun LauncherScreen(
   // Dwell-to-fold: if a dragged app rests over another app for a beat, arm folder creation so the
   // release makes a folder (a quick pass-through just reorders). moveTick restarts this on every
   // movement, so the delay only completes once the finger holds still over the candidate.
-  LaunchedEffect(moveTick, dragKey) {
+  // Keyed on foldCandidate as well as moveTick: now that jitter no longer ticks moveTick, picking
+  // up a candidate can be the only thing that happens, and the timer still has to start then.
+  LaunchedEffect(moveTick, dragKey, foldCandidate) {
     val src = dragKey ?: return@LaunchedEffect
-    if (!src.startsWith(APP_KEY) || foldCandidate == null) return@LaunchedEffect
-    delay(FOLD_DWELL_MS)
-    val cand = foldCandidate
-    if (dragKey == src && cand != null && cand.startsWith(APP_KEY) && gridSlots.contains(cand)) {
+    val cand = foldCandidate ?: return@LaunchedEffect
+    if (!HomeFold.canFold(src, cand)) return@LaunchedEffect
+    delay(HomeFold.DWELL_MS)
+    if (dragKey == src && foldCandidate == cand && gridSlots.contains(cand)) {
       foldTarget = cand
     }
   }
@@ -1322,11 +1350,10 @@ private fun SlideToStop(onStop: () -> Unit) {
   }
 }
 
-private const val APP_KEY = "app:"
-private const val FOLDER_KEY = "folder:"
+private const val APP_KEY = HomeFold.APP_KEY
+private const val FOLDER_KEY = HomeFold.FOLDER_KEY
 private const val WIDGET_KEY = "widget-tile:"
 // How long a dragged app must rest over another app before the drop makes a folder (dwell-to-fold).
-private const val FOLD_DWELL_MS = 1000L
 private const val BUILTIN_CALLS = "builtin:calls"
 private const val BUILTIN_STORE = "builtin:store"
 private const val BUILTIN_TOOLS = "builtin:tools"

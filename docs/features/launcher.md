@@ -11,8 +11,10 @@ and is fully navigable by remote on the [Portal TV](portal-tv.md).
 ## The grid
 
 - **App grid** — your installed apps, fullscreen.
-- **Folders** — in Manage mode, drag one app onto another to make a folder. Name them, rename
-  them, and drag apps back out, just like a phone.
+- **Folders** — in Manage mode, drag one app onto another and **hold it there for a second**: the
+  app underneath outlines in white to show it's ready, and releasing makes a folder. Passing
+  straight over an app without pausing just reorders the grid instead. Name folders, rename them,
+  and drag apps back out, just like a phone.
 - **Manage mode** — remove apps (tap the ✕) and organise the grid.
 
 ## Header
