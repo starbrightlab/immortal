@@ -187,6 +187,8 @@ private fun ImmortalSettingsScreen() {
 
       MqttNavRow(onOpen = { context.startActivity(Intent(context, MqttActivity::class.java)) })
 
+      PushedNotificationsSection()
+
       RemoteNavRow()
 
       FeatureSettingsNavRow(
@@ -667,6 +669,40 @@ private fun MqttNavRow(onOpen: () -> Unit) {
       }
       Text("›", color = Color(0xFF7C7C7C), fontSize = 26.sp)
     }
+  }
+}
+
+/**
+ * The fleet agent's inbound-notification switch (`POST /notify` — a toast, a sound, and/or a
+ * spoken line pushed from anything on the LAN holding the agent token).
+ *
+ * On-device because it's a consent decision that belongs at the device: the token already lets a
+ * caller manage the Portal, but making it talk in the room is a separate yes. Hidden entirely
+ * while the fleet agent is off — there's no HTTP door for it to open then.
+ *
+ * Bespoke state rather than `SettingsList(SettingsDomains.fleet, …)`: that domain snapshots a
+ * `Context`, which doesn't recompose on toggle (the same reason MQTT keeps a bespoke screen). The
+ * registry spec still drives the phone remote, and both paths write the same [FleetConfig] field.
+ */
+@Composable
+private fun PushedNotificationsSection() {
+  val context = LocalContext.current
+  if (!FleetConfig.isEnabled(context)) return
+  var on by remember { mutableStateOf(FleetConfig.notifyEnabled(context)) }
+  Spacer(Modifier.size(26.dp))
+  SectionLabel("Notifications")
+  Card {
+    ToggleRow("Accept notifications from your network", on) {
+      on = it
+      FleetConfig.setNotifyEnabled(context, it)
+    }
+    Text(
+        "Let anything on your network with the agent token show a message on this Portal, or " +
+            "speak one aloud. Home Assistant notifications over MQTT are separate and unaffected.",
+        color = Color(0xFF9A9A9A),
+        fontSize = 13.sp,
+        modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+    )
   }
 }
 

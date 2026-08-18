@@ -829,10 +829,11 @@ object SettingsDomains {
       )
 
   /**
-   * Device identity. One control: the Portal's display name, shown in the phone remote's device
-   * switcher and used as the Home Assistant device name. HA `unique_id` and the MQTT topic path key
-   * off a separate stable device id ([MqttConfig.deviceId]), so renaming is cosmetic and safe.
-   * Bound to [FleetConfig], whose setter also rewrites the shell-readable fleet manifest.
+   * Device identity and the fleet agent's inbound-notification switch. The Portal's display name is
+   * shown in the phone remote's device switcher and used as the Home Assistant device name; HA
+   * `unique_id` and the MQTT topic path key off a separate stable device id ([MqttConfig.deviceId]),
+   * so renaming is cosmetic and safe. Bound to [FleetConfig], whose name setter also rewrites the
+   * shell-readable fleet manifest.
    */
   val fleet: SettingsDomain<Context> =
       SettingsDomain(
@@ -851,6 +852,19 @@ object SettingsDomains {
                       // Reject blank or over-long names; the trimmed form must be 1..48 chars.
                       applyWhen = { it.trim().length in 1..48 },
                       help = "Shown in the phone remote and in Home Assistant.",
+                  ),
+                  BoolSpec(
+                      "notifyEnabled",
+                      "Accept notifications from your network",
+                      get = { FleetConfig.notifyEnabled(it) },
+                      set = FleetConfig::setNotifyEnabled,
+                      // Only meaningful while the agent is listening — with the agent off there is
+                      // no HTTP door for the toggle to open.
+                      visible = { c, _ -> FleetConfig.isEnabled(c) },
+                      help =
+                          "Let anything on your network with the agent token show a message on " +
+                              "this Portal, or speak one aloud. Off by default. Home Assistant " +
+                              "notifications over MQTT are separate and unaffected.",
                   ),
               ),
       )

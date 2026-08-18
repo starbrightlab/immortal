@@ -93,8 +93,11 @@ private const val SHERPA_VOICE_PARAM = "sherpa_voice_name"
     }
   }
 
-  /** Speak an arbitrary phrase (e.g. "Pasta timer done") at full volume. */
-  fun announce(context: Context, text: String) = speak(context, text, volumeOverride = 1f)
+  /** Speak an arbitrary phrase (e.g. "Pasta timer done"). [volume] is 0.0-1.0 of the spoken
+   *  stream and defaults to full — an announcement you asked for shouldn't be capped by the
+   *  hourly-chime slider. A notify payload's `speak` passes its own volume through. */
+  fun announce(context: Context, text: String, volume: Float = 1f) =
+      speak(context, text, volumeOverride = volume.coerceIn(0f, 1f))
 
   /** Audition the currently selected spoken-time voice without using a clock phrase. */
   fun testVoice(context: Context, voiceName: String = ChimeConfig.load(context).spokenVoice) {
