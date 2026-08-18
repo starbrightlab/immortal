@@ -178,6 +178,48 @@ object ImmortalSettings {
   fun setWorldClockZones(c: Context, zones: List<String>) =
       prefs(c).edit().putString("world_clock_zones", zones.joinToString(",")).apply()
 
+  /**
+   * Custom display names for world-clock zones, keyed by IANA id ("Pacific/Auckland" → "Mum's").
+   * Only renamed zones appear; anything absent falls back to the city from the id. Stored as JSON
+   * because a label can contain a comma, which the zone list's own CSV format can't survive.
+   */
+  fun worldClockLabels(c: Context): Map<String, String> =
+      parseWorldClockLabels(prefs(c).getString("world_clock_labels", null))
+
+  /** Rename [zone], or clear the custom name when [label] is blank. */
+  fun setWorldClockLabel(c: Context, zone: String, label: String) {
+    val next = worldClockLabels(c).toMutableMap()
+    val trimmed = label.trim()
+    if (trimmed.isEmpty()) next.remove(zone) else next[zone] = trimmed
+    prefs(c).edit().putString("world_clock_labels", encodeWorldClockLabels(next)).apply()
+  }
+
+  /**
+   * Read the stored label map. Forgiving by design: unset, empty and malformed all mean "no custom
+   * names", because a broken pref should cost you your labels, not your clocks.
+   */
+  fun parseWorldClockLabels(raw: String?): Map<String, String> {
+    if (raw.isNullOrBlank()) return emptyMap()
+    return runCatching {
+          val o = org.json.JSONObject(raw)
+          o.keys()
+              .asSequence()
+              .mapNotNull { k -> o.optString(k).trim().takeIf { it.isNotEmpty() }?.let { k to it } }
+              .toMap()
+        }
+        .getOrDefault(emptyMap())
+  }
+
+  fun encodeWorldClockLabels(labels: Map<String, String>): String =
+      org.json.JSONObject(labels as Map<*, *>).toString()
+
+  /** The name to show for [zone]: the user's own, else the city from the IANA id. */
+  fun worldClockDisplayName(c: Context, zone: String): String =
+      worldClockLabels(c)[zone] ?: cityFromZoneId(zone)
+
+  /** "America/New_York" → "New York". */
+  fun cityFromZoneId(zone: String): String = zone.substringAfterLast('/').replace('_', ' ')
+
   fun setShowMiniPlayer(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("show_mini_player", on).apply()
 

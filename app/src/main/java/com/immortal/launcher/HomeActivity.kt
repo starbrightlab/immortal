@@ -2723,10 +2723,14 @@ private fun weatherGradient(code: Int, isDay: Boolean): Pair<Color, Color> {
 private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
   val context = androidx.compose.ui.platform.LocalContext.current
   var zones by remember { mutableStateOf(ImmortalSettings.worldClockZones(context)) }
+  var labels by remember { mutableStateOf(ImmortalSettings.worldClockLabels(context)) }
   val lifecycleOwner = LocalLifecycleOwner.current
   DisposableEffect(lifecycleOwner) {
     val obs = LifecycleEventObserver { _, e ->
-      if (e == Lifecycle.Event.ON_RESUME) zones = ImmortalSettings.worldClockZones(context)
+      if (e == Lifecycle.Event.ON_RESUME) {
+        zones = ImmortalSettings.worldClockZones(context)
+        labels = ImmortalSettings.worldClockLabels(context)
+      }
     }
     lifecycleOwner.lifecycle.addObserver(obs)
     onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
@@ -2739,27 +2743,35 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
     }
   }
   ImmortalWidgetShell(title = "World Clock", accent = Color(0xFFFFC857), modifier = modifier) {
+    // The row takes whatever height the shell has left after its title, and inside each column the
+    // name is measured first, so the clock gets the space that remains. Sizing the clock off the
+    // column's *width* instead (fillMaxWidth().aspectRatio(1f)) pushed the names past the bottom of
+    // the card, where they were clipped.
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().weight(1f),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
       zones.take(4).forEach { zone ->
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-          AnalogClock(zone, now, Modifier.fillMaxWidth().aspectRatio(1f))
+          Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            AnalogClock(zone, now, Modifier.fillMaxHeight().aspectRatio(1f))
+          }
           Spacer(Modifier.size(6.dp))
+          // One line: the clock's name, custom if it has one, else the city from its zone id.
+          // The offset and the underlying zone live in the world-clock settings screen, so the
+          // widget stays a row of clocks with names under them.
           Text(
-              worldClockLabel(zone),
+              labels[zone] ?: worldClockLabel(zone),
               color = Color.White,
               fontSize = 12.sp,
               fontWeight = FontWeight.Medium,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
           )
-          Text(worldClockOffset(zone, now), color = Color(0xFF9A9A9A), fontSize = 10.sp, maxLines = 1)
         }
       }
     }
@@ -2769,18 +2781,6 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
 /** Short city label from a tz id, e.g. "America/New_York" → "New York". */
 private fun worldClockLabel(zoneId: String): String =
     zoneId.substringAfterLast('/').replace('_', ' ')
-
-/** Offset of [zoneId] vs the device's zone, e.g. "+5h" / "-3h" / "same". */
-private fun worldClockOffset(zoneId: String, now: Date): String {
-  val local = TimeZone.getDefault().getOffset(now.time)
-  val there = TimeZone.getTimeZone(zoneId).getOffset(now.time)
-  val diffH = (there - local) / 3_600_000
-  return when {
-    diffH == 0 -> "same"
-    diffH > 0 -> "+${diffH}h"
-    else -> "${diffH}h"
-  }
-}
 
 /** A small analog clock face for [zoneId], white by day / dark by night, with an orange seconds hand. */
 @Composable
