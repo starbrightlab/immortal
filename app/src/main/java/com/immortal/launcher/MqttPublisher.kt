@@ -60,11 +60,6 @@ class MqttPublisher(private val appContext: Context) {
    * an un-configured device nothing. (Presence is the opposite case — every [PresenceHub] reader
    * wants it — so that one lives in [PortalPresenceDetector], app-wide.)
    */
-  /**
-   * Stills for Home Assistant. Consent is the device-side setting it reads; this object opens
-   * nothing until a snapshot is actually asked for. See docs/design/camera-streaming.md.
-   */
-  private val camera by lazy { PortalCameraCapture(appContext) }
   private val ambient by lazy {
     AmbientSensors(appContext) { kind, value ->
       client?.publish("$base/${kind.key}/state", value, retain = true)
@@ -375,34 +370,6 @@ class MqttPublisher(private val appContext: Context) {
             // right after a set, so re-reading it here desyncs the HA switch
             // (mutes only every other press).
             publishMicMute(on)
-          }
-          // Camera work blocks and must not run on main; the handler posts here, so hop off.
-          "snapshot" -> {
-            Thread {
-                  runCatching {
-                        val jpeg = camera.snapshot()
-                        when {
-                          jpeg == null -> Log.i(TAG, "snapshot unavailable")
-                          // A broker with a message size limit doesn't reject an oversize
-                          // PUBLISH, it drops the CONNECTION — taking presence, sensors and
-                          // everything else down with it, once per press. Never hand it one:
-                          // say so on the device instead, where the user can act on it.
-                          jpeg.size > MAX_IMAGE_BYTES -> {
-                            Log.w(TAG, "snapshot ${jpeg.size} bytes exceeds $MAX_IMAGE_BYTES; not publishing")
-                            camera.toast("Immortal · snapshot too large for the broker")
-                          }
-                          // retain = false on purpose: a still of someone's room should not sit on
-                          // the broker indefinitely for anyone who later subscribes.
-                          else -> client?.publish("$base/camera/image", jpeg, retain = false)
-                        }
-                      }
-                      .onFailure { Log.w(TAG, "snapshot failed", it) }
-                }
-                .apply {
-                  isDaemon = true
-                  name = "mqtt-snapshot"
-                  start()
-                }
           }
           // Streaming can only be switched on within consent already given on the device;
           // CameraStreamService.sync enforces that, and we report back what actually happened
@@ -745,21 +712,22 @@ class MqttPublisher(private val appContext: Context) {
     }
     switchEntity(c, "mic_mute", "Microphone mute", icon = "mdi:microphone-off")
 
-    // Camera stills, only while the user has switched the camera on for this Portal. Off (the
-    // default) clears both configs, so HA drops the entities rather than showing them dead.
+    // The camera, only while the user has switched it on for this Portal. Off (the default)
+    // clears the configs, so HA drops the entities rather than showing them dead.
     if (ImmortalSettings.cameraEnabled(appContext)) {
-      cameraEntity(c, "camera", "Camera")
-      button(c, "snapshot", "Take snapshot", icon = "mdi:camera")
       switchEntity(c, "camera_stream", "Camera streaming", icon = "mdi:video")
       switchEntity(c, "camera_audio", "Camera audio", icon = "mdi:volume-high")
       sensor(c, "stream_url", "Stream URL", icon = "mdi:link-variant", diagnostic = true)
     } else {
-      publishConfig(c, "camera", "camera", null)
-      publishConfig(c, "button", "snapshot", null)
       publishConfig(c, "switch", "camera_stream", null)
       publishConfig(c, "switch", "camera_audio", null)
       publishConfig(c, "sensor", "stream_url", null)
     }
+    // Unconditional: 1.69-1.71 published a still-image camera and a snapshot button. They are
+    // gone, and a retained discovery config outlives the version that wrote it — so clear them
+    // for everyone, or every Portal upgraded from those versions keeps two dead entities in HA.
+    publishConfig(c, "camera", "camera", null)
+    publishConfig(c, "button", "snapshot", null)
 
     button(c, "go_home", "Home", icon = "mdi:home")
     button(c, "screensaver", "Screensaver", icon = "mdi:image-multiple")
@@ -794,8 +762,8 @@ class MqttPublisher(private val appContext: Context) {
           "notify" to "notify",
           "button" to "identify",
           "sensor" to "ip",
-          "camera" to "camera",
-          "button" to "snapshot",
+          "camera" to "camera", // legacy (1.69-1.71 stills)
+          "button" to "snapshot", // legacy (1.69-1.71 stills)
           "switch" to "camera_stream",
           "switch" to "camera_audio",
           "sensor" to "stream_url",
@@ -942,20 +910,6 @@ class MqttPublisher(private val appContext: Context) {
     publishConfig(c, "notify", obj, cfg)
   }
 
-  /**
-   * HA's MQTT `camera` component: it renders whatever JPEG arrives on [topic]. Chosen over an
-   * HTTP endpoint because it needs no second auth story — it rides the broker we already trust,
-   * and it doesn't require the (opt-in) fleet agent to be running.
-   */
-  private fun cameraEntity(c: MqttClient, obj: String, name: String) {
-    val cfg =
-        base(obj, name)
-            .put("topic", "$base/$obj/image")
-            .put("availability_topic", "$base/availability")
-            .put("icon", "mdi:cctv")
-    publishConfig(c, "camera", obj, cfg)
-  }
-
   /** Publish (or, when [cfg] is null, clear) a retained discovery config. */
   private fun publishConfig(c: MqttClient, component: String, obj: String, cfg: JSONObject?) {
     c.publish("homeassistant/$component/immortal_$id/$obj/config", cfg?.toString() ?: "", retain = true)
@@ -990,11 +944,5 @@ class MqttPublisher(private val appContext: Context) {
     const val KEEPALIVE_SEC = 45
     const val PING_MS = 20_000L
     const val BACKOFF_MS = 4_000L
-    /**
-     * Biggest image we'll put on the wire. Mosquitto's `message_size_limit` and its equivalents
-     * are commonly set well below a full-quality still, and exceeding one costs the whole
-     * connection rather than just the message.
-     */
-    const val MAX_IMAGE_BYTES = 200_000
   }
 }

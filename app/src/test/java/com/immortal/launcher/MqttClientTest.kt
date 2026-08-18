@@ -135,14 +135,14 @@ class MqttClientTest {
   }
 
   /**
-   * A camera snapshot is tens of kilobytes, far past the 127-byte boundary where MQTT's
-   * remaining-length field stops fitting in one byte. Nothing covered the multi-byte varint
-   * before, so this pins it: the broker decodes the length we wrote and gets every byte back.
+   * MQTT's remaining-length field stops fitting in one byte at 127, and every other test here
+   * publishes something far smaller. This pins the multi-byte varint: the broker decodes the
+   * length we wrote and gets every byte back.
    */
   @Test
   fun publish_encodesAMultiByteRemainingLength() {
-    val payload = ByteArray(50_000) { (it % 251).toByte() } // ~a JPEG's worth
-    val topic = "immortal/abc/camera/image"
+    val payload = ByteArray(50_000) { (it % 251).toByte() }
+    val topic = "immortal/abc/big/state"
     val server = ServerSocket()
     server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0))
     var seenLen = -1

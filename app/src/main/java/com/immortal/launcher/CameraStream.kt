@@ -25,6 +25,29 @@ import android.util.Log
 import android.view.Surface
 import androidx.core.content.ContextCompat
 
+/**
+ * Choosing a capture size. Pure — the Camera2 plumbing around it can't be unit-tested on the
+ * JVM, but which of the offered sizes we ask for can be, and it's the part with a decision in it.
+ */
+object CameraSizes {
+  /**
+   * The largest offered size whose longest edge fits within [maxEdge], or — when everything on
+   * offer is bigger — the smallest size available.
+   *
+   * Bounded on purpose: this runs on Android 9 hardware with no `largeHeap`, often while the
+   * photo frame is also holding full-screen bitmaps, and a stream for a dashboard tile does not
+   * need the sensor's full resolution. Preferring the smallest when nothing fits keeps a device
+   * that only offers large sizes working rather than failing outright.
+   */
+  fun choose(offered: List<Pair<Int, Int>>, maxEdge: Int): Pair<Int, Int>? {
+    if (offered.isEmpty()) return null
+    val area = { s: Pair<Int, Int> -> s.first.toLong() * s.second.toLong() }
+    val longest = { s: Pair<Int, Int> -> maxOf(s.first, s.second) }
+    return offered.filter { longest(it) <= maxEdge }.maxByOrNull(area)
+        ?: offered.minByOrNull(area)
+  }
+}
+
 /** Encoder sizing decisions, kept pure so the numbers are reviewable without a device. */
 object StreamProfile {
   const val MIME = "video/avc"
@@ -62,13 +85,24 @@ object StreamProfile {
  * and the RTSP server puts them on the wire. Kept separate from that so the encoder can be
  * verified on a device before any of the network side exists.
  *
- * The camera is shared: a Portal call takes it, and [GestureCamera] and [PortalCameraCapture]
- * both want it too. Only one of those can hold it at a time, so streaming is mutually exclusive
- * with them by construction — whoever asks second fails, and fails softly.
+ * The camera is shared: a Portal call takes it, and [GestureCamera] wants it too. Only one
+ * holder at a time, so streaming is mutually exclusive with them by construction — whoever
+ * asks second fails, and fails softly.
+ *
+ * It can also be taken away mid-stream. Android 9 grants the camera only to the foreground
+ * app, so opening any other app on the Portal revokes ours with `ERROR_CAMERA_DISABLED`.
+ * That is not a fatal error and must not be treated as one: [onLost] reports it so the owner
+ * can take the camera back when it becomes available again.
  */
 class CameraStream(
     private val appContext: Context,
     private val onNals: (nals: List<ByteArray>, presentationTimeUs: Long, keyframe: Boolean) -> Unit,
+    /**
+     * The camera went away while we were using it — revoked because another app came to the
+     * front, unplugged, or claimed by a Portal call. Everything is already torn down by the time
+     * this runs, so the owner is free to call [start] again whenever it likes.
+     */
+    private val onLost: () -> Unit = {},
 ) {
   @Volatile private var running = false
   private var thread: HandlerThread? = null
@@ -133,6 +167,17 @@ class CameraStream(
           stop()
         }
         .getOrDefault(false)
+  }
+
+  /**
+   * Tear down after losing the camera, then tell the owner. Distinct from [stop] only in that
+   * last part: [stop] is us deciding to finish, this is the camera being taken.
+   */
+  private fun lost(why: String) {
+    val wasRunning = running
+    Log.w(TAG, why)
+    stop()
+    if (wasRunning) runCatching { onLost() }.onFailure { Log.w(TAG, "lost-camera handler failed", it) }
   }
 
   /** Stop and release everything. Idempotent, and safe to call from any thread. */
@@ -281,11 +326,10 @@ class CameraStream(
                 }
           }
 
-          override fun onDisconnected(camera: CameraDevice) = stop()
+          override fun onDisconnected(camera: CameraDevice) = lost("camera disconnected")
 
           override fun onError(camera: CameraDevice, error: Int) {
-            Log.w(TAG, "camera error $error (${cameraErrorName(error)})")
-            stop()
+            lost("camera error $error (${cameraErrorName(error)})")
           }
         },
         handler)
@@ -321,8 +365,8 @@ class CameraStream(
 
   /**
    * Camera2's error codes in words. `CAMERA_DISABLED` in particular reads as a mystery otherwise:
-   * on Android 9 it's what you get when the app is no longer in the foreground, which is why the
-   * stream holds an overlay badge ([StreamIndicator]) for as long as it runs.
+   * on Android 9 it's what you get when the app is no longer in the foreground, which on a device
+   * whose whole job is to sit on its home screen is a routine event rather than a fault.
    */
   private fun cameraErrorName(error: Int): String =
       when (error) {

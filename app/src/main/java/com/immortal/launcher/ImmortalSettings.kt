@@ -102,7 +102,7 @@ object ImmortalSettings {
   }
 
   /**
-   * Let Home Assistant take a still from the Portal's camera. Off by default, and deliberately
+   * Let Home Assistant use the Portal's camera. Off by default, and deliberately
    * device-only consent: nothing arriving over MQTT can turn it on, and with it off the camera
    * is never opened. See docs/design/camera-streaming.md.
    *

@@ -12,7 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * Which of the camera's offered sizes a snapshot asks for. Bounded deliberately: this runs on
+ * Which of the camera's offered sizes the stream asks for. Bounded deliberately: this runs on
  * Android 9 hardware with no largeHeap, often while the photo frame holds full-screen bitmaps.
  */
 class CameraSizesTest {
@@ -40,7 +40,7 @@ class CameraSizesTest {
 
   @Test
   fun `falls back to the smallest when nothing fits`() {
-    // A device that only offers large sizes should still produce a snapshot, not fail outright.
+    // A device that only offers large sizes should still stream, not fail outright.
     assertEquals(1280 to 720, CameraSizes.choose(listOf(1280 to 720, 1920 to 1080), maxEdge = 640))
   }
 

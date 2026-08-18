@@ -4,7 +4,7 @@ Expose a Portal's camera to Home Assistant as a live stream, with **optional aud
 Portal in a nursery or hallway can double as a nanny/security camera. LAN only, off by default,
 and unmistakable when it's live.
 
-**Status:** phases 1-3 implemented (snapshots, live video, audio); phase 4 (motion) not started. This records the decisions,
+**Status:** live video and audio implemented and confirmed on hardware; phase 4 (motion) not started. Phase 1 (MQTT stills) was built, shipped in 1.69-1.71, and then **removed** — see [phase 1 was a stepping stone](#phase-1-was-a-stepping-stone). This records the decisions,
 the parts we already have, the parts that are genuinely hard, and what has to be answered on real
 hardware before writing much code.
 
@@ -110,8 +110,12 @@ today. These are requirements, not preferences:
   on. If the master switch is off on the device, the Portal ignores stream requests entirely.
 - **Three separate switches**, not one: `Camera` (master), `Camera streaming`, `Camera audio`.
   Audio cannot be on without the camera.
-- **A visible on-device indicator whenever capture is live** — on screen, not merely a
-  notification the frame is covering.
+- **A visible on-device indicator whenever capture is live.** Settled as the Portal's own
+  **hardware camera LED**, plus the foreground-service notification. An in-app overlay badge was
+  built for this and then removed: it added nothing the LED doesn't do better (the LED is wired
+  below the OS, so it can't be faked or suppressed) and it could be left stale on screen by a
+  stream that died, which is worse than no indicator — an indicator that lies is a bug, not a
+  safeguard.
 - **Say who can turn it on.** The [notification design](mqtt-notifications.md) already assumes a
   trusted-LAN broker; here that assumption has teeth, because anyone with publish credentials
   can start a stream. This must be stated in the user docs, not just a design note.
@@ -120,33 +124,24 @@ today. These are requirements, not preferences:
 
 | Entity | Type | Notes |
 | --- | --- | --- |
-| Camera | `switch` | Master power. Off means the camera is never opened. |
+| Camera | *device-only setting* | Master consent. Off means the camera is never opened. Deliberately **not** an MQTT entity: it's the one thing Home Assistant must never be able to turn on. |
 | Camera streaming | `switch` | Starts/stops the RTSP server. Requires the master. |
 | Camera audio | `switch` | Adds the audio track. Requires streaming; forced silent while mic-muted. |
 | Stream URL | `sensor` (diagnostic) | `rtsp://<ip>:8554/` — so the dashboard card can be configured by copy-paste. |
 | Motion | `binary_sensor` | Later phase; reuses the frame-difference logic `GestureCamera` already has. |
 
 The live view is wired through go2rtc + the WebRTC Camera card rather than an MQTT `camera`
-entity (which carries stills, not video). The setup guide should give the exact card YAML with
-the device's own IP filled in, as the Camera Settings screen would show it.
+entity (which carries stills, not video). The setup guide gives the exact card YAML with the
+device's own IP filled in.
 
 ## Phasing
 
 Deliberately ordered so each phase is useful alone and de-risks the next.
 
-1. **Snapshot only** — *implemented*. A JPEG still on demand, the device-side consent switch,
-   and an on-screen indicator on every capture. Proves Camera2 at real resolution on real
-   hardware and settles the per-model FOV question, for a fraction of the effort.
-
-    **Delivered over MQTT, not the fleet HTTP server as sketched above.** The HTTP route looked
-    cheaper until the Home Assistant side was considered: the fleet agent authenticates with a
-    bearer token, and HA's `generic` camera integration can send basic auth but not a bearer
-    header — which would have meant either putting the token in a query string (logged, and
-    leaked to anyone reading a dashboard config) or bolting a second auth scheme onto the agent.
-    HA's MQTT `camera` component takes the image straight off a topic, so it needs no second auth
-    story at all, rides the broker we already treat as trusted, and doesn't require the opt-in
-    fleet agent to be running. Images are published **unretained**, so a still of someone's room
-    doesn't sit on the broker for whoever subscribes next.
+1. **Snapshot only** — *built, shipped in 1.69-1.71, then removed*. See
+   [phase 1 was a stepping stone](#phase-1-was-a-stepping-stone) below. It did its job: it proved
+   Camera2 works unprivileged on a Portal, and it found the permission gap that would otherwise
+   have been blamed on the streaming code.
 2. **Video streaming** — *implemented*. RTSP + `MediaCodec` H.264, no audio yet.
 
     RTP is **interleaved over the RTSP TCP connection** rather than sent on separate UDP ports.
@@ -166,6 +161,32 @@ Deliberately ordered so each phase is useful alone and de-risks the next.
 4. **Motion** (optional). `binary_sensor` from the existing frame-diff, with a sensitivity
    number entity.
 
+### Phase 1 was a stepping stone
+
+Stills were delivered as an MQTT `camera` entity plus a `Take snapshot` button, on the reasoning
+that HA's MQTT camera component needs no second auth story — unlike the fleet HTTP server, whose
+bearer token HA's `generic` camera integration can't send. That reasoning was sound and the
+feature still didn't survive contact with the hardware:
+
+- **The images were far too big for MQTT.** A Portal Go produced a **12 MB** JPEG despite a 640px
+  request and quality 75 — the camera's JPEG sizes don't honour the bound the way the encoder's
+  video sizes do. An oversize publish doesn't get rejected on its own; Mosquitto drops the whole
+  **connection** (`disconnected: oversize packet`), taking presence, sensors and every other
+  entity down with it. A 200 KB refusal guard was added, after which the button reliably did
+  nothing at all.
+- **It fought the feature it was meant to lead to.** One camera, one holder: pressing the
+  snapshot button while streaming *killed the stream*, verified in the log.
+
+So it was removed in favour of the thing it was scaffolding for. Anyone who wants a still can
+take one from the RTSP feed — that's what HA's `camera.snapshot` service and go2rtc are for, and
+neither costs a broker connection. The retained discovery configs for both entities are cleared
+unconditionally on connect, so Portals upgraded from 1.69-1.71 don't keep two dead entities.
+
+**The lesson worth keeping:** the phase was still worth building. It answered the question the
+whole design hung on (does Camera2 work unprivileged here?) and it surfaced the ungranted
+`CAMERA` runtime permission — which would otherwise have shown up as "streaming is broken".
+A stepping stone that gets thrown away after it's been stepped on has not been wasted.
+
 ## Unknowns to settle on hardware first
 
 None of these are answerable from the source, and all of them can invalidate parts of the plan:
@@ -174,13 +195,33 @@ None of these are answerable from the source, and all of them can invalidate par
   phase 1: real capture, real JPEG, camera indicator lit. This was the question the whole design
   hung on.
 - What resolutions does Camera2 actually offer per model, for stills and for an encoder surface?
-- ~~Does Portal firmware permit camera access from a background service?~~ **No, not on its
-  own.** Confirmed on a Portal Go: the stream runs happily until another app comes to the front,
-  then dies with `ERROR_CAMERA_DISABLED`. A foreground service is not sufficient on Android 9.
-  Holding a visible overlay window (`SYSTEM_ALERT_WINDOW`, already granted) is what keeps camera
-  access alive — the same lever the bridge documents. That overlay is [`StreamIndicator`], which
-  doubles as the "camera is live" signal this note requires for continuous capture. **The two
-  requirements are the same object: removing the badge would silently break streaming.**
+- ~~Does Portal firmware permit camera access from a background service?~~ **No — and nothing
+  gets around it.** Measured on a Portal Go: the stream runs happily until another app comes to
+  the front, then dies with `ERROR_CAMERA_DISABLED` within seconds. Three things were tried, in
+  order, and all three failed:
+
+    1. **A foreground service.** Not sufficient on Android 9 — this was the first attempt and the
+       one the failure was originally blamed on.
+    2. **A visible overlay window** (`SYSTEM_ALERT_WINDOW`, already granted) — the lever the
+       bridge documents needing. The badge was confirmed on screen (`camera-live badge shown` in
+       the log) and the camera was revoked anyway. `IMPORTANT_FOREGROUND` is not enough; the gate
+       appears to want the actual top activity.
+    3. **Forcing the app-op**: `adb shell appops set com.immortal.launcher CAMERA allow`, on the
+       theory that the op was resolving as `MODE_FOREGROUND`. No change, which suggests the
+       restriction is enforced below AppOps.
+
+  **So the constraint is accepted rather than defeated**, and it costs less than it sounds: a
+  launcher is the foreground app almost all of the time, and the streaming this was built for
+  runs for hours with nobody touching the device. What matters is that losing the camera is not
+  treated as failure — `CameraStreamService` keeps the service, the RTSP port and the Home
+  Assistant switch exactly as they were, and takes the camera back within seconds of the launcher
+  returning to the front. The one thing genuinely ruled out is watching the stream in a player on
+  the Portal that is producing it.
+
+  The overlay badge that came out of attempt 2 was removed with it. It was justified as doubling
+  as the "camera is live" signal, but the Portal's **hardware camera LED** already does that job
+  properly: it's wired below the OS, so it can't be faked, and — unlike a badge that survived a
+  crashed stream on a real device — it can't be left behind.
 - ~~Is there a usable hardware `MediaCodec` H.264 encoder on API 28 Portal, and does it offer
   Constrained Baseline?~~ **Yes, with a caveat.** Confirmed encoding 640×480 at 15fps on a Portal
   Go and producing SPS/PPS. It rejects a profile hint given *without* a level

@@ -726,14 +726,14 @@ object SettingsDomains {
                       visible = { c, _ -> MqttConfig.isEnabled(c) }),
                   BoolSpec(
                       "cameraEnabled",
-                      "Camera snapshots",
+                      "Camera",
                       get = { ImmortalSettings.cameraEnabled(it) },
                       set = ImmortalSettings::setCameraEnabled,
                       help =
-                          "Let Home Assistant take a still photo from this Portal's camera. Off " +
-                              "by default, and only switchable here on the device - Home " +
-                              "Assistant can't turn it on. The Portal shows a message on screen " +
-                              "every time a photo is taken.",
+                          "Let Home Assistant use this Portal's camera as a video camera. Off by " +
+                              "default, and only switchable here on the device - Home Assistant " +
+                              "can't turn it on. The Portal shows a badge on screen the whole " +
+                              "time the camera is live.",
                       visible = { c, _ -> MqttConfig.isEnabled(c) }),
                   BoolSpec(
                       "cameraAudio",

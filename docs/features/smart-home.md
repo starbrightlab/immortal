@@ -72,41 +72,16 @@ wait out an interval before it's published, so a twitchy light sensor doesn't bu
 large jump — someone switching a lamp on — skips most of that wait, because that's the event an
 automation is actually waiting for.
 
-## Camera snapshots
+## Camera
 
-A Portal can hand Home Assistant a still photo from its own camera — a second angle on a room
-you already have a Portal in. It is **off by default**, and the switch is deliberately on the
-device only: turn it on under **Settings → Home Assistant (MQTT) → Camera snapshots**. Nothing arriving over
-MQTT can enable it, and while it is off the camera is never opened.
+A Portal can be a camera for Home Assistant — live H.264 video over RTSP, with optional sound.
+It is **off by default**, and the consent is deliberately on the device only: turn it on under
+**Settings → Home Assistant (MQTT) → Camera**. Nothing arriving over MQTT can enable it, and
+while it is off the camera is never opened.
 
-Once on, two entities appear: a **Camera** entity showing the most recent still, and a **Take
-snapshot** button that captures a fresh one. Point an automation at the button — a doorbell, a
-motion sensor elsewhere in the house, a schedule — and the camera entity updates.
-
-**The Portal announces every capture** with an on-screen message. Someone in the room should
-never be photographed without the device saying so.
-
-Some things worth knowing before relying on it:
-
-- **Stills, live video, and optional sound** — see [live streaming](#live-camera-streaming).
-- **The image is not retained on the broker.** Home Assistant shows the last one it received;
-  a subscriber joining later sees nothing until the next snapshot.
-- **The camera is shared.** A Portal call takes it, and the photo frame's wave-to-advance
-  gesture wants it too, so an occasional snapshot can come back empty rather than queueing.
-- **The image has to fit your broker's message size limit.** Snapshots are captured small on
-  purpose (640px, moderate JPEG quality), which keeps them well inside a typical limit. If your
-  broker still refuses one, the Portal says *snapshot too large for the broker* on screen rather
-  than sending it — an oversize publish costs the whole MQTT connection, not just the image.
-  Mosquitto's limit is `message_size_limit`.
-- **Anyone with broker credentials can press the button.** The same trust assumption as
-  [notifications](#notifications) — but with a camera on the other end of it, so treat broker
-  access accordingly.
-
-## Live camera streaming
-
-With the camera switched on, Home Assistant also gains a **Camera streaming** switch. Turn it on
-and the Portal serves live H.264 video over RTSP; a **Stream URL** diagnostic sensor tells you
-where, typically `rtsp://<portal-ip>:8554/`.
+Once on, three entities appear: a **Camera streaming** switch, a **Camera sound** switch, and a
+**Stream URL** diagnostic sensor telling you where to point a player — typically
+`rtsp://<portal-ip>:8554/`.
 
 It plays directly in VLC. For a Home Assistant dashboard, feed it through go2rtc — the
 **WebRTC Camera** card is the usual route:
@@ -116,7 +91,26 @@ type: custom:webrtc-camera
 url: 'rtsp://<portal-ip>:8554/'
 ```
 
-Points worth knowing:
+### The Portal has to be showing Immortal
+
+This is the one real constraint, and it comes from the platform rather than from us. **Android 9
+gives the camera to the foreground app only**, so the stream runs while the Portal is sitting on
+its home screen or photo frame — its normal state — and stops the moment somebody opens another
+app on it.
+
+That means two practical things:
+
+- **You can't watch the stream on the Portal that's producing it.** Opening a player there puts
+  that player in the foreground, which takes the camera away. Watch from anywhere else.
+- **Using the Portal pauses the stream, briefly.** It comes back on its own within a few seconds
+  of returning to the launcher — the switch stays on, the RTSP address doesn't change, and the
+  picture resumes. Viewers see a gap, not a dead stream.
+
+A foreground service isn't enough to avoid this, an overlay window isn't either, and neither is
+forcing the `CAMERA` app-op with adb; all three were measured on a Portal Go. `docs/design/camera-streaming.md`
+records what was tried.
+
+### Other points worth knowing
 
 - **Sound is optional and separate.** Turn on **Camera sound** (the Home Assistant switch, or
   Settings → Home Assistant (MQTT)) and the stream carries audio as well. It's off by default,
@@ -130,12 +124,14 @@ Points worth knowing:
   doesn't — a Portal that loses power comes back idle rather than quietly broadcasting a room.
 - **Home Assistant can start the stream, but never enable the camera.** The switch only works
   within the consent given on the device.
-- **While it runs, the camera is held.** Snapshots, the photo frame's wave-to-advance gesture and
-  a Portal call all want the same camera, so they can't overlap with streaming.
-- **A "camera live" badge sits on screen** the whole time the stream runs, on top of whatever
-  app is in front, alongside a permanent notification. It isn't only a courtesy: Android 9 only
-  lets a foreground app use the camera, and that badge is what keeps the stream alive when you
-  open something else on the Portal. Streaming stops without it.
+- **While it runs, the camera is held.** The photo frame's wave-to-advance gesture and a Portal
+  call want the same camera, so they can't overlap with streaming.
+- **The Portal's green camera light is on** for as long as the stream is, alongside a permanent
+  notification. That light is wired below the operating system, so it's a signal Immortal can
+  neither fake nor forget to turn off — which is why there's no in-app badge competing with it.
+- **Anyone with broker credentials can start it.** The same trust assumption as
+  [notifications](#notifications) — but with a camera on the other end of it, so treat broker
+  access accordingly.
 
 ## What it can control
 

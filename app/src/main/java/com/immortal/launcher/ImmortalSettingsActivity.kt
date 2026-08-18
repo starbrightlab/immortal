@@ -735,13 +735,13 @@ internal fun MqttScreen(onBack: () -> Unit) {
         MqttService.sync(context, reconfigure = true)
       }
   // CAMERA is a runtime permission that provisioning doesn't grant, and nothing else in the app
-  // asks for it — so without this the toggle switched on and every snapshot silently did nothing.
+  // asks for it — so without this the toggle switched on and the camera silently never opened.
   val cameraPermission =
       rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) {
           cameraEnabled = false
           ImmortalSettings.setCameraEnabled(context, false)
-          Toast.makeText(context, "Camera permission is needed for snapshots", Toast.LENGTH_LONG)
+          Toast.makeText(context, "Camera permission is needed for the camera", Toast.LENGTH_LONG)
               .show()
         }
         MqttService.sync(context, reconfigure = true)
@@ -1077,11 +1077,11 @@ internal fun MqttScreen(onBack: () -> Unit) {
               verticalAlignment = Alignment.CenterVertically,
           ) {
             Column(modifier = Modifier.weight(1f)) {
-              Text("Camera snapshots", color = Color.White, fontSize = 15.sp)
+              Text("Camera", color = Color.White, fontSize = 15.sp)
               Text(
-                  "Let Home Assistant take a still photo from this Portal's camera. Only " +
-                      "switchable here - Home Assistant can't turn it on - and the screen says " +
-                      "so every time a photo is taken.",
+                  "Let Home Assistant use this Portal's camera. Only switchable here - Home " +
+                      "Assistant can't turn it on - and a badge stays on screen the whole time " +
+                      "the camera is live.",
                   color = Color(0xFF9A9A9A),
                   fontSize = 13.sp,
                   modifier = Modifier.padding(top = 2.dp),

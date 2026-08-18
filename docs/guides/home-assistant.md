@@ -21,8 +21,7 @@ appear where the hardware exists.
 | Media, Media title, Media artist | The current track — see [now-playing](../features/multi-room-audio.md). |
 | Battery, Charging | On models that have a battery (Portal Go). |
 | IP address | Diagnostic. |
-| Camera | The latest still from the Portal's camera. Only when you've switched it on — see [camera snapshots](../features/smart-home.md#camera-snapshots). |
-| Stream URL | Where the live video is served, for a dashboard card. Diagnostic. |
+| Stream URL | Where the live video is served, for a dashboard card. Diagnostic. Only when the camera is switched on. |
 
 **Controls**
 
@@ -36,8 +35,7 @@ appear where the hardware exists.
 | Open | Send the Portal to a URL, an installed app, or a Home Assistant dashboard path. |
 | Notify | Push a toast with optional image, sound and tap target — see [notifications](../features/smart-home.md#notifications). |
 | Identify | Pop a toast naming the device, for finding which Portal is which. |
-| Take snapshot | Capture a fresh still. Only when the camera is switched on. |
-| Camera streaming | Start/stop live RTSP video — see [live streaming](../features/smart-home.md#live-camera-streaming). |
+| Camera streaming | Start/stop live RTSP video — see [the camera](../features/smart-home.md#camera). |
 | Camera audio | Include sound in the stream. Silenced entirely while the microphone is muted. |
 
 The Portal registers with a stable per-device id, so it survives broker reinstalls but stays unique
@@ -102,25 +100,23 @@ automation:
 - **Presence says `proxy`, not `portal`** — check **Use the Portal's own detector** is on under
   Settings → Immortal, then the `READ_LOGS` permission. The provisioning kit grants it, so re-run
   the provisioner on a Portal set up before that grant existed.
-- **No Camera entity** — it's off by default. Turn on **Camera snapshots** under Settings →
+- **No camera entities** — the camera is off by default. Turn it on under Settings →
   Home Assistant (MQTT) on the device; Home Assistant can't enable it remotely, by design.
-- **The stream dies when you open another app** — the on-screen *camera live* badge is what
-  keeps camera access alive on Android 9, so check Immortal has the "display over other apps"
-  permission (the [provisioning kit](../provisioning.md) grants it). `ImmortalStream` logs
-  `CAMERA_DISABLED — app not in the foreground` when this is what happened.
+- **The stream stops when you open an app on the Portal** — expected, and not fixable: Android 9
+  gives the camera to the foreground app only. Immortal takes it back within a few seconds of
+  returning to the launcher, logging `camera taken by another app` and then `camera back —
+  streaming resumed`. This is also why you can't watch the stream *on* the Portal producing it.
 - **Camera streaming won't stay on** — check `adb logcat -s ImmortalStream:V`. A
   `MediaCodec ... configure` failure means the encoder refused our settings; Immortal retries
   without the profile hint, so this should now start anyway. `no record-audio permission` means
   sound is ungranted: re-run the [provisioning kit](../provisioning.md), or turn **Camera sound**
   on from the device, which asks for it.
-- **Testing the stream on the Portal itself** — install VLC on it and open
-  `rtsp://127.0.0.1:8554/`. From another machine, use the Portal's address: Home Assistant's
-  **Stream URL** or **IP address** sensor has it, or `adb shell ip addr show wlan0`.
-- **The snapshot button does nothing** — watch the Portal's screen, which now says why. *No
-  camera permission* means the grant is missing: re-run the [provisioning kit](../provisioning.md),
-  or `adb shell pm grant com.immortal.launcher android.permission.CAMERA`. *Snapshot too large
-  for the broker* means your broker's message size limit is below the image; raise Mosquitto's
-  `message_size_limit`. If your broker log shows `disconnected: oversize packet`, that's this.
+- **Testing the stream** — do it from another machine, never on the Portal itself. Home
+  Assistant's **Stream URL** or **IP address** sensor has the address, or
+  `adb shell ip addr show wlan0`; then open `rtsp://<portal-ip>:8554/` in VLC.
+- **No picture at all** — check the camera permission is granted: re-run the
+  [provisioning kit](../provisioning.md), or
+  `adb shell pm grant com.immortal.launcher android.permission.CAMERA`.
 - **No temperature entity** — not every Portal has an ambient temperature sensor. Entities are only
   advertised for hardware the device actually reports, so a missing one means the sensor isn't
   there.

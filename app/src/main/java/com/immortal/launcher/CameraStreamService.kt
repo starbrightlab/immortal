@@ -14,7 +14,9 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 
 /**
@@ -22,8 +24,17 @@ import android.util.Log
  * its frames on the wire. Phase 2 of `docs/design/camera-streaming.md`.
  *
  * A foreground service because the camera is held for as long as it runs — this is exactly the
- * case Android's foreground requirement exists for, and the notification is a second, system-level
- * signal that the camera is live, alongside the on-screen indicator.
+ * case Android's foreground requirement exists for, and its notification is a signal that the
+ * camera is live. The Portal's own green camera LED is the one that matters, though: it's wired
+ * below the OS, so nothing this app does can leave it lit after the camera closes, or stop it
+ * lighting when the camera opens. An in-app badge was tried and removed — it could neither be
+ * trusted to disappear nor keep the camera alive, which were its two reasons to exist.
+ *
+ * **A lost camera is not the end of the stream.** Android 9 gives the camera to the foreground
+ * app, so anyone who opens something on the Portal takes it from us. The service stays up, keeps
+ * the RTSP port and the Home Assistant switch as they were, and takes the camera back as soon as
+ * it is free again — otherwise a moment's use of the Portal would silently end a stream that
+ * nobody is standing next to.
  *
  * **Streaming does not survive a reboot.** [ImmortalSettings.cameraEnabled] is the consent and
  * persists; whether the stream is actually running does not, so a Portal that loses power comes
@@ -34,14 +45,20 @@ class CameraStreamService : Service() {
   private var stream: CameraStream? = null
   private var audio: AudioStream? = null
   private var server: RtspServer? = null
+  private val retries = Handler(Looper.getMainLooper())
+  /** True between losing the camera and getting it back — so the log says each once, not each try. */
+  private var waitingForCamera = false
 
   override fun onCreate() {
     super.onCreate()
     createChannel()
     startForeground(NOTIF_ID, notification())
-    val s = CameraStream(applicationContext) { nals, ptsUs, keyframe ->
-      server?.broadcast(nals, ptsUs, keyframe)
-    }
+    val s =
+        CameraStream(
+            applicationContext,
+            onNals = { nals, ptsUs, keyframe -> server?.broadcast(nals, ptsUs, keyframe) },
+            onLost = ::cameraLost,
+        )
     stream = s
     val srv =
         RtspServer(
@@ -80,9 +97,6 @@ class CameraStreamService : Service() {
       stopSelf()
     } else {
       running = true
-      // Load-bearing as well as honest: the badge is what keeps the camera open when another app
-      // comes to the front. See StreamIndicator.
-      StreamIndicator.show(this)
       Log.i(TAG, "streaming service up on :${RtspServer.DEFAULT_PORT}")
     }
     notifyState()
@@ -94,8 +108,8 @@ class CameraStreamService : Service() {
 
   override fun onDestroy() {
     running = false
+    retries.removeCallbacksAndMessages(null)
     notifyState()
-    StreamIndicator.hide(this)
     runCatching { stream?.stop() }
     runCatching { audio?.stop() }
     runCatching { server?.stop() }
@@ -104,6 +118,41 @@ class CameraStreamService : Service() {
     server = null
     super.onDestroy()
   }
+
+  /** Somebody else has the camera. Say so once, then keep asking for it back. */
+  private fun cameraLost() {
+    if (!running) return
+    if (!waitingForCamera) {
+      waitingForCamera = true
+      Log.i(TAG, "camera taken by another app — will resume when it's free")
+    }
+    scheduleRetry()
+  }
+
+  private fun scheduleRetry() {
+    retries.removeCallbacks(retry)
+    retries.postDelayed(retry, RETRY_MS)
+  }
+
+  private val retry =
+      object : Runnable {
+        override fun run() {
+          val s = stream ?: return
+          if (!running || s.isRunning()) return
+          // start() only asks: a camera that is still held fails asynchronously and arrives back
+          // here through onLost, which schedules the next attempt. So don't announce success on
+          // its return value — wait for the stream to still be alive a moment later.
+          if (!s.start()) return scheduleRetry()
+          retries.postDelayed(
+              {
+                if (running && waitingForCamera && stream?.isRunning() == true) {
+                  waitingForCamera = false
+                  Log.i(TAG, "camera back — streaming resumed")
+                }
+              },
+              SETTLE_MS)
+        }
+      }
 
   private fun createChannel() {
     if (Build.VERSION.SDK_INT >= 26) {
@@ -129,6 +178,16 @@ class CameraStreamService : Service() {
     private const val TAG = "ImmortalStream"
     private const val CHANNEL = "camera_stream"
     private const val NOTIF_ID = 4713
+
+    /**
+     * How long to wait before asking for a revoked camera back. Short enough that stepping out of
+     * an app restores the picture while you're still walking away from the Portal, long enough
+     * that a camera held for an hour costs a retry every few seconds and nothing more.
+     */
+    private const val RETRY_MS = 5_000L
+
+    /** How long a restarted stream must survive before we call it resumed. */
+    private const val SETTLE_MS = 3_000L
 
     /** True while the service is up — what the Home Assistant switch reports. */
     @Volatile
