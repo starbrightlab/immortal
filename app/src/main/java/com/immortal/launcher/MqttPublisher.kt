@@ -144,6 +144,7 @@ class MqttPublisher(private val appContext: Context) {
                 publishDiscovery(c)
                 publishPresence(PresenceHub.current)
                 publishAudioState()
+                publishStreamState()
               }
               .onFailure { Log.w(TAG, "reconfigure failed", it) }
         }
@@ -204,6 +205,7 @@ class MqttPublisher(private val appContext: Context) {
                     // move these without telling us, so HA's slider and switches would sit on
                     // whatever we last published until the next reconnect.
                     runCatching { publishAudioState() }
+                    runCatching { publishStreamState() }
                   }
                 }
               }
@@ -290,6 +292,7 @@ class MqttPublisher(private val appContext: Context) {
     publishScreen()
     publishIp()
     publishAudioState()
+    publishStreamState()
     if (MqttConfig.ambientSensors(appContext)) ambient.start()
   }
 
@@ -396,6 +399,13 @@ class MqttPublisher(private val appContext: Context) {
                   name = "mqtt-snapshot"
                   start()
                 }
+          }
+          // Streaming can only be switched on within consent already given on the device;
+          // CameraStreamService.sync enforces that, and we report back what actually happened
+          // rather than what was asked for.
+          "camera_stream" -> {
+            CameraStreamService.sync(appContext, payload.trim().equals("ON", ignoreCase = true))
+            publishStreamState()
           }
           "notify" -> handleNotify(payload)
           // Show the photo frame on demand — the same surface the launcher's header
@@ -571,6 +581,23 @@ class MqttPublisher(private val appContext: Context) {
     c.publish("$base/charging/state", if (charging) "ON" else "OFF", retain = true)
   }
 
+  /**
+   * Whether the stream is live, and where to point a player at it. Reported from the service's
+   * own state, so a stream that refused to start (no permission, camera busy) shows as off
+   * rather than leaving the switch stuck on.
+   */
+  private fun publishStreamState() {
+    val c = client ?: return
+    if (!ImmortalSettings.cameraEnabled(appContext)) return
+    c.publish("$base/camera_stream/state", if (CameraStreamService.running) "ON" else "OFF", retain = true)
+    val ip = currentIp()
+    c.publish(
+        "$base/stream_url/state",
+        if (ip.isBlank()) "unknown" else "rtsp://$ip:${RtspServer.DEFAULT_PORT}/",
+        retain = true,
+    )
+  }
+
   private fun publishIp() {
     client?.publish("$base/ip/state", currentIp().ifBlank { "unknown" }, retain = true)
   }
@@ -704,9 +731,13 @@ class MqttPublisher(private val appContext: Context) {
     if (ImmortalSettings.cameraEnabled(appContext)) {
       cameraEntity(c, "camera", "Camera")
       button(c, "snapshot", "Take snapshot", icon = "mdi:camera")
+      switchEntity(c, "camera_stream", "Camera streaming", icon = "mdi:video")
+      sensor(c, "stream_url", "Stream URL", icon = "mdi:link-variant", diagnostic = true)
     } else {
       publishConfig(c, "camera", "camera", null)
       publishConfig(c, "button", "snapshot", null)
+      publishConfig(c, "switch", "camera_stream", null)
+      publishConfig(c, "sensor", "stream_url", null)
     }
 
     button(c, "go_home", "Home", icon = "mdi:home")
@@ -744,6 +775,8 @@ class MqttPublisher(private val appContext: Context) {
           "sensor" to "ip",
           "camera" to "camera",
           "button" to "snapshot",
+          "switch" to "camera_stream",
+          "sensor" to "stream_url",
           "button" to "screen_off", // legacy (pre-1.41)
       ) + AmbientKind.values().map { "sensor" to it.key }
 

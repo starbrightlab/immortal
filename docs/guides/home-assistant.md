@@ -22,6 +22,7 @@ appear where the hardware exists.
 | Battery, Charging | On models that have a battery (Portal Go). |
 | IP address | Diagnostic. |
 | Camera | The latest still from the Portal's camera. Only when you've switched it on — see [camera snapshots](../features/smart-home.md#camera-snapshots). |
+| Stream URL | Where the live video is served, for a dashboard card. Diagnostic. |
 
 **Controls**
 
@@ -36,6 +37,7 @@ appear where the hardware exists.
 | Notify | Push a toast with optional image, sound and tap target — see [notifications](../features/smart-home.md#notifications). |
 | Identify | Pop a toast naming the device, for finding which Portal is which. |
 | Take snapshot | Capture a fresh still. Only when the camera is switched on. |
+| Camera streaming | Start/stop live RTSP video — see [live streaming](../features/smart-home.md#live-camera-streaming). |
 
 The Portal registers with a stable per-device id, so it survives broker reinstalls but stays unique
 across a fleet. Its **device name is shared with the [fleet agent](../features/fleet.md)**, so a

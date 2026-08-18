@@ -475,6 +475,13 @@
             android:name=".MqttService"
             android:exported="false" />
 
+        <!-- Live camera streaming (RTSP). Foreground because the camera is held for as long as
+             it runs, and the notification is a second, system-level signal that it's live. -->
+        <service
+            android:name=".CameraStreamService"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
+
         <!-- App switcher, opened from the quick-button overlay (internal). -->
         <activity
             android:name=".AppSwitcherActivity"

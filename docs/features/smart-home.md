@@ -88,8 +88,8 @@ never be photographed without the device saying so.
 
 Some things worth knowing before relying on it:
 
-- **It is stills, not video.** Live streaming with optional audio is designed but not built —
-  see [the design note](../design/camera-streaming.md).
+- **Stills and live video, but no sound yet.** Audio is designed but not built — see
+  [the design note](../design/camera-streaming.md).
 - **The image is not retained on the broker.** Home Assistant shows the last one it received;
   a subscriber joining later sees nothing until the next snapshot.
 - **The camera is shared.** A Portal call takes it, and the photo frame's wave-to-advance
@@ -102,6 +102,32 @@ Some things worth knowing before relying on it:
 - **Anyone with broker credentials can press the button.** The same trust assumption as
   [notifications](#notifications) — but with a camera on the other end of it, so treat broker
   access accordingly.
+
+## Live camera streaming
+
+With the camera switched on, Home Assistant also gains a **Camera streaming** switch. Turn it on
+and the Portal serves live H.264 video over RTSP; a **Stream URL** diagnostic sensor tells you
+where, typically `rtsp://<portal-ip>:8554/`.
+
+It plays directly in VLC. For a Home Assistant dashboard, feed it through go2rtc — the
+**WebRTC Camera** card is the usual route:
+
+```yaml
+type: custom:webrtc-camera
+url: 'rtsp://<portal-ip>:8554/'
+```
+
+Points worth knowing:
+
+- **No audio yet.** Video only; sound is the next phase.
+- **Streaming does not survive a reboot.** The camera *permission* persists, the live stream
+  doesn't — a Portal that loses power comes back idle rather than quietly broadcasting a room.
+- **Home Assistant can start the stream, but never enable the camera.** The switch only works
+  within the consent given on the device.
+- **While it runs, the camera is held.** Snapshots, the photo frame's wave-to-advance gesture and
+  a Portal call all want the same camera, so they can't overlap with streaming.
+- **The notification is deliberate.** A permanent one shows while the camera is live — a
+  system-level signal alongside the on-screen one.
 
 ## What it can control
 
