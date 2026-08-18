@@ -60,6 +60,11 @@ class MqttPublisher(private val appContext: Context) {
    * an un-configured device nothing. (Presence is the opposite case — every [PresenceHub] reader
    * wants it — so that one lives in [PortalPresenceDetector], app-wide.)
    */
+  /**
+   * Stills for Home Assistant. Consent is the device-side setting it reads; this object opens
+   * nothing until a snapshot is actually asked for. See docs/design/camera-streaming.md.
+   */
+  private val camera by lazy { PortalCameraCapture(appContext) }
   private val ambient by lazy {
     AmbientSensors(appContext) { kind, value ->
       client?.publish("$base/${kind.key}/state", value, retain = true)
@@ -364,6 +369,24 @@ class MqttPublisher(private val appContext: Context) {
             // (mutes only every other press).
             publishMicMute(on)
           }
+          // Camera work blocks and must not run on main; the handler posts here, so hop off.
+          "snapshot" -> {
+            Thread {
+                  runCatching {
+                        val jpeg = camera.snapshot()
+                        if (jpeg == null) Log.i(TAG, "snapshot unavailable")
+                        // retain = false on purpose: a still of someone's room should not sit on
+                        // the broker indefinitely for anyone who later subscribes.
+                        else client?.publish("$base/camera/image", jpeg, retain = false)
+                      }
+                      .onFailure { Log.w(TAG, "snapshot failed", it) }
+                }
+                .apply {
+                  isDaemon = true
+                  name = "mqtt-snapshot"
+                  start()
+                }
+          }
           "notify" -> handleNotify(payload)
           // Show the photo frame on demand — the same surface the launcher's header
           // screensaver button launches (HomeActivity.onStartScreensaver). This is the
@@ -666,6 +689,16 @@ class MqttPublisher(private val appContext: Context) {
     }
     switchEntity(c, "mic_mute", "Microphone mute", icon = "mdi:microphone-off")
 
+    // Camera stills, only while the user has switched the camera on for this Portal. Off (the
+    // default) clears both configs, so HA drops the entities rather than showing them dead.
+    if (ImmortalSettings.cameraEnabled(appContext)) {
+      cameraEntity(c, "camera", "Camera")
+      button(c, "snapshot", "Take snapshot", icon = "mdi:camera")
+    } else {
+      publishConfig(c, "camera", "camera", null)
+      publishConfig(c, "button", "snapshot", null)
+    }
+
     button(c, "go_home", "Home", icon = "mdi:home")
     button(c, "screensaver", "Screensaver", icon = "mdi:image-multiple")
     textEntity(c, "open", "Open", icon = "mdi:open-in-app")
@@ -699,6 +732,8 @@ class MqttPublisher(private val appContext: Context) {
           "notify" to "notify",
           "button" to "identify",
           "sensor" to "ip",
+          "camera" to "camera",
+          "button" to "snapshot",
           "button" to "screen_off", // legacy (pre-1.41)
       ) + AmbientKind.values().map { "sensor" to it.key }
 
@@ -840,6 +875,20 @@ class MqttPublisher(private val appContext: Context) {
             .put("command_template", "{\"message\": {{ value|tojson }}}")
             .put("availability_topic", "$base/availability")
     publishConfig(c, "notify", obj, cfg)
+  }
+
+  /**
+   * HA's MQTT `camera` component: it renders whatever JPEG arrives on [topic]. Chosen over an
+   * HTTP endpoint because it needs no second auth story — it rides the broker we already trust,
+   * and it doesn't require the (opt-in) fleet agent to be running.
+   */
+  private fun cameraEntity(c: MqttClient, obj: String, name: String) {
+    val cfg =
+        base(obj, name)
+            .put("topic", "$base/$obj/image")
+            .put("availability_topic", "$base/availability")
+            .put("icon", "mdi:cctv")
+    publishConfig(c, "camera", obj, cfg)
   }
 
   /** Publish (or, when [cfg] is null, clear) a retained discovery config. */

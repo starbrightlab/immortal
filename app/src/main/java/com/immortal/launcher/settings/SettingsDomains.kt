@@ -593,6 +593,16 @@ object SettingsDomains {
                               "Assistant, the fleet tools and multi-room audio. Falls back on its " +
                               "own if the Portal isn't reporting it."),
                   BoolSpec(
+                      "cameraEnabled",
+                      "Camera snapshots",
+                      get = { it.cameraEnabled },
+                      set = ImmortalSettings::setCameraEnabled,
+                      help =
+                          "Let Home Assistant take a still photo from this Portal's camera. Off " +
+                              "by default, and only switchable here on the device - Home " +
+                              "Assistant can't turn it on. The Portal shows a message on screen " +
+                              "every time a photo is taken."),
+                  BoolSpec(
                       "multiRoomEnabled",
                       "Multi-room audio",
                       get = { it.multiRoomEnabled },
@@ -637,6 +647,7 @@ object SettingsDomains {
                   "constrainPageWidth" to "Home screen",
                   "clockFormat" to "Clock",
                   "portalPresence" to "Presence",
+                  "cameraEnabled" to "Camera",
                   "multiRoomEnabled" to "Audio",
                   "snapcastHost" to "Audio",
                   "maPort" to "Audio",
@@ -646,6 +657,9 @@ object SettingsDomains {
           onApplied = { c, keys ->
             if ("hideStatusBar" in keys) SettingsGuard.applyStatusBar(c)
             if ("portalPresence" in keys) PortalPresenceDetector.sync(c)
+            // The publisher advertises (or clears) the camera entities from this, so a running
+            // publisher has to re-read it rather than wait for the next reconnect.
+            if ("cameraEnabled" in keys) MqttService.sync(c, reconfigure = true)
             if (keys.any { it in setOf("multiRoomEnabled", "snapcastHost", "maPort", "maUsername", "maPassword") })
                 MultiRoomService.sync(c)
           },

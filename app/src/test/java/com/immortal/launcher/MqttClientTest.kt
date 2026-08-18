@@ -12,6 +12,7 @@ import java.io.OutputStream
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -131,6 +132,65 @@ class MqttClientTest {
         .apply { isDaemon = true }
         .start()
     return server
+  }
+
+  /**
+   * A camera snapshot is tens of kilobytes, far past the 127-byte boundary where MQTT's
+   * remaining-length field stops fitting in one byte. Nothing covered the multi-byte varint
+   * before, so this pins it: the broker decodes the length we wrote and gets every byte back.
+   */
+  @Test
+  fun publish_encodesAMultiByteRemainingLength() {
+    val payload = ByteArray(50_000) { (it % 251).toByte() } // ~a JPEG's worth
+    val topic = "immortal/abc/camera/image"
+    val server = ServerSocket()
+    server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0))
+    var seenLen = -1
+    var seenPayload: ByteArray? = null
+    val done = java.util.concurrent.CountDownLatch(1)
+    Thread {
+          runCatching {
+            server.accept().use { sock ->
+              val inp = DataInputStream(sock.getInputStream())
+              sock.getOutputStream().write(byteArrayOf(0x20, 0x02, 0x00, 0x00)) // CONNACK
+              sock.getOutputStream().flush()
+              // Drain the CONNECT, then read the PUBLISH we care about.
+              repeat(2) {
+                inp.readByte()
+                var len = 0
+                var shift = 0
+                while (true) {
+                  val b = inp.readByte().toInt() and 0xff
+                  len = len or ((b and 0x7f) shl shift)
+                  if (b and 0x80 == 0) break
+                  shift += 7
+                }
+                val body = ByteArray(len).also { b -> inp.readFully(b) }
+                if (it == 1) {
+                  seenLen = len
+                  // body = 2-byte topic length + topic + payload
+                  val topicLen = ((body[0].toInt() and 0xff) shl 8) or (body[1].toInt() and 0xff)
+                  seenPayload = body.copyOfRange(2 + topicLen, body.size)
+                }
+              }
+            }
+          }
+          done.countDown()
+        }
+        .apply { isDaemon = true }
+        .start()
+
+    val c = clientTo(server)
+    try {
+      assertTrue(c.connect(keepAliveSec = 30, connectTimeoutMs = 2000))
+      c.publish(topic, payload, retain = false)
+      assertTrue("broker never finished reading", done.await(5, java.util.concurrent.TimeUnit.SECONDS))
+    } finally {
+      c.close()
+      server.close()
+    }
+    assertEquals(2 + topic.length + payload.size, seenLen)
+    assertArrayEquals(payload, seenPayload)
   }
 
   @Test

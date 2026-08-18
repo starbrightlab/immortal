@@ -4,9 +4,9 @@ Expose a Portal's camera to Home Assistant as a live stream, with **optional aud
 Portal in a nursery or hallway can double as a nanny/security camera. LAN only, off by default,
 and unmistakable when it's live.
 
-**Status:** scoped, not implemented. This records the decisions, the parts we already have, the
-parts that are genuinely hard, and what has to be answered on real hardware before writing much
-code.
+**Status:** phase 1 (snapshots) implemented; phases 2-4 not started. This records the decisions,
+the parts we already have, the parts that are genuinely hard, and what has to be answered on real
+hardware before writing much code.
 
 ## Goal
 
@@ -134,10 +134,19 @@ the device's own IP filled in, as the Camera Settings screen would show it.
 
 Deliberately ordered so each phase is useful alone and de-risks the next.
 
-1. **Snapshot only.** A JPEG still on demand from the existing fleet HTTP server, plus the
-   `Camera` master switch and the on-screen indicator. Works in HA via the `generic` camera
-   integration. Proves Camera2 at real resolution on real hardware, and settles the per-model
-   FOV question, for a fraction of the effort.
+1. **Snapshot only** — *implemented*. A JPEG still on demand, the device-side consent switch,
+   and an on-screen indicator on every capture. Proves Camera2 at real resolution on real
+   hardware and settles the per-model FOV question, for a fraction of the effort.
+
+    **Delivered over MQTT, not the fleet HTTP server as sketched above.** The HTTP route looked
+    cheaper until the Home Assistant side was considered: the fleet agent authenticates with a
+    bearer token, and HA's `generic` camera integration can send basic auth but not a bearer
+    header — which would have meant either putting the token in a query string (logged, and
+    leaked to anyone reading a dashboard config) or bolting a second auth scheme onto the agent.
+    HA's MQTT `camera` component takes the image straight off a topic, so it needs no second auth
+    story at all, rides the broker we already treat as trusted, and doesn't require the opt-in
+    fleet agent to be running. Images are published **unretained**, so a still of someone's room
+    doesn't sit on the broker for whoever subscribes next.
 2. **Video streaming.** RTSP + `MediaCodec` H.264, no audio. The encoder work.
 3. **Audio.** AAC track, the mic broker, and the mute gating.
 4. **Motion** (optional). `binary_sensor` from the existing frame-diff, with a sensitivity

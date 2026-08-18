@@ -72,6 +72,32 @@ wait out an interval before it's published, so a twitchy light sensor doesn't bu
 large jump — someone switching a lamp on — skips most of that wait, because that's the event an
 automation is actually waiting for.
 
+## Camera snapshots
+
+A Portal can hand Home Assistant a still photo from its own camera — a second angle on a room
+you already have a Portal in. It is **off by default**, and the switch is deliberately on the
+device only: turn it on under **Settings → Immortal → Camera snapshots**. Nothing arriving over
+MQTT can enable it, and while it is off the camera is never opened.
+
+Once on, two entities appear: a **Camera** entity showing the most recent still, and a **Take
+snapshot** button that captures a fresh one. Point an automation at the button — a doorbell, a
+motion sensor elsewhere in the house, a schedule — and the camera entity updates.
+
+**The Portal announces every capture** with an on-screen message. Someone in the room should
+never be photographed without the device saying so.
+
+Some things worth knowing before relying on it:
+
+- **It is stills, not video.** Live streaming with optional audio is designed but not built —
+  see [the design note](../design/camera-streaming.md).
+- **The image is not retained on the broker.** Home Assistant shows the last one it received;
+  a subscriber joining later sees nothing until the next snapshot.
+- **The camera is shared.** A Portal call takes it, and the photo frame's wave-to-advance
+  gesture wants it too, so an occasional snapshot can come back empty rather than queueing.
+- **Anyone with broker credentials can press the button.** The same trust assumption as
+  [notifications](#notifications) — but with a camera on the other end of it, so treat broker
+  access accordingly.
+
 ## What it can control
 
 - **Screen on/off** (`ScreenControl`, which uses the screen-off device-admin granted during

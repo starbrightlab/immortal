@@ -21,6 +21,7 @@ appear where the hardware exists.
 | Media, Media title, Media artist | The current track — see [now-playing](../features/multi-room-audio.md). |
 | Battery, Charging | On models that have a battery (Portal Go). |
 | IP address | Diagnostic. |
+| Camera | The latest still from the Portal's camera. Only when you've switched it on — see [camera snapshots](../features/smart-home.md#camera-snapshots). |
 
 **Controls**
 
@@ -34,6 +35,7 @@ appear where the hardware exists.
 | Open | Send the Portal to a URL, an installed app, or a Home Assistant dashboard path. |
 | Notify | Push a toast with optional image, sound and tap target — see [notifications](../features/smart-home.md#notifications). |
 | Identify | Pop a toast naming the device, for finding which Portal is which. |
+| Take snapshot | Capture a fresh still. Only when the camera is switched on. |
 
 The Portal registers with a stable per-device id, so it survives broker reinstalls but stays unique
 across a fleet. Its **device name is shared with the [fleet agent](../features/fleet.md)**, so a
@@ -97,6 +99,8 @@ automation:
 - **Presence says `proxy`, not `portal`** — check **Use the Portal's own detector** is on under
   Settings → Immortal, then the `READ_LOGS` permission. The provisioning kit grants it, so re-run
   the provisioner on a Portal set up before that grant existed.
+- **No Camera entity** — it's off by default. Turn on **Camera snapshots** under Settings →
+  Immortal on the device; Home Assistant can't enable it remotely, by design.
 - **No temperature entity** — not every Portal has an ambient temperature sensor. Entities are only
   advertised for hardware the device actually reports, so a missing one means the sensor isn't
   there.
