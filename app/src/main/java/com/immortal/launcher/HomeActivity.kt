@@ -1464,6 +1464,11 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
   var pairUrl by remember { mutableStateOf<String?>(null) }
   var pairPin by remember { mutableStateOf<String?>(null) }
 
+  // Same idea for AirPlay: turn the receiver on and show which name to pick in Control Center.
+  // The glyph is hidden entirely where the native library can't load (arm64-only build).
+  var showAirPlay by remember { mutableStateOf(false) }
+  val airPlaySupported = remember { AirPlayControl.isProbablySupported() }
+
   // Layout: the big clock anchors the left; the weather and date stack on the
   // right, right-aligned, so the header reads as a balanced pair of blocks. The
   // clock and the right-hand stack are centred against each other.
@@ -1505,6 +1510,22 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
             },
     ) {
       Box(contentAlignment = Alignment.Center) { RemoteGlyph() }
+    }
+    // AirPlay — the other "use your phone with this Portal" affordance: turn the receiver on
+    // (if off) and show the name to pick in Control Center.
+    if (airPlaySupported) {
+      Spacer(Modifier.size(14.dp))
+      Surface(
+          color = Color(0x33FFFFFF),
+          shape = androidx.compose.foundation.shape.CircleShape,
+          modifier =
+              Modifier.size(56.dp).tvFocusable(androidx.compose.foundation.shape.CircleShape) {
+                enableAirPlay(context)
+                showAirPlay = true
+              },
+      ) {
+        Box(contentAlignment = Alignment.Center) { AirPlayGlyph() }
+      }
     }
     // "Hey" button — push-to-talk for the active assistant. The launcher stays
     // dumb: it just broadcasts the trigger; Millennium owns assistant selection,
@@ -1573,6 +1594,26 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
           RemotePairCard(pairUrl, pairPin)
           Spacer(Modifier.size(16.dp))
           PairDoneButton { showPair = false }
+        }
+      }
+    }
+  }
+
+  if (showAirPlay) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = { showAirPlay = false }) {
+      Surface(color = Color(0xFF101012), shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
+          Text("Stream from your iPhone", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+          Text(
+              "AirPlay is on. Pick this Portal in Control Center on a phone, tablet or Mac on the " +
+                  "same Wi-Fi.",
+              color = Color(0xFF9A9A9A),
+              fontSize = 13.sp,
+              modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
+          )
+          AirPlayPairCard(FleetConfig.name(context), AirPlayConfig.requirePin(context))
+          Spacer(Modifier.size(16.dp))
+          PairDoneButton { showAirPlay = false }
         }
       }
     }
@@ -1919,6 +1960,41 @@ private fun RemoteGlyph() {
     // Speaker slit near the top, home dot near the bottom.
     drawLine(Color.White, Offset(w * 0.44f, w * 0.22f), Offset(w * 0.56f, w * 0.22f), strokeWidth = s)
     drawCircle(color = Color.White, radius = w * 0.045f, center = Offset(w * 0.5f, w * 0.67f))
+  }
+}
+
+/**
+ * White line-art AirPlay glyph for the header "stream from your iPhone" button — Apple's own mark:
+ * a screen outline with a triangle rising into it from below.
+ */
+@Composable
+private fun AirPlayGlyph() {
+  Canvas(modifier = Modifier.size(28.dp)) {
+    val w = size.minDimension
+    val s = w * 0.08f
+    val stroke =
+        Stroke(
+            width = s,
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            join = androidx.compose.ui.graphics.StrokeJoin.Round,
+        )
+    // Screen: an open-bottomed rounded rect, so the triangle reads as sitting in its mouth.
+    drawRoundRect(
+        color = Color.White,
+        topLeft = Offset(w * 0.14f, w * 0.16f),
+        size = Size(w * 0.72f, w * 0.50f),
+        cornerRadius = CornerRadius(w * 0.08f, w * 0.08f),
+        style = stroke,
+    )
+    // Triangle, apex up, centred under the screen.
+    val path =
+        androidx.compose.ui.graphics.Path().apply {
+          moveTo(w * 0.50f, w * 0.56f)
+          lineTo(w * 0.74f, w * 0.88f)
+          lineTo(w * 0.26f, w * 0.88f)
+          close()
+        }
+    drawPath(path, color = Color.White, style = stroke)
   }
 }
 

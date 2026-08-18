@@ -1,0 +1,21 @@
+# Same four dependencies at the same commits as upstream, re-rooted under airplay/ because the
+# native stack lives in its own Gradle module here. Pins are tracked in airplay/UPSTREAM.md.
+#
+# UxPlay in particular must stay a real checkout: the applyUxplayPatches Gradle task runs
+# `git -C .../UxPlay checkout -- <files>` then `git apply` against it at CMake-configure time.
+[submodule "airplay/src/main/cpp/third_party/UxPlay"]
+	path = airplay/src/main/cpp/third_party/UxPlay
+	url = https://github.com/FDH2/UxPlay.git
+	shallow = true
+[submodule "airplay/src/main/cpp/third_party/libplist"]
+	path = airplay/src/main/cpp/third_party/libplist
+	url = https://github.com/libimobiledevice/libplist.git
+	shallow = true
+[submodule "airplay/src/main/cpp/third_party/openssl-cmake"]
+	path = airplay/src/main/cpp/third_party/openssl-cmake
+	url = https://github.com/viaduck/openssl-cmake.git
+	shallow = true
+[submodule "airplay/src/main/cpp/third_party/ffmpeg"]
+	path = airplay/src/main/cpp/third_party/ffmpeg
+	url = https://github.com/FFmpeg/FFmpeg.git
+	shallow = true

@@ -236,6 +236,38 @@ class SettingsDomainTest {
   }
 
   @Test
+  fun airplayRegistry_coversEveryPersistedField_orExplicitlyAccountsForIt() {
+    // Same tripwire as the other snapshot-backed domains: a new AirPlayConfig.Settings field that
+    // nobody specs would silently never appear on-device or on the phone remote. `pairing` is a
+    // NavSpec (the how-to-connect screen), so it holds no value of its own and isn't listed here —
+    // every persisted field must be bound by a value spec.
+    val fields =
+        com.immortal.launcher.AirPlayConfig.Settings::class.java.declaredFields
+            .filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) }
+            .map { it.name }
+            .toSet()
+    val specKeys = SettingsDomains.airplay.specs.map { it.key }.toSet()
+    val uncovered = fields - specKeys
+    assertTrue(
+        "AirPlayConfig.Settings has persisted fields neither in the registry nor accounted for: $uncovered",
+        uncovered.isEmpty())
+  }
+
+  @Test
+  fun airplayResolution_rejectsValuesOutsideItsOptions() {
+    // The resolution enum writes straight to prefs, and the module parses the stored string by
+    // splitting on a literal "x" — a garbage value pushed from the remote would take the foreground
+    // service down on every start attempt. AirPlayOptions sanitises as the last line of defence;
+    // this coercer is the first, and keeps the applied-key set truthful.
+    val spec = SettingsDomains.airplay.specs.first { it.key == "resolution" } as EnumSpec<*>
+    spec.options.forEach { (value, _) ->
+      assertEquals("resolution must accept its own option '$value'", value, spec.coerce(value))
+    }
+    assertNull("resolution must skip an unrecognised value", spec.coerce("1920X1080"))
+    assertNull("resolution must skip an unrecognised value", spec.coerce("not-a-real-value"))
+  }
+
+  @Test
   fun allDomains_sectionKeysMatchRealSpecs() {
     SettingsRegistry.domains.forEach { dom ->
       val specKeys = dom.specs.map { it.key }.toSet()
@@ -261,6 +293,7 @@ class SettingsDomainTest {
             SettingsDomains.digitalclock to emptySet(),
             SettingsDomains.welcome to emptySet(),
             SettingsDomains.sunrise to emptySet(),
+            SettingsDomains.airplay to setOf("pairing"),
         )
     rendered.forEach { (dom, exclude) ->
       val blank =
@@ -421,6 +454,7 @@ class SettingsDomainTest {
             "WelcomeConfig",
             "SunriseConfig",
             "QuickBarConfig",
+            "AirPlayConfig",
             // Context-typed domains (no aggregate Settings class); pinned by their own tests above.
             "MqttConfig",
             "FleetConfig",

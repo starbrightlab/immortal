@@ -69,6 +69,17 @@ object DreamPolicy {
   @Volatile var inStockHandoff: Boolean = false
 
   /**
+   * Set by a full-screen Activity that owns the display for as long as it is up — currently
+   * [AirPlayActivity] during a cast. The dream stops the moment such an Activity comes forward,
+   * which is a genuine REDREAM (someone is here), so the presence verdict below stays honest; but
+   * relaunching the holding photo frame would drop it straight over the top of the cast.
+   *
+   * Deliberately in-memory only, unlike [bridgeAt]: the flag is meaningless without the Activity
+   * that set it, so a process restart clearing it is the correct behaviour.
+   */
+  @Volatile var suppressFrame: Boolean = false
+
+  /**
    * Called from [ImmortalApp.onCreate] to restore bridge state after a process restart.
    * Without this, a new process spawned for a dream-service invocation sees default
    * (zeroed) values and classifies the dream stop as REDREAM, relaunching the photo
@@ -177,6 +188,10 @@ object DreamPolicy {
     // companion). SUPPRESSED (a Calls handoff) leaves presence untouched.
     PresenceHub.onDreamStopped(context, verdict)
     if (verdict != DreamStopVerdict.REDREAM) return
+    if (suppressFrame) {
+      Log.i(TAG, "frame relaunch suppressed; a full-screen owner is up")
+      return
+    }
     // Inside the overnight window the SleepScheduler owns the screen. In dark mode, relaunching the
     // frame would wake the screen just to blank it again — a flash every time a stray sibling/system
     // dream cycles overnight (issue #73). Let the scheduler re-blank in place instead.

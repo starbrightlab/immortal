@@ -14,6 +14,15 @@
 .cxx
 local.properties
 
+# :airplay (AirPlay receiver) build output. Its four native submodules under
+# airplay/src/main/cpp/third_party/ ARE tracked, as gitlinks — see .gitmodules.
+/airplay/build/
+
+# Editor swap files. Not just tidiness: sync-upstream.sh refuses to run while anything
+# under airplay/ is dirty, and a stray .swp there blocks a sync with nothing to commit.
+.*.sw?
+*~
+
 # MkDocs build output (the docs site is built and deployed by CI, not committed).
 /site
 

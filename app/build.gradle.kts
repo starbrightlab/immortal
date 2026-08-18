@@ -28,6 +28,13 @@ android {
   namespace = "com.immortal.launcher"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  // Not because this module compiles native code — it doesn't — but because AGP strips the .so
+  // files it packages using the NDK's llvm-strip, and without a version to resolve it silently
+  // gives up ("Unable to strip the following libraries, packaging them as they are") and ships
+  // :airplay's libraries unstripped. That was 19 MB of .so instead of 8 MB. Keep in step with
+  // ndkVersion in airplay/build.gradle.kts.
+  ndkVersion = "27.0.12077973"
+
   defaultConfig {
     applicationId = "com.immortal.launcher"
     minSdk = 24
@@ -125,13 +132,25 @@ dependencies {
   // render the BitMatrix to a Bitmap ourselves, no Android-specific zxing module needed.
   implementation("com.google.zxing:core:3.5.3")
 
+  // AirPlay 2 receiver (audio / mirroring / AirPlay video). Ships its own service, permissions
+  // and ProGuard keep rules, so nothing else here changes. arm64-only native library; gate any
+  // UI on AirPlayEngine.isSupported(). See airplay/UPSTREAM.md and its licensing tripwire.
+  implementation(project(":airplay"))
+  // AirPlayControl and AirPlayActivity bind AirPlayService directly to follow a session, so :app
+  // compiles against its public surface: kotlinx-coroutines for the StateFlows it exposes, and
+  // lifecycle-service for its LifecycleService supertype. Both are `implementation` details of
+  // :airplay (hosts that only use AirPlayEngine need neither), so they're declared here.
+  implementation(libs.kotlinx.coroutines)
+  implementation(libs.androidx.lifecycle.service)
+
   // Media3 Transformer: on-device, hardware-accelerated video downscale/transcode for the
   // screensaver media cache ([VideoTranscoder]) — turns near-original remote clips into
   // 1200x800 derivatives the Portal stores and replays locally. -effect provides Presentation
-  // (aspect-fit resize); -common carries MediaItem etc.
-  implementation("androidx.media3:media3-transformer:1.5.1")
-  implementation("androidx.media3:media3-effect:1.5.1")
-  implementation("androidx.media3:media3-common:1.5.1")
+  // (aspect-fit resize); -common carries MediaItem etc. Version comes from the catalog, shared
+  // with :airplay (one media3 per APK).
+  implementation(libs.media3.transformer)
+  implementation(libs.media3.effect)
+  implementation(libs.media3.common)
 
   // Unit tests (pure JVM — no device/emulator). org.json provides a real
   // implementation so JSON-parsing logic can be tested off-device (the android.jar

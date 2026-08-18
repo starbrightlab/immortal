@@ -32,3 +32,8 @@ dependencyResolutionManagement {
 rootProject.name = "Portal Sample App"
 
 include(":app")
+
+// AirPlay 2 receiver (audio, screen mirroring, AirPlay video). Vendored from
+// jqssun/android-airplay-server — see airplay/UPSTREAM.md before touching anything under
+// airplay/src/main/. NOTE the licensing tripwire at the top of airplay/build.gradle.kts.
+include(":airplay")

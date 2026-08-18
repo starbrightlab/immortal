@@ -8,6 +8,9 @@
 package com.immortal.launcher.settings
 
 import android.content.Context
+import com.immortal.launcher.AirPlayConfig
+import com.immortal.launcher.AirPlayControl
+import com.immortal.launcher.AirPlayPairActivity
 import com.immortal.launcher.CalendarFeed
 import com.immortal.launcher.CalendarUrlEntryActivity
 import com.immortal.launcher.SunriseConfig
@@ -853,6 +856,12 @@ object SettingsDomains {
                       help = "Shown in the phone remote and in Home Assistant.",
                   ),
               ),
+          onApplied = { c, keys ->
+            // The AirPlay receiver advertises under this name (it has no name of its own, by
+            // design), so a rename has to re-register mDNS or the Portal keeps showing up in
+            // Control Center under the old one. No-op when AirPlay is off or unchanged.
+            if ("name" in keys) AirPlayControl.applyConfig(c)
+          },
       )
 
   /** Every registered domain. */
@@ -1283,6 +1292,91 @@ object SettingsDomains {
           defaults = { WelcomeConfig.Settings() },
       )
 
+  /**
+   * The AirPlay receiver ([AirPlayConfig]) — stream audio or a screen from an iPhone/iPad/Mac.
+   *
+   * The advertised name is deliberately absent: it's [FleetConfig.name], owned by the `fleet`
+   * domain, so there's no second name to drift. Everything past the master toggle is gated on it,
+   * and the whole domain hides on a device with no native library — the build filters it to arm64,
+   * so that's emulators only, but a settings screen offering a feature that cannot start is worse
+   * than one that doesn't mention it.
+   *
+   * Restarting the receiver so a change takes effect belongs in [onApplied], fired once per batch,
+   * so a push from the phone remote re-applies exactly like the on-device screen.
+   */
+  val airplay: SettingsDomain<AirPlayConfig.Settings> =
+      SettingsDomain(
+          id = "airplay",
+          title = "AirPlay",
+          load = AirPlayConfig::load,
+          specs =
+              listOf(
+                  BoolSpec(
+                      "enabled",
+                      "Stream from your iPhone",
+                      get = { it.enabled },
+                      set = AirPlayConfig::setEnabled,
+                      help =
+                          "Let an iPhone, iPad or Mac on this Wi-Fi play music through the Portal's " +
+                              "speakers, or put its screen on the Portal.",
+                      visible = { _, _ -> AirPlayControl.isProbablySupported() }),
+                  NavSpec(
+                      "pairing",
+                      "How to connect",
+                      value = { c, _ -> FleetConfig.name(c) },
+                      activity = AirPlayPairActivity::class.java,
+                      help = "What to tap in Control Center, and the name to pick.",
+                      visible = { _, s -> s.enabled && AirPlayControl.isProbablySupported() }),
+                  BoolSpec(
+                      "allowMirroring",
+                      "Allow screen mirroring",
+                      get = { it.allowMirroring },
+                      set = AirPlayConfig::setAllowMirroring,
+                      help = "Off leaves an audio-only speaker — the Portal stops offering Screen Mirroring.",
+                      visible = { _, s -> s.enabled && AirPlayControl.isProbablySupported() }),
+                  BoolSpec(
+                      "showOnConnect",
+                      "Show the screen when casting starts",
+                      get = { it.showOnConnect },
+                      set = AirPlayConfig::setShowOnConnect,
+                      help =
+                          "Bring the cast to the front automatically. Music never interrupts the " +
+                              "screensaver either way.",
+                      visible = { _, s -> s.enabled && s.allowMirroring && AirPlayControl.isProbablySupported() }),
+                  BoolSpec(
+                      "requirePin",
+                      "Ask for a code",
+                      get = { it.requirePin },
+                      set = AirPlayConfig::setRequirePin,
+                      help =
+                          "Show a code on the Portal that has to be typed into the phone before it " +
+                              "can connect.",
+                      visible = { _, s -> s.enabled && AirPlayControl.isProbablySupported() }),
+                  // Advertised mirroring resolution. "auto" = the Portal's real panel size, which is
+                  // what a sender should normally match; the fixed options exist for a sender that
+                  // negotiates badly with an unusual panel. Free-text WxH would be an inline string
+                  // the on-device renderer can't edit, so it's an enum on both surfaces.
+                  EnumSpec(
+                      "resolution",
+                      "Mirroring resolution",
+                      get = { it.resolution },
+                      set = AirPlayConfig::setResolution,
+                      options =
+                          listOf(
+                              "auto" to "Match the Portal",
+                              "1920x1080" to "1080p",
+                              "1280x720" to "720p"),
+                      coerce = { v ->
+                        v.takeIf { it in setOf("auto", "1920x1080", "1280x720") }
+                      },
+                      visible = { _, s -> s.enabled && s.allowMirroring && AirPlayControl.isProbablySupported() }),
+              ),
+          defaults = { AirPlayConfig.Settings() },
+          onApplied = { c, _ -> AirPlayControl.applyConfig(c) },
+      )
+
   val all: List<SettingsDomain<*>> =
-      listOf(screensaver, calendar, immortal, mqtt, quickbar, fleet, chime, digitalclock, welcome, sunrise)
+      listOf(
+          screensaver, calendar, immortal, mqtt, quickbar, fleet, chime, digitalclock, welcome,
+          sunrise, airplay)
 }
