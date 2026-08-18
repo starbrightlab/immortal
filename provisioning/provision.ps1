@@ -247,6 +247,9 @@ function Grant-Perms {
   A shell pm grant $cfg["PKG"] android.permission.WRITE_EXTERNAL_STORAGE | Out-Null
   # Lets the fleet agent's /logcat endpoint read system-wide logs (development perm).
   A shell pm grant $cfg["PKG"] android.permission.READ_LOGS | Out-Null
+  # Camera snapshots for Home Assistant. The feature stays OFF until the user turns it on in
+  # Settings; granting here only means it works when they do, instead of silently doing nothing.
+  A shell pm grant $cfg["PKG"] android.permission.CAMERA | Out-Null
   # Lets Immortal bring the photo frame back instantly when the system force-wakes
   # the screensaver (~2 min in, a quirk of Meta's power manager) even if another
   # app is in the foreground.

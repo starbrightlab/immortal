@@ -593,16 +593,6 @@ object SettingsDomains {
                               "Assistant, the fleet tools and multi-room audio. Falls back on its " +
                               "own if the Portal isn't reporting it."),
                   BoolSpec(
-                      "cameraEnabled",
-                      "Camera snapshots",
-                      get = { it.cameraEnabled },
-                      set = ImmortalSettings::setCameraEnabled,
-                      help =
-                          "Let Home Assistant take a still photo from this Portal's camera. Off " +
-                              "by default, and only switchable here on the device - Home " +
-                              "Assistant can't turn it on. The Portal shows a message on screen " +
-                              "every time a photo is taken."),
-                  BoolSpec(
                       "multiRoomEnabled",
                       "Multi-room audio",
                       get = { it.multiRoomEnabled },
@@ -647,7 +637,6 @@ object SettingsDomains {
                   "constrainPageWidth" to "Home screen",
                   "clockFormat" to "Clock",
                   "portalPresence" to "Presence",
-                  "cameraEnabled" to "Camera",
                   "multiRoomEnabled" to "Audio",
                   "snapcastHost" to "Audio",
                   "maPort" to "Audio",
@@ -659,7 +648,6 @@ object SettingsDomains {
             if ("portalPresence" in keys) PortalPresenceDetector.sync(c)
             // The publisher advertises (or clears) the camera entities from this, so a running
             // publisher has to re-read it rather than wait for the next reconnect.
-            if ("cameraEnabled" in keys) MqttService.sync(c, reconfigure = true)
             if (keys.any { it in setOf("multiRoomEnabled", "snapcastHost", "maPort", "maUsername", "maPassword") })
                 MultiRoomService.sync(c)
           },
@@ -736,6 +724,17 @@ object SettingsDomains {
                           "Publish this Portal's ambient sensors (temperature, light) to Home " +
                               "Assistant. Only sensors this model actually has will appear.",
                       visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  BoolSpec(
+                      "cameraEnabled",
+                      "Camera snapshots",
+                      get = { ImmortalSettings.cameraEnabled(it) },
+                      set = ImmortalSettings::setCameraEnabled,
+                      help =
+                          "Let Home Assistant take a still photo from this Portal's camera. Off " +
+                              "by default, and only switchable here on the device - Home " +
+                              "Assistant can't turn it on. The Portal shows a message on screen " +
+                              "every time a photo is taken.",
+                      visible = { c, _ -> MqttConfig.isEnabled(c) }),
                   IntSpec(
                       "tempOffset",
                       "Temperature offset",
@@ -758,7 +757,8 @@ object SettingsDomains {
                   "useTls" to "Security",
                   "validateCert" to "Security",
                   "ambientSensors" to "Sensors",
-                  "tempOffset" to "Sensors"),
+                  "tempOffset" to "Sensors",
+                  "cameraEnabled" to "Camera"),
           onApplied = { c, keys ->
             // TLS<->port convenience hop, lifted out of the bespoke on-device screen so the phone
             // remote gets it too (it didn't before — a real drift): flipping TLS moves the port to
@@ -771,7 +771,7 @@ object SettingsDomains {
             }
             // These are read by the running publisher, not just at connect time, so tell it to
             // re-read them — a plain sync() would no-op against an already-running service.
-            val live = keys.any { it in setOf("ambientSensors", "tempOffset") }
+            val live = keys.any { it in setOf("ambientSensors", "tempOffset", "cameraEnabled") }
             MqttService.sync(c, reconfigure = live)
           },
       )

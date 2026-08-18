@@ -7,6 +7,12 @@
 
 package com.immortal.launcher
 
+import androidx.core.content.ContextCompat
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.widget.Toast
+import android.content.pm.PackageManager
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -713,6 +719,19 @@ internal fun MqttScreen(onBack: () -> Unit) {
   var validateCert by remember { mutableStateOf(MqttConfig.validateCert(context)) }
   var ambientSensors by remember { mutableStateOf(MqttConfig.ambientSensors(context)) }
   var tempOffset by remember { mutableStateOf(MqttConfig.tempOffset(context)) }
+  var cameraEnabled by remember { mutableStateOf(ImmortalSettings.cameraEnabled(context)) }
+  // CAMERA is a runtime permission that provisioning doesn't grant, and nothing else in the app
+  // asks for it — so without this the toggle switched on and every snapshot silently did nothing.
+  val cameraPermission =
+      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) {
+          cameraEnabled = false
+          ImmortalSettings.setCameraEnabled(context, false)
+          Toast.makeText(context, "Camera permission is needed for snapshots", Toast.LENGTH_LONG)
+              .show()
+        }
+        MqttService.sync(context, reconfigure = true)
+      }
   // MqttStatus is a plain holder updated off the main thread, so poll it for live
   // "Connecting… → Connected" feedback (Compose won't recompose on its writes).
   var status by remember { mutableStateOf(MqttStatus.text) }
@@ -748,6 +767,19 @@ internal fun MqttScreen(onBack: () -> Unit) {
     MqttConfig.setAmbientSensors(context, ambientSensors)
     MqttConfig.setTempOffset(context, tempOffset)
     MqttService.sync(context, reconfigure = true)
+  }
+
+  /**
+   * Enabling the camera asks for the permission there and then. Turning it on without it looks
+   * like it worked and then does nothing, which is exactly how this shipped the first time.
+   */
+  fun applyCamera(on: Boolean) {
+    ImmortalSettings.setCameraEnabled(context, on)
+    val granted =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+    if (on && !granted) cameraPermission.launch(Manifest.permission.CAMERA)
+    else MqttService.sync(context, reconfigure = true)
   }
 
   Column(
@@ -1020,6 +1052,34 @@ internal fun MqttScreen(onBack: () -> Unit) {
                 color = Color(0xFF7C7C7C),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+            )
+          }
+        }
+        Spacer(Modifier.size(26.dp))
+        SectionLabel("Camera")
+        Card {
+          Row(
+              modifier = Modifier.fillMaxWidth().padding(18.dp),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text("Camera snapshots", color = Color.White, fontSize = 15.sp)
+              Text(
+                  "Let Home Assistant take a still photo from this Portal's camera. Only " +
+                      "switchable here - Home Assistant can't turn it on - and the screen says " +
+                      "so every time a photo is taken.",
+                  color = Color(0xFF9A9A9A),
+                  fontSize = 13.sp,
+                  modifier = Modifier.padding(top = 2.dp),
+              )
+            }
+            Segmented(
+                options = listOf("Off" to "off", "On" to "on"),
+                selected = if (cameraEnabled) "on" else "off",
+                onSelect = {
+                  cameraEnabled = it == "on"
+                  applyCamera(cameraEnabled)
+                },
             )
           }
         }

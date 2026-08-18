@@ -100,7 +100,12 @@ automation:
   Settings → Immortal, then the `READ_LOGS` permission. The provisioning kit grants it, so re-run
   the provisioner on a Portal set up before that grant existed.
 - **No Camera entity** — it's off by default. Turn on **Camera snapshots** under Settings →
-  Immortal on the device; Home Assistant can't enable it remotely, by design.
+  Home Assistant (MQTT) on the device; Home Assistant can't enable it remotely, by design.
+- **The snapshot button does nothing** — watch the Portal's screen, which now says why. *No
+  camera permission* means the grant is missing: re-run the [provisioning kit](../provisioning.md),
+  or `adb shell pm grant com.immortal.launcher android.permission.CAMERA`. *Snapshot too large
+  for the broker* means your broker's message size limit is below the image; raise Mosquitto's
+  `message_size_limit`. If your broker log shows `disconnected: oversize packet`, that's this.
 - **No temperature entity** — not every Portal has an ambient temperature sensor. Entities are only
   advertised for hardware the device actually reports, so a missing one means the sensor isn't
   there.

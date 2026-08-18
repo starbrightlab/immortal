@@ -58,10 +58,6 @@ object ImmortalSettings {
       // PresenceHub. On by default — it needs no permission provisioning doesn't already
       // grant, and falls back to the proxy on its own when the detector stays quiet.
       val portalPresence: Boolean = true,
-      // Let Home Assistant take a still from the Portal's camera. OFF by default and
-      // deliberately device-only consent: nothing arriving over MQTT can turn this on, and with
-      // it off the camera is never opened. See docs/design/camera-streaming.md.
-      val cameraEnabled: Boolean = false,
       // Hide the system status bar (immersive). Default on — the clean wall-frame look,
       // and what provisioning seeds; swipe from the top still reveals it transiently.
       val hideStatusBar: Boolean = true,
@@ -95,7 +91,6 @@ object ImmortalSettings {
         clockFormat = p.getString("clock_format", CLOCK_AUTO) ?: CLOCK_AUTO,
         showMiniPlayer = p.getBoolean("show_mini_player", true),
         portalPresence = p.getBoolean("portal_presence", true),
-        cameraEnabled = p.getBoolean("camera_enabled", false),
         hideStatusBar = p.getBoolean("hide_status_bar", true),
         constrainPageWidth = p.getBoolean("constrain_page_width", false),
         multiRoomEnabled = p.getBoolean("multiroom_enabled", false),
@@ -106,6 +101,15 @@ object ImmortalSettings {
     )
   }
 
+  /**
+   * Let Home Assistant take a still from the Portal's camera. Off by default, and deliberately
+   * device-only consent: nothing arriving over MQTT can turn it on, and with it off the camera
+   * is never opened. See docs/design/camera-streaming.md.
+   *
+   * Stored here rather than in [MqttConfig] — where its setting is now surfaced — so that anyone
+   * who already switched it on keeps it, with no migration to get wrong. It's an app-level
+   * capability; Home Assistant is simply what consumes it.
+   */
   fun cameraEnabled(c: Context): Boolean = prefs(c).getBoolean("camera_enabled", false)
 
   fun setCameraEnabled(c: Context, on: Boolean) =

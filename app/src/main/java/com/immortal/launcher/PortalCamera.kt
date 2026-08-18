@@ -15,6 +15,7 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.params.StreamConfigurationMap
 import android.media.ImageReader
 import android.os.Handler
@@ -69,7 +70,7 @@ class PortalCameraCapture(private val appContext: Context) {
 
   /** True when the user has enabled the camera AND the permission is actually granted. */
   fun available(): Boolean =
-      ImmortalSettings.load(appContext).cameraEnabled &&
+      ImmortalSettings.cameraEnabled(appContext) &&
           ContextCompat.checkSelfPermission(appContext, Manifest.permission.CAMERA) ==
               PackageManager.PERMISSION_GRANTED
 
@@ -82,6 +83,9 @@ class PortalCameraCapture(private val appContext: Context) {
   fun snapshot(timeoutMs: Long = TIMEOUT_MS): ByteArray? {
     if (!available()) {
       Log.i(TAG, "camera off or ungranted — no snapshot")
+      toast(
+          if (ImmortalSettings.cameraEnabled(appContext)) "Immortal · no camera permission"
+          else "Immortal · camera snapshots are off")
       return null
     }
     var thread: HandlerThread? = null
@@ -149,13 +153,18 @@ class PortalCameraCapture(private val appContext: Context) {
       val req =
           cam.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
             addTarget(rdr.surface)
+            // Without this the device picks its own default, typically 95+, and a 640px still
+            // lands in the hundreds of KB — big enough that a broker with a message size limit
+            // drops the whole connection rather than just the image. A dashboard tile does not
+            // need that fidelity.
+            set(CaptureRequest.JPEG_QUALITY, JPEG_QUALITY)
           }
       sess.capture(req.build(), null, handler)
       if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
         Log.w(TAG, "capture didn't complete within ${timeoutMs}ms")
         return null
       }
-      bytes?.also { indicate(it.size) }
+      bytes?.also { indicate(it.size) } ?: null.also { toast("Immortal · camera snapshot failed") }
     } catch (t: Throwable) {
       // The camera is shared and this runs alongside the always-on dream: a failure here must
       // never take a process down, it just means no snapshot this time.
@@ -172,10 +181,13 @@ class PortalCameraCapture(private val appContext: Context) {
   /** Tell the room. A capture the Portal doesn't announce is not one we should be taking. */
   private fun indicate(byteCount: Int) {
     Log.i(TAG, "snapshot captured ($byteCount bytes)")
+    toast("Immortal · camera snapshot taken")
+  }
+
+  /** On-screen feedback, including for failures — a silent no-op is impossible to diagnose. */
+  internal fun toast(text: String) {
     Handler(appContext.mainLooper).post {
-      runCatching {
-        Toast.makeText(appContext, "Immortal · camera snapshot taken", Toast.LENGTH_SHORT).show()
-      }
+      runCatching { Toast.makeText(appContext, text, Toast.LENGTH_SHORT).show() }
     }
   }
 
@@ -231,6 +243,8 @@ class PortalCameraCapture(private val appContext: Context) {
     const val TAG = "ImmortalCamera"
     /** Longest edge we'll ask for — a dashboard tile, not a photograph. */
     const val MAX_EDGE = 640
+    /** Modest on purpose; see the capture request. */
+    const val JPEG_QUALITY: Byte = 75
     const val TIMEOUT_MS = 5_000L
   }
 }

@@ -374,10 +374,20 @@ class MqttPublisher(private val appContext: Context) {
             Thread {
                   runCatching {
                         val jpeg = camera.snapshot()
-                        if (jpeg == null) Log.i(TAG, "snapshot unavailable")
-                        // retain = false on purpose: a still of someone's room should not sit on
-                        // the broker indefinitely for anyone who later subscribes.
-                        else client?.publish("$base/camera/image", jpeg, retain = false)
+                        when {
+                          jpeg == null -> Log.i(TAG, "snapshot unavailable")
+                          // A broker with a message size limit doesn't reject an oversize
+                          // PUBLISH, it drops the CONNECTION — taking presence, sensors and
+                          // everything else down with it, once per press. Never hand it one:
+                          // say so on the device instead, where the user can act on it.
+                          jpeg.size > MAX_IMAGE_BYTES -> {
+                            Log.w(TAG, "snapshot ${jpeg.size} bytes exceeds $MAX_IMAGE_BYTES; not publishing")
+                            camera.toast("Immortal · snapshot too large for the broker")
+                          }
+                          // retain = false on purpose: a still of someone's room should not sit on
+                          // the broker indefinitely for anyone who later subscribes.
+                          else -> client?.publish("$base/camera/image", jpeg, retain = false)
+                        }
                       }
                       .onFailure { Log.w(TAG, "snapshot failed", it) }
                 }
@@ -925,5 +935,11 @@ class MqttPublisher(private val appContext: Context) {
     const val KEEPALIVE_SEC = 45
     const val PING_MS = 20_000L
     const val BACKOFF_MS = 4_000L
+    /**
+     * Biggest image we'll put on the wire. Mosquitto's `message_size_limit` and its equivalents
+     * are commonly set well below a full-quality still, and exceeding one costs the whole
+     * connection rather than just the message.
+     */
+    const val MAX_IMAGE_BYTES = 200_000
   }
 }

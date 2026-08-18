@@ -76,7 +76,7 @@ automation is actually waiting for.
 
 A Portal can hand Home Assistant a still photo from its own camera — a second angle on a room
 you already have a Portal in. It is **off by default**, and the switch is deliberately on the
-device only: turn it on under **Settings → Immortal → Camera snapshots**. Nothing arriving over
+device only: turn it on under **Settings → Home Assistant (MQTT) → Camera snapshots**. Nothing arriving over
 MQTT can enable it, and while it is off the camera is never opened.
 
 Once on, two entities appear: a **Camera** entity showing the most recent still, and a **Take
@@ -94,6 +94,11 @@ Some things worth knowing before relying on it:
   a subscriber joining later sees nothing until the next snapshot.
 - **The camera is shared.** A Portal call takes it, and the photo frame's wave-to-advance
   gesture wants it too, so an occasional snapshot can come back empty rather than queueing.
+- **The image has to fit your broker's message size limit.** Snapshots are captured small on
+  purpose (640px, moderate JPEG quality), which keeps them well inside a typical limit. If your
+  broker still refuses one, the Portal says *snapshot too large for the broker* on screen rather
+  than sending it — an oversize publish costs the whole MQTT connection, not just the image.
+  Mosquitto's limit is `message_size_limit`.
 - **Anyone with broker credentials can press the button.** The same trust assumption as
   [notifications](#notifications) — but with a camera on the other end of it, so treat broker
   access accordingly.
