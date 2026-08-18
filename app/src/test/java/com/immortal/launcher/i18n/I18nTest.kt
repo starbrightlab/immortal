@@ -63,4 +63,30 @@ class I18nTest {
             usesFolder = false,
             userLang = "en"))
   }
+
+  @Test
+  fun noTranslationStartsWithListMarker() {
+    val file =
+        listOf(
+                java.io.File("src/main/java/com/immortal/launcher/i18n/I18n.kt"),
+                java.io.File("app/src/main/java/com/immortal/launcher/i18n/I18n.kt"))
+            .firstOrNull { it.exists() }
+
+    if (file != null) {
+      val regex = Regex("""->\s*"([0-9]+[.)]\s+.*)"""")
+      val matches = file.readLines().mapNotNull { line -> regex.find(line)?.groupValues?.get(1) }
+      assertTrue("Found translations starting with list markers: $matches", matches.isEmpty())
+    }
+
+    assertFalse(
+        I18n.translate(
+                "In Home Assistant, add the Mosquitto broker add-on (Settings → Add-ons) and the MQTT integration. New to MQTT? See home-assistant.io/integrations/mqtt",
+                "es")
+            .matches(Regex("""^\d+[.)]\s.*""")))
+    assertFalse(
+        I18n.translate(
+                "Install and set up Music Assistant as a server on your home network. New to Music Assistant? Learn more at music-assistant.io",
+                "es")
+            .matches(Regex("""^\d+[.)]\s.*""")))
+  }
 }
