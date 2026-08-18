@@ -70,6 +70,7 @@ class MqttPublisher(private val appContext: Context) {
   private val nowPlayingListener = NowPlayingHub.Listener { st -> runCatching { publishMedia(st) } }
   private var batteryReceiver: BroadcastReceiver? = null
   private var screenReceiver: BroadcastReceiver? = null
+  private var micMuteReceiver: BroadcastReceiver? = null
 
   fun start() {
     if (running) return
@@ -126,7 +127,8 @@ class MqttPublisher(private val appContext: Context) {
    *
    * The sensors are restarted rather than left alone so that a changed temperature offset shows
    * up at once — re-registering replays each sensor's current reading — instead of waiting for
-   * the room to move.
+   * the room to move. Current state is republished too, so this is also the deterministic
+   * "something changed underneath you, catch up" nudge for callers outside the publisher.
    */
   fun reconfigure() {
     val c = client ?: return
@@ -136,6 +138,7 @@ class MqttPublisher(private val appContext: Context) {
                 if (MqttConfig.ambientSensors(appContext)) ambient.start()
                 publishDiscovery(c)
                 publishPresence(PresenceHub.current)
+                publishAudioState()
               }
               .onFailure { Log.w(TAG, "reconfigure failed", it) }
         }
@@ -192,6 +195,10 @@ class MqttPublisher(private val appContext: Context) {
                     // sleep) — keeps the screen sensor and presence from going stale.
                     runCatching { publishScreen() }
                     runCatching { publishPresence(PresenceHub.current) }
+                    // Audio for the same reason: the system volume keys and any local control
+                    // move these without telling us, so HA's slider and switches would sit on
+                    // whatever we last published until the next reconnect.
+                    runCatching { publishAudioState() }
                   }
                 }
               }
@@ -263,6 +270,18 @@ class MqttPublisher(private val appContext: Context) {
           addAction(Intent.ACTION_SCREEN_ON)
           addAction(Intent.ACTION_SCREEN_OFF)
         })
+    // Mic mute can be changed by anything on the device — a remapped remote button, another
+    // app, the system — and HA's switch would then sit stale until the next reconnect. The
+    // platform broadcasts every change from API 28 (every Portal), so follow that rather than
+    // asking each caller to remember to republish.
+    val mr =
+        object : BroadcastReceiver() {
+          override fun onReceive(c: Context, i: Intent) = runCatching { publishMicMute() }.let {}
+        }
+    micMuteReceiver = mr
+    // The literal avoids gating on AudioManager.ACTION_MICROPHONE_MUTE_CHANGED (API 28) when
+    // minSdk is 24; on an older device the action simply never fires.
+    appContext.registerReceiver(mr, IntentFilter(ACTION_MIC_MUTE_CHANGED))
     publishScreen()
     publishIp()
     publishAudioState()
@@ -277,6 +296,8 @@ class MqttPublisher(private val appContext: Context) {
     batteryReceiver = null
     screenReceiver?.let { r -> runCatching { appContext.unregisterReceiver(r) } }
     screenReceiver = null
+    micMuteReceiver?.let { r -> runCatching { appContext.unregisterReceiver(r) } }
+    micMuteReceiver = null
   }
 
   // --- commands (broker → device) ---------------------------------------------
@@ -850,6 +871,8 @@ class MqttPublisher(private val appContext: Context) {
 
   private companion object {
     const val TAG = "ImmortalMqtt"
+    /** [android.media.AudioManager.ACTION_MICROPHONE_MUTE_CHANGED], usable below API 28. */
+    const val ACTION_MIC_MUTE_CHANGED = "android.media.action.MICROPHONE_MUTE_CHANGED"
     const val KEEPALIVE_SEC = 45
     const val PING_MS = 20_000L
     const val BACKOFF_MS = 4_000L

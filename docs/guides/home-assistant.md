@@ -29,7 +29,7 @@ appear where the hardware exists.
 | Screen | Wake or sleep the display (uses the screen-off device admin). |
 | Play / pause, Next track, Previous track | Transport for whatever is playing. |
 | Media volume, Speaker mute, Volume up / down | Hidden on Portal TV, where volume changes are inaudible. |
-| Microphone mute | |
+| Microphone mute | Follows the device: muting from anywhere on the Portal updates the switch. |
 | Home, Screensaver | Go to the launcher, or show the photo frame. |
 | Open | Send the Portal to a URL, an installed app, or a Home Assistant dashboard path. |
 | Notify | Push a toast with optional image, sound and tap target — see [notifications](../features/smart-home.md#notifications). |
