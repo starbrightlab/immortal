@@ -294,10 +294,14 @@ class MqttPublisher(private val appContext: Context) {
     publishAudioState()
     publishStreamState()
     if (MqttConfig.ambientSensors(appContext)) ambient.start()
+    // The service knows when it actually came up; publishing straight after sync() reported the
+    // state from BEFORE the start, which read as the switch refusing to stay on.
+    CameraStreamService.onStateChanged = { runCatching { publishStreamState() }.let {} }
   }
 
   private fun detach() {
     runCatching { ambient.stop() }
+    CameraStreamService.onStateChanged = null
     runCatching { PresenceHub.removeListener(presenceListener) }
     runCatching { NowPlayingHub.removeListener(nowPlayingListener) }
     batteryReceiver?.let { r -> runCatching { appContext.unregisterReceiver(r) } }
@@ -403,10 +407,10 @@ class MqttPublisher(private val appContext: Context) {
           // Streaming can only be switched on within consent already given on the device;
           // CameraStreamService.sync enforces that, and we report back what actually happened
           // rather than what was asked for.
-          "camera_stream" -> {
-            CameraStreamService.sync(appContext, payload.trim().equals("ON", ignoreCase = true))
-            publishStreamState()
-          }
+          // No publish here: the service reports its own state once it has actually started or
+          // stopped, through onStateChanged.
+          "camera_stream" ->
+              CameraStreamService.sync(appContext, payload.trim().equals("ON", ignoreCase = true))
           "camera_audio" -> {
             val on = payload.trim().equals("ON", ignoreCase = true)
             ImmortalSettings.setCameraAudio(appContext, on)

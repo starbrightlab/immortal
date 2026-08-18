@@ -720,6 +720,20 @@ internal fun MqttScreen(onBack: () -> Unit) {
   var ambientSensors by remember { mutableStateOf(MqttConfig.ambientSensors(context)) }
   var tempOffset by remember { mutableStateOf(MqttConfig.tempOffset(context)) }
   var cameraEnabled by remember { mutableStateOf(ImmortalSettings.cameraEnabled(context)) }
+  var cameraAudio by remember { mutableStateOf(ImmortalSettings.cameraAudio(context)) }
+  var streaming by remember { mutableStateOf(CameraStreamService.running) }
+  // RECORD_AUDIO has the same shape as CAMERA: declared, not granted by provisioning, and
+  // nothing on this path asked for it — so sound silently never worked.
+  val micPermission =
+      rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) {
+          cameraAudio = false
+          ImmortalSettings.setCameraAudio(context, false)
+          Toast.makeText(context, "Microphone permission is needed for stream sound", Toast.LENGTH_LONG)
+              .show()
+        }
+        MqttService.sync(context, reconfigure = true)
+      }
   // CAMERA is a runtime permission that provisioning doesn't grant, and nothing else in the app
   // asks for it — so without this the toggle switched on and every snapshot silently did nothing.
   val cameraPermission =
@@ -1081,6 +1095,62 @@ internal fun MqttScreen(onBack: () -> Unit) {
                   applyCamera(cameraEnabled)
                 },
             )
+          }
+          if (cameraEnabled) {
+            Divider()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text("Camera sound", color = Color.White, fontSize = 15.sp)
+                Text(
+                    "Include sound in the video stream. Muting the microphone silences it, and " +
+                        "an intercom announcement takes the microphone back.",
+                    color = Color(0xFF9A9A9A),
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+              }
+              Segmented(
+                  options = listOf("Off" to "off", "On" to "on"),
+                  selected = if (cameraAudio) "on" else "off",
+                  onSelect = {
+                    cameraAudio = it == "on"
+                    ImmortalSettings.setCameraAudio(context, cameraAudio)
+                    val granted =
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                            PackageManager.PERMISSION_GRANTED
+                    if (cameraAudio && !granted) micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    else MqttService.sync(context, reconfigure = true)
+                  },
+              )
+            }
+            Divider()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text("Stream video now", color = Color.White, fontSize = 15.sp)
+                Text(
+                    "Start the live RTSP stream from here as well as from Home Assistant. " +
+                        "Play it at rtsp://127.0.0.1:8554/ on this Portal, or at the Portal's " +
+                        "own address from elsewhere. Stops on reboot.",
+                    color = Color(0xFF9A9A9A),
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+              }
+              Segmented(
+                  options = listOf("Off" to "off", "On" to "on"),
+                  selected = if (streaming) "on" else "off",
+                  onSelect = {
+                    streaming = it == "on"
+                    CameraStreamService.sync(context, streaming)
+                  },
+              )
+            }
           }
         }
       }

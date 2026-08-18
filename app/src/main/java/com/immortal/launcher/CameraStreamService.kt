@@ -82,6 +82,7 @@ class CameraStreamService : Service() {
       running = true
       Log.i(TAG, "streaming service up on :${RtspServer.DEFAULT_PORT}")
     }
+    notifyState()
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
@@ -90,6 +91,7 @@ class CameraStreamService : Service() {
 
   override fun onDestroy() {
     running = false
+    notifyState()
     runCatching { stream?.stop() }
     runCatching { audio?.stop() }
     runCatching { server?.stop() }
@@ -130,6 +132,17 @@ class CameraStreamService : Service() {
       private set
 
     /**
+     * Notified whenever [running] actually changes.
+     *
+     * Starting a service is asynchronous, so a caller that publishes state straight after
+     * [sync] reports the state from *before* the start — which read as the switch refusing to
+     * stay on. The service is the only thing that knows when it truly came up, so it says so.
+     */
+    @Volatile var onStateChanged: (() -> Unit)? = null
+
+    private fun notifyState() = runCatching { onStateChanged?.invoke() }.let {}
+
+    /**
      * Start or stop streaming. Starting requires the device-side camera consent: a Home Assistant
      * command can turn the stream on only within permission already granted on the Portal, never
      * grant it.
@@ -141,7 +154,9 @@ class CameraStreamService : Service() {
         else context.startService(intent)
       } else {
         context.stopService(intent)
-        running = false
+        // stopService is asynchronous too, but onDestroy will notify; setting it here keeps an
+        // immediate read honest for the case where the service wasn't running at all.
+        if (running) running = false else notifyState()
       }
     }
   }

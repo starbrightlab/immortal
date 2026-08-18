@@ -104,6 +104,14 @@ automation:
   the provisioner on a Portal set up before that grant existed.
 - **No Camera entity** — it's off by default. Turn on **Camera snapshots** under Settings →
   Home Assistant (MQTT) on the device; Home Assistant can't enable it remotely, by design.
+- **Camera streaming won't stay on** — check `adb logcat -s ImmortalStream:V`. A
+  `MediaCodec ... configure` failure means the encoder refused our settings; Immortal retries
+  without the profile hint, so this should now start anyway. `no record-audio permission` means
+  sound is ungranted: re-run the [provisioning kit](../provisioning.md), or turn **Camera sound**
+  on from the device, which asks for it.
+- **Testing the stream on the Portal itself** — install VLC on it and open
+  `rtsp://127.0.0.1:8554/`. From another machine, use the Portal's address: Home Assistant's
+  **Stream URL** or **IP address** sensor has it, or `adb shell ip addr show wlan0`.
 - **The snapshot button does nothing** — watch the Portal's screen, which now says why. *No
   camera permission* means the grant is missing: re-run the [provisioning kit](../provisioning.md),
   or `adb shell pm grant com.immortal.launcher android.permission.CAMERA`. *Snapshot too large

@@ -116,24 +116,8 @@ class CameraStream(
           thread = ht
           val handler = Handler(ht.looper)
 
-          val enc = MediaCodec.createEncoderByType(StreamProfile.MIME)
+          val enc = configureEncoder(width, height, fps) ?: return false
           codec = enc
-          val format =
-              MediaFormat.createVideoFormat(StreamProfile.MIME, width, height).apply {
-                setInteger(
-                    MediaFormat.KEY_COLOR_FORMAT,
-                    MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-                setInteger(
-                    MediaFormat.KEY_BIT_RATE, StreamProfile.bitrateFor(width, height, fps))
-                setInteger(MediaFormat.KEY_FRAME_RATE, fps)
-                setInteger(
-                    MediaFormat.KEY_I_FRAME_INTERVAL, StreamProfile.KEYFRAME_INTERVAL_S)
-                // Ask for Constrained Baseline. Not every encoder honours the request; the SDP
-                // reports what the SPS actually says, so a device that ignores this is visible
-                // rather than mysterious.
-                setInteger(MediaFormat.KEY_PROFILE, StreamProfile.PROFILE_CONSTRAINED_BASELINE)
-              }
-          enc.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
           val surface = enc.createInputSurface()
           inputSurface = surface
           enc.start()
@@ -168,6 +152,50 @@ class CameraStream(
     thread = null
     drain = null
     Log.i(TAG, "streaming stopped")
+  }
+
+  /**
+   * Build and configure the encoder, asking for Constrained Baseline but not insisting.
+   *
+   * Portal's encoder rejects the profile hint outright — `CodecException 0x80001001` straight out
+   * of `configure()`, verified on a Portal Go — so a single attempt meant no stream at all. A
+   * level is set alongside the profile because a profile without one is the classic way to make
+   * `configure()` throw; if that still fails we drop both and take whatever the encoder picks.
+   *
+   * Falling back is safe precisely because the SDP reports what the **SPS** says rather than what
+   * we asked for: a client is told the truth either way, and a stream that plays in VLC but not a
+   * browser is a visible, explicable outcome rather than a silent failure.
+   */
+  private fun configureEncoder(w: Int, h: Int, fps: Int): MediaCodec? {
+    for (withProfile in listOf(true, false)) {
+      val enc =
+          runCatching { MediaCodec.createEncoderByType(StreamProfile.MIME) }.getOrNull() ?: return null
+      val format =
+          MediaFormat.createVideoFormat(StreamProfile.MIME, w, h).apply {
+            setInteger(
+                MediaFormat.KEY_COLOR_FORMAT,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+            setInteger(MediaFormat.KEY_BIT_RATE, StreamProfile.bitrateFor(w, h, fps))
+            setInteger(MediaFormat.KEY_FRAME_RATE, fps)
+            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, StreamProfile.KEYFRAME_INTERVAL_S)
+            if (withProfile) {
+              setInteger(MediaFormat.KEY_PROFILE, StreamProfile.PROFILE_CONSTRAINED_BASELINE)
+              setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel31)
+            }
+          }
+      val configured =
+          runCatching { enc.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE) }
+      if (configured.isSuccess) {
+        if (!withProfile) {
+          Log.w(TAG, "encoder rejected the Constrained Baseline hint; using its own profile")
+        }
+        return enc
+      }
+      Log.i(TAG, "configure (profile=$withProfile) failed: ${configured.exceptionOrNull()?.message}")
+      runCatching { enc.release() }
+    }
+    Log.w(TAG, "no usable H.264 encoder configuration")
+    return null
   }
 
   /**

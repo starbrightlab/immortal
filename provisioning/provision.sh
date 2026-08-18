@@ -314,6 +314,8 @@ grant_perms() {
   # Camera snapshots for Home Assistant. The feature stays OFF until the user turns it on in
   # Settings; granting here only means it works when they do, instead of silently doing nothing.
   a shell pm grant "$PKG" android.permission.CAMERA >/dev/null 2>&1
+  # Sound for the camera stream, and the intercom. Both stay OFF until the user turns them on.
+  a shell pm grant "$PKG" android.permission.RECORD_AUDIO >/dev/null 2>&1
   # Lets Immortal bring the photo frame back instantly when the system force-wakes
   # the screensaver (~2 min in, a quirk of Meta's power manager) even if another
   # app is in the foreground. SYSTEM_ALERT_WINDOW holders may start activities
