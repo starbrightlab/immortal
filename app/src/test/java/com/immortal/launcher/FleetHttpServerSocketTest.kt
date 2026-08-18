@@ -12,7 +12,6 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -126,9 +125,18 @@ class FleetHttpServerSocketTest {
     val server = serverOn(port) { FleetHttpServer.Response(200, """{"ok":true}""") }
     assertEquals("HTTP/1.1 200 OK", ok(port))
     server.stop()
-    assertNotNull(
-        "expected connect to fail after stop()",
-        runCatching { connect(port).close() }.exceptionOrNull(),
-    )
+    // Prove the port was released by binding it ourselves: if stop() had left the listener open,
+    // this throws BindException.
+    //
+    // The obvious alternative — assert that a fresh connect() fails — is the same claim but it
+    // races, and it flaked on CI while passing locally every time. Once stop() frees the port the
+    // OS is free to hand that number to anything else asking for an ephemeral port, including
+    // another test in this suite calling freePort(). If something else binds it first, the connect
+    // succeeds and the test fails while stop() did its job perfectly.
+    ServerSocket().use { probe ->
+      probe.reuseAddress = true
+      probe.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port))
+      assertTrue("stop() should release the listening port", probe.isBound)
+    }
   }
 }
