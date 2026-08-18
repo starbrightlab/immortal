@@ -212,10 +212,10 @@ class PhotoFrameController(
   private var index = -1
 
   // In-memory cache for preloaded adjacent photo Bitmaps (prev/next) for instant swipe performance.
-  // Sized by memory byte count (max 1/8th of available max heap, capped between 16MB and 32MB) to prevent OOM.
+  // Sized by memory byte count (1/8th of available max heap, bounded between 4MB and 32MB) to prevent OOM.
   private val preloadedBitmaps = run {
     val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
-    val cacheSizeKb = (maxMemoryKb / 8).coerceIn(16 * 1024, 32 * 1024)
+    val cacheSizeKb = (maxMemoryKb / 8).coerceIn(4 * 1024, 32 * 1024)
     object : android.util.LruCache<String, Bitmap>(cacheSizeKb) {
       override fun sizeOf(key: String, value: Bitmap): Int {
         return (value.byteCount / 1024).coerceAtLeast(1)
