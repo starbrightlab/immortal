@@ -14,6 +14,15 @@
     <!-- Store: install and remove apps on-device via PackageInstaller. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- See other installed apps. A no-op on the Portals' Android 9/10, but on
+         Android 11+ package-visibility filtering otherwise blinds us to every
+         third-party app: the launcher grid shows only our own tiles, the store's
+         installed-version checks miss, and MQTT/fleet launch-app commands (which
+         take arbitrary package ids) resolve nothing. QUERY_ALL_PACKAGES rather
+         than a scoped <queries> block because the store catalog and remote
+         launch targets aren't a fixed set we could enumerate. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <!-- Self-healing: reaffirm our screensaver settings if something resets them.
          Not granted at install (privileged); provisioning grants it via
          `pm grant ... WRITE_SECURE_SETTINGS`. Harmless no-op if not granted. -->
