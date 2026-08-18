@@ -71,15 +71,7 @@ object ScreensaverConfig {
   const val SOUND_BROWN = "brown"
   val SOUNDSCAPES =
       listOf(SOUND_OFF, SOUND_RAIN, SOUND_OCEAN, SOUND_FIREPLACE, SOUND_WHITE, SOUND_PINK, SOUND_BROWN)
-  fun soundscapeLabel(s: String): String = when (s) {
-    SOUND_RAIN -> "Rain"
-    SOUND_OCEAN -> "Ocean waves"
-    SOUND_FIREPLACE -> "Fireplace"
-    SOUND_WHITE -> "White noise"
-    SOUND_PINK -> "Pink noise"
-    SOUND_BROWN -> "Brown noise"
-    else -> "Off"
-  }
+  fun soundscapeLabel(s: String): String = com.immortal.launcher.i18n.I18n.soundscapeLabel(s)
 
   // Online photo feeds (used when source == SOURCE_DEFAULT). All keyless.
   const val FEED_PICSUM = "picsum" // Lorem Picsum random photos (current default)
@@ -88,13 +80,7 @@ object ScreensaverConfig {
   const val FEED_WIKIMEDIA = "wikimedia" // Wikimedia Picture of the Day
   const val FEED_APOD = "apod" // NASA Astronomy Picture of the Day (DEMO_KEY)
   val FEEDS = listOf(FEED_PICSUM, FEED_MET, FEED_ARTIC, FEED_WIKIMEDIA, FEED_APOD)
-  fun feedLabel(feed: String): String = when (feed) {
-    FEED_MET -> "The Met — art"
-    FEED_ARTIC -> "Art Institute of Chicago"
-    FEED_WIKIMEDIA -> "Wikimedia Picture of the Day"
-    FEED_APOD -> "NASA Astronomy Picture"
-    else -> "Random photos (Picsum)"
-  }
+  fun feedLabel(feed: String): String = com.immortal.launcher.i18n.I18n.feedLabel(feed)
 
   data class Settings(
       // Master on/off for Immortal's photo-frame screensaver. When off, Immortal

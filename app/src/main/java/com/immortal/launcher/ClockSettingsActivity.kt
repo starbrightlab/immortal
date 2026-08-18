@@ -79,6 +79,7 @@ class ClockSettingsActivity : ComponentActivity() {
 @Composable
 private fun ClockSettingsScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var clockConfig by remember { mutableStateOf(DigitalClockConfig.load(context)) }
   var settings by remember { mutableStateOf(ImmortalSettings.load(context)) }
 
@@ -114,9 +115,9 @@ private fun ClockSettingsScreen() {
                 .padding(horizontal = 28.dp, vertical = 32.dp),
     ) {
       Column(modifier = Modifier.widthIn(max = 1100.dp).focusRequester(firstFocus).focusGroup()) {
-        Text("Clock", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+        Text(com.immortal.launcher.i18n.I18n.translate("Clock", userLang), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            "Choose the digital clock and how it looks on the screensaver.",
+            com.immortal.launcher.i18n.I18n.translate("Choose the digital clock and how it looks on the screensaver.", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 16.sp,
             modifier = Modifier.padding(top = 6.dp),
@@ -131,7 +132,7 @@ private fun ClockSettingsScreen() {
         }
 
         // Preview button — opens fullscreen preview (a bespoke action, not a setting).
-        SectionLabel("Preview")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("Preview", userLang))
         Card {
           Row(
               modifier = Modifier.fillMaxWidth().padding(18.dp).clickable {
@@ -142,9 +143,9 @@ private fun ClockSettingsScreen() {
               verticalAlignment = Alignment.CenterVertically,
           ) {
             Column(modifier = Modifier.weight(1f)) {
-              Text("Preview", color = Color.White, fontSize = 17.sp)
+              Text(com.immortal.launcher.i18n.I18n.translate("Preview", userLang), color = Color.White, fontSize = 17.sp)
               Text(
-                  "See the clock full-screen with your current settings.",
+                  com.immortal.launcher.i18n.I18n.translate("See the clock full-screen with your current settings.", userLang),
                   color = Color(0xFF9A9A9A),
                   fontSize = 13.sp,
                   modifier = Modifier.padding(top = 2.dp),
@@ -160,7 +161,7 @@ private fun ClockSettingsScreen() {
                 },
             ) {
               Text(
-                  "Preview",
+                  com.immortal.launcher.i18n.I18n.translate("Preview", userLang),
                   color = Color.White,
                   fontSize = 15.sp,
                   modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
@@ -170,7 +171,7 @@ private fun ClockSettingsScreen() {
         }
 
         Text(
-            "Changes apply immediately. Tap the clock icon on the home screen to start the screensaver.",
+            com.immortal.launcher.i18n.I18n.translate("Changes apply immediately. Tap the clock icon on the home screen to start the screensaver.", userLang),
             color = Color(0xFF7C7C7C),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),

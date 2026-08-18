@@ -56,15 +56,23 @@ class SunriseSettingsActivity : ComponentActivity() {
   }
 }
 
-private val DAY_LABELS =
-    listOf(
-        Calendar.MONDAY to "M", Calendar.TUESDAY to "T", Calendar.WEDNESDAY to "W",
-        Calendar.THURSDAY to "T", Calendar.FRIDAY to "F", Calendar.SATURDAY to "S",
-        Calendar.SUNDAY to "S")
+private fun dayLabels(userLang: String?): List<Pair<Int, String>> {
+  val isEs = com.immortal.launcher.i18n.I18n.isSpanish(userLang)
+  return listOf(
+      Calendar.MONDAY to (if (isEs) "L" else "M"),
+      Calendar.TUESDAY to (if (isEs) "M" else "T"),
+      Calendar.WEDNESDAY to (if (isEs) "X" else "W"),
+      Calendar.THURSDAY to (if (isEs) "J" else "T"),
+      Calendar.FRIDAY to (if (isEs) "V" else "F"),
+      Calendar.SATURDAY to (if (isEs) "S" else "S"),
+      Calendar.SUNDAY to (if (isEs) "D" else "S"))
+}
 
 @Composable
 private fun SunriseScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
+  val dayLabels = remember(userLang) { dayLabels(userLang) }
   val initial = remember { SunriseConfig.load(context) }
   var enabled by remember { mutableStateOf(initial.enabled) }
   var hour by remember { mutableIntStateOf(initial.hour) }
@@ -74,9 +82,6 @@ private fun SunriseScreen() {
   var days by remember { mutableStateOf(initial.days) }
 
   fun persist() {
-    // Set days first (bespoke — the registry models scalars, not sets), then route the scalar
-    // fields through the domain so its onApplied (SunriseScheduler.reschedule) fires once with
-    // the new days already in prefs.
     SunriseConfig.setDays(context, days)
     SettingsDomains.sunrise.apply(
         context,
@@ -93,22 +98,22 @@ private fun SunriseScreen() {
         modifier = Modifier.widthIn(max = 620.dp).padding(28.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-      Text("🌅 Sunrise alarm", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-      Text("The screen brightens gradually to wake you, with an optional gentle chime.",
+      Text(com.immortal.launcher.i18n.I18n.translate("🌅 Sunrise alarm", userLang), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+      Text(com.immortal.launcher.i18n.I18n.translate("The screen brightens gradually to wake you, with an optional gentle chime.", userLang),
           color = Color(0xFFB8B8B8), fontSize = 15.sp)
 
       Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text("Enabled", color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+        Text(com.immortal.launcher.i18n.I18n.translate("Enabled", userLang), color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
         Switch(checked = enabled, onCheckedChange = { enabled = it; persist() })
       }
 
       // Time pickers (stepper rows).
-      Stepper("Hour", hour, 0, 23) { hour = it; persist() }
-      Stepper("Minute", minute, 0, 59, step = 5) { minute = it; persist() }
+      Stepper(com.immortal.launcher.i18n.I18n.translate("Hour", userLang), hour, 0, 23) { hour = it; persist() }
+      Stepper(com.immortal.launcher.i18n.I18n.translate("Minute", userLang), minute, 0, 59, step = 5) { minute = it; persist() }
 
-      Text("Wake on", color = Color(0xFF9A9A9A), fontSize = 14.sp)
+      Text(com.immortal.launcher.i18n.I18n.translate("Wake on", userLang), color = Color(0xFF9A9A9A), fontSize = 14.sp)
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        DAY_LABELS.forEach { (d, label) ->
+        dayLabels.forEach { (d, label) ->
           val on = d in days
           Surface(color = if (on) MaterialTheme.colorScheme.primary else Color(0x22FFFFFF), shape = CircleShape,
               modifier = Modifier.tvFocusable(CircleShape, focusScale = 1.08f) {
@@ -120,12 +125,12 @@ private fun SunriseScreen() {
         }
       }
 
-      Text("Ramp: $ramp min", color = Color.White, fontSize = 16.sp)
+      Text(com.immortal.launcher.i18n.I18n.tr("Ramp: $ramp min", "Duración: $ramp min", userLang), color = Color.White, fontSize = 16.sp)
       Slider(value = ramp.toFloat(), onValueChange = { ramp = it.toInt() },
           valueRange = 1f..45f, onValueChangeFinished = { persist() })
 
       Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text("Chime at the end", color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
+        Text(com.immortal.launcher.i18n.I18n.translate("Chime at the end", userLang), color = Color.White, fontSize = 18.sp, modifier = Modifier.weight(1f))
         Switch(checked = chime, onCheckedChange = { chime = it; persist() })
       }
 
@@ -134,9 +139,9 @@ private fun SunriseScreen() {
       }
       Text(
           if (next != null)
-              "Next: " + java.text.SimpleDateFormat("EEE d MMM, HH:mm", java.util.Locale.getDefault())
+              com.immortal.launcher.i18n.I18n.tr("Next: ", "Próxima: ", userLang) + java.text.SimpleDateFormat("EEE d MMM, HH:mm", java.util.Locale.getDefault())
                   .format(java.util.Date(next))
-          else "Alarm is off.",
+          else com.immortal.launcher.i18n.I18n.translate("Alarm is off.", userLang),
           color = Color(0xFF8AB4F8), fontSize = 15.sp)
 
       Surface(color = Color(0xFFEF6C00), shape = RoundedCornerShape(14.dp),
@@ -146,7 +151,7 @@ private fun SunriseScreen() {
                     .putExtra(WakeLightActivity.EXTRA_RAMP_MIN, 1)
                     .putExtra(WakeLightActivity.EXTRA_CHIME, chime))
           }) {
-        Text("Preview (1-min ramp)", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+        Text(com.immortal.launcher.i18n.I18n.translate("Preview (1-min ramp)", userLang), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 14.dp).fillMaxWidth())
       }
     }

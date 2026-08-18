@@ -55,6 +55,7 @@ class ChimeSettingsActivity : ComponentActivity() {
 @Composable
 private fun ChimeSettingsScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var settings by remember { mutableStateOf(ChimeConfig.load(context)) }
   val activity = context as? Activity
 
@@ -68,9 +69,9 @@ private fun ChimeSettingsScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      Text("Sounds", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+      Text(com.immortal.launcher.i18n.I18n.translate("Sounds", userLang), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
       Text(
-          "Gentle ambient cues. All off by default; nothing plays during quiet hours.",
+          com.immortal.launcher.i18n.I18n.translate("Gentle ambient cues. All off by default; nothing plays during quiet hours.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 15.sp,
           textAlign = TextAlign.Center,
@@ -93,16 +94,17 @@ private fun ChimeSettingsScreen() {
               ChimeConfig.setSpokenVoice(context, name)
               settings = settings.copy(spokenVoice = name)
             }
-            TestButton("Test voice") { ChimePlayer.testVoice(context, settings.spokenVoice) }
+            TestButton(com.immortal.launcher.i18n.I18n.translate("Test voice", userLang)) { ChimePlayer.testVoice(context, settings.spokenVoice) }
           }
           if (settings.hourlyChimeOn) {
-            TestButton("Play chime") { ChimePlayer.playChime(context) }
+            TestButton(com.immortal.launcher.i18n.I18n.translate("Play chime", userLang)) { ChimePlayer.playChime(context) }
           }
           if (settings.goldenHourOn) {
-            TestButton("Test sunrise") { ChimePlayer.playSunriseTone(context) }
-            TestButton("Test sunset") { ChimePlayer.playSunsetTone(context) }
+            TestButton(com.immortal.launcher.i18n.I18n.translate("Test golden hour", userLang)) {
+              ChimePlayer.playGoldenHourTone(context)
+            }
           }
-          TestButton("Play ping") { ChimePlayer.playPing(context, repeats = 1) }
+          TestButton(com.immortal.launcher.i18n.I18n.translate("Play ping", userLang)) { ChimePlayer.playPing(context, repeats = 1) }
         }
       }
     }

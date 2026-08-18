@@ -108,10 +108,16 @@ private fun ScreensaverSettingsScreen() {
               .verticalScroll(rememberScrollState())
               .padding(horizontal = 28.dp, vertical = 32.dp),
   ) {
+    val userLang = ImmortalSettings.load(context).language
     Column(modifier = Modifier.widthIn(max = 1100.dp).focusRequester(firstFocus).focusGroup()) {
-      Text("Screensaver", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Choose what shows on the photo frame when your Portal is idle.",
+          com.immortal.launcher.i18n.I18n.translate("Photo frame screensaver", userLang),
+          color = Color.White,
+          fontSize = 34.sp,
+          fontWeight = FontWeight.SemiBold,
+      )
+      Text(
+          com.immortal.launcher.i18n.I18n.translate("Configure photo sources, display style, and energy saving.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -121,13 +127,12 @@ private fun ScreensaverSettingsScreen() {
       // Master toggle gates everything below (kept here rather than in the list so the rest only
       // renders when the frame is on, matching the original screen).
       Card {
-        ToggleRow("Show the photo-frame screensaver", settings.enabled) {
+        ToggleRow(com.immortal.launcher.i18n.I18n.translate("Show the photo-frame screensaver", userLang), settings.enabled) {
           apply(SettingsDomains.screensaver, "enabled", it)
         }
       }
       Text(
-          "Turn this off to let your Portal's screen sleep on its own timer (or run your own " +
-              "screensaver). Immortal won't switch it back on.",
+          com.immortal.launcher.i18n.I18n.translate("Turn this off to let your Portal's screen sleep on its own timer (or run your own screensaver). Immortal won't switch it back on.", userLang),
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 10.dp, start = 4.dp, end = 4.dp),
@@ -138,7 +143,7 @@ private fun ScreensaverSettingsScreen() {
         SettingsList(SettingsDomains.screensaver, settings, exclude = setOf("enabled")) { k, v ->
           apply(SettingsDomains.screensaver, k, v)
         }
-        SectionLabel("Calendar")
+        SectionLabel(com.immortal.launcher.i18n.I18n.translate("Calendar", userLang))
         SettingsList(SettingsDomains.calendar, settings) { k, v ->
           apply(SettingsDomains.calendar, k, v)
         }
@@ -152,7 +157,7 @@ private fun ScreensaverSettingsScreen() {
                 },
         ) {
           Text(
-              "Preview screensaver",
+              com.immortal.launcher.i18n.I18n.translate("Preview screensaver", userLang),
               color = Color.White,
               fontSize = 18.sp,
               fontWeight = FontWeight.SemiBold,

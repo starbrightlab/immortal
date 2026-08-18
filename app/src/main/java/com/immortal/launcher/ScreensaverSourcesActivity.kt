@@ -73,6 +73,7 @@ class ScreensaverSourcesActivity : ComponentActivity() {
 @Composable
 private fun ScreensaverSourcesScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var settings by remember { mutableStateOf(ScreensaverConfig.load(context)) }
   var mediaCount by remember { mutableStateOf<Int?>(null) }
   var folderName by remember { mutableStateOf<String?>(null) }
@@ -132,9 +133,14 @@ private fun ScreensaverSourcesScreen() {
               .padding(horizontal = 28.dp, vertical = 32.dp),
   ) {
     Column(modifier = Modifier.widthIn(max = 1100.dp).focusRequester(firstFocus).focusGroup()) {
-      Text("Photo source", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Choose where your screensaver photos come from.",
+          com.immortal.launcher.i18n.I18n.translate("Photo source", userLang),
+          color = Color.White,
+          fontSize = 34.sp,
+          fontWeight = FontWeight.SemiBold,
+      )
+      Text(
+          com.immortal.launcher.i18n.I18n.translate("Choose where your screensaver photos come from.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -152,10 +158,13 @@ private fun ScreensaverSourcesScreen() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(modifier = Modifier.weight(1f)) {
-            Text("Set up from your phone", color = Color.White, fontSize = 17.sp)
             Text(
-                "Pair the phone remote, then enter Immich keys, NAS details, a link, or the " +
-                    "calendar from another device on your Wi-Fi.",
+                com.immortal.launcher.i18n.I18n.translate("Set up from your phone", userLang),
+                color = Color.White,
+                fontSize = 17.sp,
+            )
+            Text(
+                com.immortal.launcher.i18n.I18n.translate("Pair the phone remote, then enter Immich keys, NAS details, a link, or the calendar from another device on your Wi-Fi.", userLang),
                 color = Color(0xFF9A9A9A),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 2.dp),
@@ -168,11 +177,11 @@ private fun ScreensaverSourcesScreen() {
       Spacer(Modifier.size(26.dp))
 
       // ── Standard ──────────────────────────────────────────────────────────
-      SectionLabel("Standard")
+      SectionLabel(com.immortal.launcher.i18n.I18n.translate("Standard", userLang))
       Card {
         SelectableRow(
-            title = "Immortal photos",
-            subtitle = "A calming built-in photo feed (no setup).",
+            title = com.immortal.launcher.i18n.I18n.translate("Immortal photos", userLang),
+            subtitle = com.immortal.launcher.i18n.I18n.translate("A calming built-in photo feed (no setup).", userLang),
             selected = isDefault,
             onClick = {
               ScreensaverConfig.useDefault(context)
@@ -181,78 +190,77 @@ private fun ScreensaverSourcesScreen() {
         )
         Divider()
         SelectableRow(
-            title = "My photos & videos",
-            subtitle = folderSubtitle(settings.usesFolder, folderName, mediaCount),
+            title = com.immortal.launcher.i18n.I18n.translate("My photos & videos", userLang),
+            subtitle = folderSubtitle(settings.usesFolder, folderName, mediaCount, userLang),
             selected = settings.usesFolder,
             onClick = { openPicker() },
         )
         if (settings.usesFolder) {
           Divider()
-          TextButtonRow("Choose a different folder…") { openPicker() }
+          TextButtonRow(com.immortal.launcher.i18n.I18n.translate("Choose a different folder…", userLang)) { openPicker() }
         }
         Divider()
         SelectableRow(
-            title = "Shared album link",
-            subtitle = albumUrlSubtitle(settings.usesUrl, settings.albumUrl),
+            title = com.immortal.launcher.i18n.I18n.translate("Shared album link", userLang),
+            subtitle = albumUrlSubtitle(settings.usesUrl, settings.albumUrl, userLang),
             selected = settings.usesUrl,
             onClick = { open(AlbumUrlEntryActivity::class.java) },
         )
         if (settings.usesUrl) {
           Divider()
-          AlbumRefreshStepper(settings.albumRefreshMin) { v ->
+          AlbumRefreshStepper(settings.albumRefreshMin, userLang) { v ->
             val c = ScreensaverConfig.clampAlbumRefresh(v)
             ScreensaverConfig.setAlbumRefreshMin(context, c)
             settings = settings.copy(albumRefreshMin = c)
           }
           Divider()
-          TextButtonRow("Paste a different link…") { open(AlbumUrlEntryActivity::class.java) }
+          TextButtonRow(com.immortal.launcher.i18n.I18n.translate("Paste a different link…", userLang)) { open(AlbumUrlEntryActivity::class.java) }
         }
       }
 
       Spacer(Modifier.size(26.dp))
 
       // ── Advanced (self-hosted) ────────────────────────────────────────────
-      SectionLabel("Advanced")
+      SectionLabel(com.immortal.launcher.i18n.I18n.translate("Advanced", userLang))
       Text(
-          "Self-hosted sources — pull from your own server or NAS, or point the screensaver at a " +
-              "web frame like Immich Kiosk. These are on your local network.",
+          com.immortal.launcher.i18n.I18n.translate("Self-hosted sources — pull from your own server or NAS, or point the screensaver at a web frame like Immich Kiosk. These are on your local network.", userLang),
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 0.dp, bottom = 8.dp, start = 4.dp, end = 4.dp),
       )
       Card {
         SourceConnectRow(
-            "Immich server",
-            immichSubtitle(settings),
+            com.immortal.launcher.i18n.I18n.translate("Immich server", userLang),
+            immichSubtitle(settings, userLang),
             settings.usesImmich,
-            "Change Immich server or album…",
+            com.immortal.launcher.i18n.I18n.translate("Change Immich server or album…", userLang),
         ) {
           open(ImmichConnectActivity::class.java)
         }
         Divider()
         SourceConnectRow(
-            "Network share (NAS)",
-            smbSubtitle(settings),
+            com.immortal.launcher.i18n.I18n.translate("Network share (NAS)", userLang),
+            smbSubtitle(settings, userLang),
             settings.usesSmb,
-            "Change network share…",
+            com.immortal.launcher.i18n.I18n.translate("Change network share…", userLang),
         ) {
           open(SmbConnectActivity::class.java)
         }
         Divider()
         SourceConnectRow(
-            "WebDAV folder",
-            davSubtitle(settings),
+            com.immortal.launcher.i18n.I18n.translate("WebDAV folder", userLang),
+            davSubtitle(settings, userLang),
             settings.usesDav,
-            "Change WebDAV folder…",
+            com.immortal.launcher.i18n.I18n.translate("Change WebDAV folder…", userLang),
         ) {
           open(DavConnectActivity::class.java)
         }
         Divider()
         SourceConnectRow(
-            "Web page",
-            webUrlSubtitle(settings),
+            com.immortal.launcher.i18n.I18n.translate("Web page", userLang),
+            webUrlSubtitle(settings, userLang),
             settings.usesWebUrl,
-            "Change web page…",
+            com.immortal.launcher.i18n.I18n.translate("Change web page…", userLang),
         ) {
           open(WebUrlEntryActivity::class.java)
         }
@@ -285,44 +293,52 @@ private fun SourceConnectRow(
 }
 
 // --- subtitles --------------------------------------------------------------
-private fun folderSubtitle(usesFolder: Boolean, name: String?, count: Int?): String =
+private fun folderSubtitle(usesFolder: Boolean, name: String?, count: Int?, userLang: String): String =
     when {
-      !usesFolder -> "Pick a folder of your photos and videos on your Portal."
-      count == null -> "${name ?: "Selected folder"} — scanning…"
-      count < 0 -> "${name ?: "Selected folder"} — can't read it; showing built-in photos"
-      count == 0 -> "${name ?: "Selected folder"} — no photos or videos found"
-      else -> "${name ?: "Selected folder"} — $count item${if (count == 1) "" else "s"}"
+      !usesFolder -> com.immortal.launcher.i18n.I18n.tr(
+          "Pick a folder of your photos and videos on your Portal.",
+          "Selecciona una carpeta de fotos y vídeos en tu Portal.",
+          userLang
+      )
+      count == null -> "${name ?: com.immortal.launcher.i18n.I18n.tr("Selected folder", "Carpeta seleccionada", userLang)} — ${com.immortal.launcher.i18n.I18n.tr("scanning…", "escaneando…", userLang)}"
+      count < 0 -> "${name ?: com.immortal.launcher.i18n.I18n.tr("Selected folder", "Carpeta seleccionada", userLang)} — ${com.immortal.launcher.i18n.I18n.tr("can't read it; showing built-in photos", "no se puede leer; mostrando fotos integradas", userLang)}"
+      count == 0 -> "${name ?: com.immortal.launcher.i18n.I18n.tr("Selected folder", "Carpeta seleccionada", userLang)} — ${com.immortal.launcher.i18n.I18n.tr("no photos or videos found", "sin fotos o vídeos", userLang)}"
+      else -> "${name ?: com.immortal.launcher.i18n.I18n.tr("Selected folder", "Carpeta seleccionada", userLang)} — $count ${com.immortal.launcher.i18n.I18n.tr("item", "elemento", userLang)}${if (count == 1) "" else "s"}"
     }
 
-private fun albumUrlSubtitle(usesUrl: Boolean, url: String?): String =
+private fun albumUrlSubtitle(usesUrl: Boolean, url: String?, userLang: String): String =
     when {
-      !usesUrl -> "Paste a public iCloud, Google Photos, or Synology Photos share link."
-      url.isNullOrBlank() -> "No link yet — tap to paste one."
+      !usesUrl -> com.immortal.launcher.i18n.I18n.tr(
+          "Paste a public iCloud, Google Photos, or Synology Photos share link.",
+          "Pega un enlace público de iCloud, Google Photos o Synology Photos.",
+          userLang
+      )
+      url.isNullOrBlank() -> com.immortal.launcher.i18n.I18n.tr("No link yet — tap to paste one.", "Sin enlace aún — toca para pegar uno.", userLang)
       else -> "${RemoteAlbum.providerName(url)} — ${shortUrl(url)}"
     }
 
-private fun immichSubtitle(s: ScreensaverConfig.Settings): String =
+private fun immichSubtitle(s: ScreensaverConfig.Settings, userLang: String): String =
     when {
-      !s.usesImmich -> "Pull photos from your self-hosted Immich server."
-      !s.immichAlbumName.isNullOrBlank() -> "Connected — album “${s.immichAlbumName}”"
-      else -> "Connected — whole library"
+      !s.usesImmich -> com.immortal.launcher.i18n.I18n.tr("Pull photos from your self-hosted Immich server.", "Obtén fotos de tu propio servidor Immich.", userLang)
+      !s.immichAlbumName.isNullOrBlank() -> com.immortal.launcher.i18n.I18n.tr("Connected — album “${s.immichAlbumName}”", "Conectado — álbum “${s.immichAlbumName}”", userLang)
+      else -> com.immortal.launcher.i18n.I18n.tr("Connected — whole library", "Conectado — biblioteca completa", userLang)
     }
 
-private fun smbSubtitle(s: ScreensaverConfig.Settings): String =
+private fun smbSubtitle(s: ScreensaverConfig.Settings, userLang: String): String =
     when {
-      !s.usesSmb -> "Show photos from a folder on your NAS over the network."
-      else -> "Connected — \\\\${s.smbHost}\\${s.smbShare}"
+      !s.usesSmb -> com.immortal.launcher.i18n.I18n.tr("Show photos from a folder on your NAS over the network.", "Muestra fotos de una carpeta de tu NAS en la red.", userLang)
+      else -> "Conectado — \\\\${s.smbHost}\\${s.smbShare}"
     }
 
-private fun davSubtitle(s: ScreensaverConfig.Settings): String =
+private fun davSubtitle(s: ScreensaverConfig.Settings, userLang: String): String =
     when {
-      !s.usesDav -> "Show photos from a WebDAV share or Nextcloud."
-      else -> "Connected — ${shortUrl(s.davUrl.orEmpty())}"
+      !s.usesDav -> com.immortal.launcher.i18n.I18n.tr("Show photos from a WebDAV share or Nextcloud.", "Muestra fotos desde WebDAV o Nextcloud.", userLang)
+      else -> "Conectado — ${shortUrl(s.davUrl.orEmpty())}"
     }
 
-private fun webUrlSubtitle(s: ScreensaverConfig.Settings): String =
+private fun webUrlSubtitle(s: ScreensaverConfig.Settings, userLang: String): String =
     when {
-      !s.usesWebUrl -> "Render any web page (Immich Kiosk, a dashboard) as the screensaver."
+      !s.usesWebUrl -> com.immortal.launcher.i18n.I18n.tr("Render any web page (Immich Kiosk, a dashboard) as the screensaver.", "Muestra cualquier página web (Immich Kiosk, panel) como salvapantallas.", userLang)
       else -> shortUrl(s.webUrl.orEmpty())
     }
 
@@ -343,7 +359,7 @@ private fun TextButtonRow(label: String, onClick: () -> Unit) {
 
 // Non-uniform steps so every LEFT/RIGHT tap lands on a value users think in (15m … 24h).
 @Composable
-private fun AlbumRefreshStepper(minutes: Int, onChange: (Int) -> Unit) {
+private fun AlbumRefreshStepper(minutes: Int, userLang: String, onChange: (Int) -> Unit) {
   val src = remember { MutableInteractionSource() }
   val focused by src.collectIsFocusedAsState()
   Row(
@@ -369,7 +385,7 @@ private fun AlbumRefreshStepper(minutes: Int, onChange: (Int) -> Unit) {
               .padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text("Refresh album", color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+    Text(com.immortal.launcher.i18n.I18n.translate("Album refresh", userLang), color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
     ArrowButton("◀", focused) { onChange(prevAlbumRefreshStep(minutes)) }
     Text(
         formatRefreshMinutes(minutes),
