@@ -4,8 +4,7 @@ Expose a Portal's camera to Home Assistant as a live stream, with **optional aud
 Portal in a nursery or hallway can double as a nanny/security camera. LAN only, off by default,
 and unmistakable when it's live.
 
-**Status:** phase 1 (snapshots) and phase 2 (live video) implemented; phase 3 (audio) and
-phase 4 (motion) not started. This records the decisions,
+**Status:** phases 1-3 implemented (snapshots, live video, audio); phase 4 (motion) not started. This records the decisions,
 the parts we already have, the parts that are genuinely hard, and what has to be answered on real
 hardware before writing much code.
 
@@ -82,7 +81,7 @@ for wave-to-advance during the photo frame. Streaming and gesture-wave must be *
 exclusive**, with one owner arbitrating and the stream recovering after a call releases the
 device.
 
-**4. Microphone contention — currently unmanaged.** `LanAudio` (intercom) and `AudioNote` both
+**4. Microphone contention — was unmanaged; now brokered through `MicOwner`.** `LanAudio` (intercom) and `AudioNote` both
 open `AudioSource.MIC` today with **no arbitration between them at all**. Audio streaming would
 be a third consumer, and the failure is silent: whoever asks second gets nothing useful. This
 needs a single mic broker with an explicit priority — a live intercom announcement should win,
@@ -92,7 +91,7 @@ On Portal+ there is a further constraint: Meta's own far-field mic service (`com
 can hold the microphone, which is why the bridge ships a `--free-mic` provisioning flag. Expect
 audio to be unavailable on some models until that's disabled, and detect it rather than assume.
 
-**5. Mic mute has to gate audio.** Immortal publishes a `mic_mute` switch to Home Assistant. A
+**5. Mic mute has to gate audio — done, and unit-tested.** Immortal publishes a `mic_mute` switch to Home Assistant. A
 stream that keeps sending audio while HA says the microphone is muted is both a contradiction
 and a genuine privacy surprise. **When `isMicrophoneMute` is true the audio track must be
 silent.** That rule is pure logic and should be unit-tested, not left to integration behaviour.
@@ -156,7 +155,14 @@ Deliberately ordered so each phase is useful alone and de-risks the next.
     15fps. The parts where a mistake is invisible rather than loud — RTP packetisation, FU-A
     fragmentation, the SDP — are pure and unit-tested (`RtpH264`, `RtspSdp`); the Camera2 and
     `MediaCodec` plumbing around them is not, and needs a device.
-3. **Audio.** AAC track, the mic broker, and the mute gating.
+3. **Audio** — *implemented*. An AAC-LC track alongside the video, its own RTP clock and
+   control URL, so a viewer that only wants a picture sets up one track and not the other.
+
+    Both hazards named above are addressed. [`MicOwner`] arbitrates the microphone by priority,
+    and the intercom and voice notes now go through it too — closing the pre-existing gap where
+    nothing arbitrated at all and whoever asked second silently got nothing. Muting the
+    microphone stops audio leaving the device rather than merely lowering it, which is the only
+    reading of the `mic_mute` switch that isn't a lie.
 4. **Motion** (optional). `binary_sensor` from the existing frame-diff, with a sensitivity
    number entity.
 

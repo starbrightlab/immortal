@@ -41,11 +41,16 @@ class RtspServer(
   @Volatile private var running = false
   private val clients = CopyOnWriteArrayList<Client>()
   @Volatile private var sequence = 0
+  @Volatile private var audioSequence = 0
   private val ssrc = (System.nanoTime() and 0x7FFFFFFF).toInt()
+  // A distinct SSRC: two streams sharing one would be treated as a single confused source.
+  private val audioSsrc = ssrc xor 0x5A5A5A5A
 
   /** One connected client. [playing] gates RTP: a client gets frames only after it says PLAY. */
   private class Client(val socket: Socket, val out: OutputStream) {
     @Volatile var playing = false
+    /** True once the client has SETUP the audio track; it only gets sound if it asked for it. */
+    @Volatile var wantsAudio = false
     val writeLock = Any()
   }
 
@@ -150,12 +155,17 @@ class RtspServer(
               body = body)
         }
       }
-      "SETUP" ->
-          respond(
-              client,
-              cseq,
-              extra =
-                  "Transport: RTP/AVP/TCP;unicast;interleaved=0-1\r\nSession: $SESSION_ID\r\n")
+      "SETUP" -> {
+        // Each track gets its own interleaved channel pair on the one connection: video on 0/1,
+        // audio on 2/3. A client that never SETUPs track 1 simply never receives sound.
+        val audioTrack = req.uri.contains("trackID=$AUDIO_TRACK")
+        if (audioTrack) client.wantsAudio = true
+        val channels = if (audioTrack) "$AUDIO_CHANNEL-${AUDIO_CHANNEL + 1}" else "$RTP_CHANNEL-${RTP_CHANNEL + 1}"
+        respond(
+            client,
+            cseq,
+            extra = "Transport: RTP/AVP/TCP;unicast;interleaved=$channels\r\nSession: $SESSION_ID\r\n")
+      }
       "PLAY" -> {
         respond(client, cseq, extra = "Session: $SESSION_ID\r\nRange: npt=0.000-\r\n")
         client.playing = true
@@ -213,14 +223,37 @@ class RtspServer(
     if (keyframe) Log.v(TAG, "keyframe sent to ${playing.size} client(s)")
   }
 
+  /**
+   * Send one AAC frame to every client that asked for the audio track.
+   *
+   * Audio keeps its own sequence numbers and its own clock — RTP timestamps are per-stream, and
+   * running audio on the video's 90 kHz clock is a classic way to get sound that drifts.
+   */
+  fun broadcastAudio(frame: ByteArray, presentationTimeUs: Long, sampleRate: Int) {
+    if (!running) return
+    val listeners = clients.filter { it.playing && it.wantsAudio }
+    if (listeners.isEmpty()) return
+    audioSequence = (audioSequence + 1) and 0xFFFF
+    val packet =
+        RtpH264.header(
+            audioSequence,
+            AacRtp.timestamp(presentationTimeUs, sampleRate),
+            audioSsrc,
+            // Every AAC frame is a complete access unit, so the marker is always set.
+            marker = true,
+            payloadType = AacRtp.PAYLOAD_TYPE,
+        ) + AacRtp.packetize(frame)
+    listeners.forEach { send(it, packet, AUDIO_CHANNEL) }
+  }
+
   /** Interleaved framing: '$', channel, 2-byte length, then the RTP packet (RFC 2326 §10.12). */
-  private fun send(client: Client, packet: ByteArray) {
+  private fun send(client: Client, packet: ByteArray, channel: Byte = RTP_CHANNEL) {
     runCatching {
           synchronized(client.writeLock) {
             client.out.write(
                 byteArrayOf(
                     INTERLEAVE_MAGIC,
-                    RTP_CHANNEL,
+                    channel,
                     (packet.size ushr 8).toByte(),
                     packet.size.toByte()))
             client.out.write(packet)
@@ -245,6 +278,9 @@ class RtspServer(
     private const val SESSION_ID = "immortal"
     private const val INTERLEAVE_MAGIC: Byte = 0x24 // '$'
     private const val RTP_CHANNEL: Byte = 0
+    private const val AUDIO_CHANNEL: Byte = 2
+    const val VIDEO_TRACK = 0
+    const val AUDIO_TRACK = 1
     private const val NAL_SPS = 7
     private const val NAL_PPS = 8
   }

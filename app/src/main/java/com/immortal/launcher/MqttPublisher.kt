@@ -407,6 +407,17 @@ class MqttPublisher(private val appContext: Context) {
             CameraStreamService.sync(appContext, payload.trim().equals("ON", ignoreCase = true))
             publishStreamState()
           }
+          "camera_audio" -> {
+            val on = payload.trim().equals("ON", ignoreCase = true)
+            ImmortalSettings.setCameraAudio(appContext, on)
+            // Audio is set up when the stream starts, so a change mid-stream needs a restart to
+            // take effect — the SDP has to describe the track for a client to ask for it.
+            if (CameraStreamService.running) {
+              CameraStreamService.sync(appContext, false)
+              CameraStreamService.sync(appContext, true)
+            }
+            publishStreamState()
+          }
           "notify" -> handleNotify(payload)
           // Show the photo frame on demand — the same surface the launcher's header
           // screensaver button launches (HomeActivity.onStartScreensaver). This is the
@@ -590,6 +601,10 @@ class MqttPublisher(private val appContext: Context) {
     val c = client ?: return
     if (!ImmortalSettings.cameraEnabled(appContext)) return
     c.publish("$base/camera_stream/state", if (CameraStreamService.running) "ON" else "OFF", retain = true)
+    c.publish(
+        "$base/camera_audio/state",
+        if (ImmortalSettings.cameraAudio(appContext)) "ON" else "OFF",
+        retain = true)
     val ip = currentIp()
     c.publish(
         "$base/stream_url/state",
@@ -732,11 +747,13 @@ class MqttPublisher(private val appContext: Context) {
       cameraEntity(c, "camera", "Camera")
       button(c, "snapshot", "Take snapshot", icon = "mdi:camera")
       switchEntity(c, "camera_stream", "Camera streaming", icon = "mdi:video")
+      switchEntity(c, "camera_audio", "Camera audio", icon = "mdi:volume-high")
       sensor(c, "stream_url", "Stream URL", icon = "mdi:link-variant", diagnostic = true)
     } else {
       publishConfig(c, "camera", "camera", null)
       publishConfig(c, "button", "snapshot", null)
       publishConfig(c, "switch", "camera_stream", null)
+      publishConfig(c, "switch", "camera_audio", null)
       publishConfig(c, "sensor", "stream_url", null)
     }
 
@@ -776,6 +793,7 @@ class MqttPublisher(private val appContext: Context) {
           "camera" to "camera",
           "button" to "snapshot",
           "switch" to "camera_stream",
+          "switch" to "camera_audio",
           "sensor" to "stream_url",
           "button" to "screen_off", // legacy (pre-1.41)
       ) + AmbientKind.values().map { "sensor" to it.key }

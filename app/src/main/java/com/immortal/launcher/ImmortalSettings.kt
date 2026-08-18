@@ -112,6 +112,16 @@ object ImmortalSettings {
    */
   fun cameraEnabled(c: Context): Boolean = prefs(c).getBoolean("camera_enabled", false)
 
+  /**
+   * Include sound in the camera stream. Persisted (a nursery wants it on every time), but it only
+   * ever takes effect while streaming, which deliberately doesn't persist. Muting the microphone
+   * still silences it — see [AudioStream.shouldEmit].
+   */
+  fun cameraAudio(c: Context): Boolean = prefs(c).getBoolean("camera_audio", false)
+
+  fun setCameraAudio(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("camera_audio", on).apply()
+
   fun setCameraEnabled(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("camera_enabled", on).apply()
 

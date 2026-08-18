@@ -49,6 +49,21 @@ class RtspSdpTest {
   }
 
   @Test
+  fun `the session describes video alone, or video and audio`() {
+    val videoOnly = RtspSdp.sessionSdp(640, 480, sps, pps)
+    assertTrue(videoOnly.contains("m=video"))
+    assertTrue("no audio track when there's no sound", !videoOnly.contains("m=audio"))
+
+    val withAudio = RtspSdp.sessionSdp(640, 480, sps, pps, audioSampleRate = 16000)
+    assertTrue(withAudio.contains("m=video"))
+    assertTrue(withAudio.contains("m=audio"))
+    // Separate control URLs are what let a client set up one track and not the other.
+    assertTrue(withAudio.contains("a=control:trackID=0"))
+    assertTrue(withAudio.contains("a=control:trackID=1"))
+    assertTrue("video must come first", withAudio.indexOf("m=video") < withAudio.indexOf("m=audio"))
+  }
+
+  @Test
   fun `the SDP carries everything a client needs`() {
     val sdp = RtspSdp.videoSdp(640, 480, sps, pps)
     assertTrue(sdp.startsWith("v=0\r\n"))

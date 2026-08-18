@@ -38,6 +38,7 @@ appear where the hardware exists.
 | Identify | Pop a toast naming the device, for finding which Portal is which. |
 | Take snapshot | Capture a fresh still. Only when the camera is switched on. |
 | Camera streaming | Start/stop live RTSP video — see [live streaming](../features/smart-home.md#live-camera-streaming). |
+| Camera audio | Include sound in the stream. Silenced entirely while the microphone is muted. |
 
 The Portal registers with a stable per-device id, so it survives broker reinstalls but stays unique
 across a fleet. Its **device name is shared with the [fleet agent](../features/fleet.md)**, so a

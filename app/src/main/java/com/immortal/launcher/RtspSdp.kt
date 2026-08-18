@@ -75,7 +75,23 @@ object RtspSdp {
           "a=fmtp:$payloadType packetization-mode=1;profile-level-id=${profileLevelId(sps)};" +
               "sprop-parameter-sets=$params\r\n")
       append("a=framesize:$payloadType $width-$height\r\n")
-      append("a=control:trackID=0\r\n")
+      append("a=control:trackID=${RtspServer.VIDEO_TRACK}\r\n")
     }
   }
+
+  /**
+   * The full session: video, plus the audio track when sound is running. Audio is a separate
+   * media section with its own clock and its own control URL, so a client can set up one track
+   * and not the other — which is exactly what a viewer that only wants a picture will do.
+   */
+  fun sessionSdp(
+      width: Int,
+      height: Int,
+      sps: ByteArray,
+      pps: ByteArray,
+      audioSampleRate: Int? = null,
+      audioChannels: Int = 1,
+  ): String =
+      videoSdp(width, height, sps, pps) +
+          (audioSampleRate?.let { AacRtp.audioSdp(it, audioChannels, RtspServer.AUDIO_TRACK) } ?: "")
 }

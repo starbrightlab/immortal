@@ -88,8 +88,7 @@ never be photographed without the device saying so.
 
 Some things worth knowing before relying on it:
 
-- **Stills and live video, but no sound yet.** Audio is designed but not built — see
-  [the design note](../design/camera-streaming.md).
+- **Stills, live video, and optional sound** — see [live streaming](#live-camera-streaming).
 - **The image is not retained on the broker.** Home Assistant shows the last one it received;
   a subscriber joining later sees nothing until the next snapshot.
 - **The camera is shared.** A Portal call takes it, and the photo frame's wave-to-advance
@@ -119,7 +118,14 @@ url: 'rtsp://<portal-ip>:8554/'
 
 Points worth knowing:
 
-- **No audio yet.** Video only; sound is the next phase.
+- **Sound is optional and separate.** Turn on **Camera sound** (the Home Assistant switch, or
+  Settings → Home Assistant (MQTT)) and the stream carries audio as well. It's off by default,
+  and a viewer that only wants a picture can take the video track alone.
+- **Muting the microphone silences the stream.** Not quietened — no audio leaves the device at
+  all while the `Microphone mute` switch is on. That switch is the truth.
+- **Someone talking takes the microphone back.** A live [intercom](tools.md) announcement, or
+  recording a voice note, outranks a background stream: the sound drops out for the duration and
+  the video carries on.
 - **Streaming does not survive a reboot.** The camera *permission* persists, the live stream
   doesn't — a Portal that loses power comes back idle rather than quietly broadcasting a room.
 - **Home Assistant can start the stream, but never enable the camera.** The switch only works

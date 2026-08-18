@@ -22,6 +22,7 @@ import android.util.Log
  */
 class AudioNote(private val context: Context) {
   private val TAG = "ImmortalNote"
+  private val MIC_OWNER = "audio-note"
   private var recorder: MediaRecorder? = null
   private var player: MediaPlayer? = null
 
@@ -31,6 +32,13 @@ class AudioNote(private val context: Context) {
   /** Begin recording to the note file (overwrites any previous memo). */
   fun startRecording(): Boolean = runCatching {
     stopPlaying()
+    // Deliberate user action, so it outranks the camera stream's audio track and takes the
+    // microphone from it. See [MicOwner] — nothing arbitrated this before, and a note recorded
+    // while something else held the mic came out silent.
+    if (!MicOwner.acquire(MIC_OWNER, MicOwner.PRIORITY_NOTE)) {
+      Log.w(TAG, "microphone held by ${MicOwner.holder} — not recording")
+      return@runCatching false
+    }
     val file = NotesConfig.audioFile(context)
     @Suppress("DEPRECATION")
     val rec = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else MediaRecorder()
@@ -49,7 +57,11 @@ class AudioNote(private val context: Context) {
     recordStartMs = System.currentTimeMillis()
     recorder = rec
     true
-  }.getOrElse { Log.w(TAG, "startRecording failed", it); false }
+  }.getOrElse {
+    Log.w(TAG, "startRecording failed", it)
+    MicOwner.release(MIC_OWNER)
+    false
+  }
 
   private var recordStartMs = 0L
 
@@ -61,6 +73,7 @@ class AudioNote(private val context: Context) {
   fun stopRecording(): Boolean {
     val r = recorder ?: return NotesConfig.hasAudioNote(context)
     recorder = null
+    MicOwner.release(MIC_OWNER)
     // MediaRecorder.stop() throws if stopped almost immediately (no encoded frames),
     // leaving a corrupt file. Guard against a too-short tap.
     val tooShort = System.currentTimeMillis() - recordStartMs < 500

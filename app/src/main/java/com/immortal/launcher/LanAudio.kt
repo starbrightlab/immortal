@@ -36,6 +36,7 @@ class LanAudio {
   // here would make ServerSocket(PORT) in startBroadcast() fail to bind.
   val PORT = 8724
   private val SAMPLE_RATE = 16000
+  private val MIC_OWNER = "intercom"
 
   @Volatile private var running = false
   private var serverThread: Thread? = null
@@ -75,6 +76,13 @@ class LanAudio {
   }
 
   private fun pumpMicTo(out: OutputStream) {
+    // Someone speaking outranks anything else that wants the microphone (the camera stream's
+    // audio track, in practice), and takes it. Before [MicOwner] existed nothing arbitrated at
+    // all: whoever opened the mic second just got silence, with nothing to say why.
+    if (!MicOwner.acquire(MIC_OWNER, MicOwner.PRIORITY_INTERCOM)) {
+      Log.w(TAG, "microphone held by ${MicOwner.holder} — not announcing")
+      return
+    }
     val minBuf = AudioRecord.getMinBufferSize(
         SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
     val rec = AudioRecord(
@@ -83,12 +91,13 @@ class LanAudio {
     runCatching {
       rec.startRecording()
       val buf = ByteArray(2048)
-      while (running) {
+      while (running && MicOwner.holds(MIC_OWNER)) {
         val n = rec.read(buf, 0, buf.size)
         if (n > 0) out.write(buf, 0, n) else break
       }
     }.onFailure { Log.w(TAG, "mic pump ended", it) }
     runCatching { rec.stop() }; runCatching { rec.release() }
+    MicOwner.release(MIC_OWNER)
   }
 
   /** Connect to [host] and play whatever audio it streams. [onState] reports connect

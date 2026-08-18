@@ -32,6 +32,7 @@ import android.util.Log
 class CameraStreamService : Service() {
 
   private var stream: CameraStream? = null
+  private var audio: AudioStream? = null
   private var server: RtspServer? = null
 
   override fun onCreate() {
@@ -48,11 +49,30 @@ class CameraStreamService : Service() {
               val sps = s.sps
               val pps = s.pps
               if (sps == null || pps == null) null
-              else RtspSdp.videoSdp(s.width, s.height, sps, pps)
+              else
+                  RtspSdp.sessionSdp(
+                      s.width,
+                      s.height,
+                      sps,
+                      pps,
+                      // Only describe an audio track if sound is actually running: promising one
+                      // we can't deliver leaves a client waiting for packets that never come.
+                      audioSampleRate = if (audio?.isRunning() == true) AudioStream.SAMPLE_RATE else null,
+                  )
             },
             onActiveChanged = { active -> Log.i(TAG, "viewers: $active") },
         )
     server = srv
+    // Audio starts before the SDP can be asked for, so the description is right from the first
+    // DESCRIBE. It's allowed to fail — no permission, or something louder holding the microphone
+    // — and the stream simply carries on without sound.
+    if (ImmortalSettings.cameraAudio(applicationContext)) {
+      val a = AudioStream(applicationContext) { frame, ptsUs ->
+        srv.broadcastAudio(frame, ptsUs, AudioStream.SAMPLE_RATE)
+      }
+      audio = if (a.start()) a else null
+      if (audio == null) Log.i(TAG, "continuing without audio")
+    }
     val ok = runCatching { srv.start() }.isSuccess && s.start()
     if (!ok) {
       Log.w(TAG, "couldn't start streaming — stopping")
@@ -71,8 +91,10 @@ class CameraStreamService : Service() {
   override fun onDestroy() {
     running = false
     runCatching { stream?.stop() }
+    runCatching { audio?.stop() }
     runCatching { server?.stop() }
     stream = null
+    audio = null
     server = null
     super.onDestroy()
   }

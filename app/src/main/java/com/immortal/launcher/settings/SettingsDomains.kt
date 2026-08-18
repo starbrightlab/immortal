@@ -735,6 +735,15 @@ object SettingsDomains {
                               "Assistant can't turn it on. The Portal shows a message on screen " +
                               "every time a photo is taken.",
                       visible = { c, _ -> MqttConfig.isEnabled(c) }),
+                  BoolSpec(
+                      "cameraAudio",
+                      "Camera sound",
+                      get = { ImmortalSettings.cameraAudio(it) },
+                      set = ImmortalSettings::setCameraAudio,
+                      help =
+                          "Include sound in the camera stream. Muting the microphone silences it, " +
+                              "and a live intercom announcement takes the microphone back.",
+                      visible = { c, _ -> MqttConfig.isEnabled(c) && ImmortalSettings.cameraEnabled(c) }),
                   IntSpec(
                       "tempOffset",
                       "Temperature offset",
@@ -758,7 +767,8 @@ object SettingsDomains {
                   "validateCert" to "Security",
                   "ambientSensors" to "Sensors",
                   "tempOffset" to "Sensors",
-                  "cameraEnabled" to "Camera"),
+                  "cameraEnabled" to "Camera",
+                  "cameraAudio" to "Camera"),
           onApplied = { c, keys ->
             // TLS<->port convenience hop, lifted out of the bespoke on-device screen so the phone
             // remote gets it too (it didn't before — a real drift): flipping TLS moves the port to
