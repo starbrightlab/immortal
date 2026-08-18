@@ -82,12 +82,11 @@ class RemoteKeyService : AccessibilityService() {
 
   private fun perform(action: String) {
     when (action) {
-      // Software mic mute — the same flag the MQTT mic_mute switch drives, which does mute a live
-      // call on Portal hardware. Re-publish so Home Assistant doesn't drift out of sync.
-      ImmortalSettings.KEY_ACTION_MIC_MUTE -> {
-        audio.isMicrophoneMute = !audio.isMicrophoneMute
-        MqttService.sync(this)
-      }
+      // Software mic mute: the same flag the MQTT mic_mute switch drives, which does mute a live
+      // call on Portal hardware. Nothing to republish here. MqttPublisher listens for the
+      // platform's MICROPHONE_MUTE_CHANGED broadcast, so Home Assistant follows this flip
+      // whatever caused it.
+      ImmortalSettings.KEY_ACTION_MIC_MUTE -> audio.isMicrophoneMute = !audio.isMicrophoneMute
       ImmortalSettings.KEY_ACTION_HOME ->
           startActivity(
               Intent(Intent.ACTION_MAIN)
