@@ -17,16 +17,44 @@ import java.util.concurrent.ConcurrentHashMap
 import org.json.JSONObject
 
 /**
- * Photo metadata for the screensaver caption — the "taken at <place> · <date>" line,
- * tvOS-style. Read from EXIF, so it only exists for the user's *own* photos: the local
- * folder and SMB (NAS) sources, which decode real image files. The web/CDN sources
- * (Picsum/Unsplash, iCloud/Google shared albums, Immich) serve re-encoded images with
- * EXIF stripped, so there's nothing to show there and the caption is simply hidden.
+ * Photo metadata for the screensaver caption — the "taken at <place> · <date>" block,
+ * tvOS-style — plus the formatting of every line the frame draws ([Caption]).
+ *
+ * Two things can fill it in:
+ *  - **EXIF**, for the user's *own* photo files: the local folder and SMB (NAS) sources, which
+ *    decode real images. That yields the capture date and (reverse-geocoded) place.
+ *  - **Immich**, which is asked for each photo's stored detail directly
+ *    ([ImmichSource.details]) — date, description, place, people and tags. Its previews are
+ *    re-encoded with EXIF stripped, so the server is the only thing that knows them.
+ *
+ * The remaining web/CDN sources (Picsum/Unsplash, iCloud/Google shared albums, WebDAV) serve
+ * stripped images with no companion API, so there's nothing to show and the caption stays hidden.
  *
  * Everything is best-effort: a missing date, absent GPS, or a failed lookup just means
  * less (or no) caption — never a crash and never a blocked slideshow.
  */
 object PhotoCaption {
+
+  /**
+   * One photo's caption, as the frame will draw it: up to five short lines, any of which may be
+   * absent (the renderer hides an empty one). [place] and [date] can come from either source;
+   * [description], [people] and [tags] only ever come from Immich.
+   */
+  data class Caption(
+      val place: String? = null,
+      val date: String? = null,
+      val description: String? = null,
+      val people: String? = null,
+      val tags: String? = null,
+  ) {
+    val isEmpty: Boolean
+      get() =
+          place.isNullOrBlank() &&
+              date.isNullOrBlank() &&
+              description.isNullOrBlank() &&
+              people.isNullOrBlank() &&
+              tags.isNullOrBlank()
+  }
 
   /** Capture date (epoch millis) and GPS coordinates pulled from a photo's EXIF block. */
   data class Meta(val dateMillis: Long?, val lat: Double?, val lng: Double?) {
@@ -58,6 +86,39 @@ object PhotoCaption {
   /** Friendly capture date, e.g. "June 22, 2026" in the device locale. Null when absent. */
   fun formatDate(millis: Long?): String? =
       millis?.let { SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(Date(it)) }
+
+  // A caption line has to stay one row on a 1280px-wide Portal, and a well-tagged photo of a
+  // family gathering can carry a dozen of each — so both lists are capped and the remainder is
+  // summarised rather than truncated mid-name.
+  private const val MAX_PEOPLE = 4
+  private const val MAX_TAGS = 5
+
+  /**
+   * The people line: "Alice, Bob & Carol", or "Alice, Bob, Carol, Dave +3" past [MAX_PEOPLE].
+   * Null when nobody is named.
+   */
+  fun formatPeople(names: List<String>): String? {
+    val list = cleaned(names)
+    return when {
+      list.isEmpty() -> null
+      list.size > MAX_PEOPLE -> list.take(MAX_PEOPLE).joinToString(", ") + " +${list.size - MAX_PEOPLE}"
+      list.size == 1 -> list[0]
+      else -> list.dropLast(1).joinToString(", ") + " & " + list.last()
+    }
+  }
+
+  /** The tags line: "Beach · Sunset · Italy", with a "+n" tail past [MAX_TAGS]. Null when none. */
+  fun formatTags(names: List<String>): String? {
+    val list = cleaned(names)
+    if (list.isEmpty()) return null
+    val more = list.size - MAX_TAGS
+    val shown = list.take(MAX_TAGS) + (if (more > 0) listOf("+$more") else emptyList())
+    return shown.joinToString("  ·  ")
+  }
+
+  /** Trimmed, de-duplicated, blanks dropped — what both lines start from. */
+  private fun cleaned(names: List<String>): List<String> =
+      names.mapNotNull { it.trim().ifBlank { null } }.distinct()
 
   // --- reverse geocoding (keyless) -------------------------------------------
   // BigDataCloud's reverse-geocode-client endpoint needs no key — the same keyless-web-service

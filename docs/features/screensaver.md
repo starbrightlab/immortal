@@ -40,11 +40,39 @@ you don't type URLs and credentials on the Portal:
 | iCloud shared album | Paste a shared-album link (supports Apple's newer CloudKit link format). |
 | Google Photos | Paste a public shared-album link. |
 | Synology Photos | Paste a public album share link. For a local HTTPS address, the NAS certificate must be trusted by the Portal. |
-| [Immich](https://immich.app/) | A self-hosted photo library. Photos **and** videos (with "Play videos" on), from an album or the whole library. |
+| [Immich](https://immich.app/) | A self-hosted photo library. Photos **and** videos (with "Play videos" on), from an album or the whole library. Photos can carry a [caption](#photo-captions) with their date, description, location, people and tags. |
 | Network share (SMB) | A file server on your LAN. |
 | WebDAV | Any WebDAV server. |
 | Web page | Pull images from any web page. |
 | Built-in feed | Keyless. Pick between Lorem Picsum (stock photography), the Met Museum and Art Institute of Chicago collections, Wikimedia featured landscapes, or NASA's Astronomy Picture of the Day. Unsplash-ready with a key. |
+
+## Photo captions
+
+The frame can label the photo it's showing, tvOS-style, in the corner of the overlay — under the
+now-playing card when both are up. Up to five lines, each of which appears only when that photo
+has something for it:
+
+| Line | What it shows |
+| --- | --- |
+| **Location** | Where the photo was taken — "Arezzo, Italy" |
+| **Photo date** | When it was taken — "June 22, 2026" |
+| **Description** | The description you typed on the photo in Immich |
+| **People** | The people Immich recognised — "Alice, Bob & Carol" |
+| **Tags** | The tags the photo is filed under in Immich |
+
+Which sources can fill these in depends on what survives to the Portal:
+
+- **Immich** supplies all five. The frame asks the server for each photo as it comes up
+  (`GET /api/assets/{id}`) and caches the answer, so a looping album asks once per photo.
+- **Your own folder** and a **network share (SMB)** supply the date and location, read from the
+  photo's own EXIF block; the location is reverse-geocoded to a place name.
+- The remaining sources (built-in feed, iCloud/Google shared albums, WebDAV) serve re-encoded
+  images with EXIF stripped and have no metadata API, so they show no caption.
+
+Each line has its own switch under **Photo details** in the screensaver settings (on the Portal or
+from the [phone remote](remote.md)); a switch only appears when the active source can actually
+supply that line. All five are on by default. Captions are hidden on a full-bleed clock face
+(which owns the whole frame) and while a video is playing.
 
 ## Presence-aware behaviour
 
