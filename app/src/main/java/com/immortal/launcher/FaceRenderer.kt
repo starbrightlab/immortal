@@ -114,10 +114,14 @@ class FaceRenderer(
   private var lastArtBitmap: Bitmap? = null
   private var npListener: NowPlayingHub.Listener? = null
 
-  // Photo caption (place / date). A grid element like the rest, fed per-photo via [setCaption].
+  // Photo caption (place / date / description / people / tags). A grid element like the rest, fed
+  // per-photo via [setCaption]; each line hides itself when that photo has nothing for it.
   private var captionPanel: LinearLayout? = null
   private var captionPlace: TextView? = null
   private var captionDate: TextView? = null
+  private var captionDescription: TextView? = null
+  private var captionPeople: TextView? = null
+  private var captionTags: TextView? = null
 
   fun start(face: Face) {
     this.face = face
@@ -150,6 +154,9 @@ class FaceRenderer(
     captionPanel = null
     captionPlace = null
     captionDate = null
+    captionDescription = null
+    captionPeople = null
+    captionTags = null
 
     buildClockCluster(face.clock)
     val fullBleed = clockFace?.fullBleed == true
@@ -468,9 +475,14 @@ class FaceRenderer(
   }
 
   /**
-   * The photo caption ("place" bold over a lighter "date") as a grid element, so it stacks with
-   * whatever else lands in the same cell (notably the now-playing card — both default to
-   * bottom-right) instead of overlapping it. Hidden until [setCaption] gets real metadata.
+   * The photo caption as a grid element, so it stacks with whatever else lands in the same cell
+   * (notably the now-playing card — both default to bottom-right) instead of overlapping it.
+   *
+   * Up to five stacked lines: the place in bold over a lighter date (the original pair, from EXIF
+   * or from Immich), then the Immich-only detail — the description the user typed, who's in the
+   * shot, and its tags. Each is a step smaller and dimmer than the line above, so the block reads
+   * as one caption rather than five competing rows, and each hides itself when that photo has
+   * nothing for it. Hidden entirely until [setCaption] gets real metadata.
    */
   private fun buildCaption(spec: CaptionSpec) {
     val align = horizontalGravity(spec.position)
@@ -478,16 +490,26 @@ class FaceRenderer(
     col.orientation = LinearLayout.VERTICAL
     col.gravity = align
     col.visibility = View.GONE
-    val place = text(19f, Color.WHITE, false)
-    place.typeface = Typeface.DEFAULT_BOLD
-    place.maxLines = 1
-    place.ellipsize = TextUtils.TruncateAt.END
-    place.gravity = align
-    val date = text(14f, 0xCCFFFFFF.toInt(), true)
-    date.maxLines = 1
-    date.gravity = align
-    col.addView(place, LinearLayout.LayoutParams(WRAP, WRAP))
-    col.addView(date, LinearLayout.LayoutParams(WRAP, WRAP))
+
+    // A caption line: hidden until it has text, capped in width so a long description (or a photo
+    // full of named faces) wraps/ellipsizes instead of stretching the column across the frame.
+    fun line(sizeSp: Float, color: Int, lightFont: Boolean, maxLines: Int = 1): TextView {
+      val t = text(sizeSp, color, lightFont)
+      t.maxLines = maxLines
+      t.ellipsize = TextUtils.TruncateAt.END
+      t.gravity = align
+      t.maxWidth = dp(560)
+      t.visibility = View.GONE
+      col.addView(t, LinearLayout.LayoutParams(WRAP, WRAP))
+      return t
+    }
+
+    val place = line(19f, Color.WHITE, false).apply { typeface = Typeface.DEFAULT_BOLD }
+    val date = line(14f, 0xCCFFFFFF.toInt(), true)
+    val description = line(15f, 0xE6FFFFFF.toInt(), true, maxLines = 2)
+    val people = line(14f, 0xCCFFFFFF.toInt(), true)
+    val tags = line(13f, 0x99FFFFFF.toInt(), true)
+
     // Top margin gives breathing room from whatever sits above in the same cell (the now-playing
     // card). A GONE sibling contributes no space, so a lone caption isn't pushed off the bottom.
     bucket(spec.position)
@@ -495,29 +517,32 @@ class FaceRenderer(
     captionPanel = col
     captionPlace = place
     captionDate = date
+    captionDescription = description
+    captionPeople = people
+    captionTags = tags
   }
 
   /**
-   * Push the latest photo caption (main thread). A blank/absent place AND date hides it; otherwise
+   * Push the latest photo caption (main thread). A null/empty caption hides the block; otherwise
    * each line shows only when it has content. No-op when the caption isn't built (disabled, or a
    * full-bleed face).
    */
-  fun setCaption(place: String?, date: String?) {
+  fun setCaption(caption: PhotoCaption.Caption?) {
     val col = captionPanel ?: return
-    val p = place?.takeIf { it.isNotBlank() }
-    val d = date?.takeIf { it.isNotBlank() }
-    if (p == null && d == null) {
+    if (caption == null || caption.isEmpty) {
       col.visibility = View.GONE
       return
     }
-    captionPlace?.apply {
-      visibility = if (p == null) View.GONE else View.VISIBLE
-      text = p ?: ""
+    fun line(v: TextView?, s: String?) {
+      val t = s?.trim()?.ifBlank { null }
+      v?.visibility = if (t == null) View.GONE else View.VISIBLE
+      v?.text = t ?: ""
     }
-    captionDate?.apply {
-      visibility = if (d == null) View.GONE else View.VISIBLE
-      text = d ?: ""
-    }
+    line(captionPlace, caption.place)
+    line(captionDate, caption.date)
+    line(captionDescription, caption.description)
+    line(captionPeople, caption.people)
+    line(captionTags, caption.tags)
     col.visibility = View.VISIBLE
   }
 
