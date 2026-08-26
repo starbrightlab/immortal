@@ -36,25 +36,127 @@ import org.json.JSONObject
 object PhotoCaption {
 
   /**
-   * One photo's caption, as the frame will draw it: up to five short lines, any of which may be
-   * absent (the renderer hides an empty one). [place] and [date] can come from either source;
-   * [description], [people] and [tags] only ever come from Immich.
+   * The five things a caption can say about a photo. This is the identity the whole feature is
+   * keyed on: the user's chosen [order], the per-line [LineStyle], the settings toggles, and the
+   * icon each line draws all hang off it, so adding a sixth line is one entry here plus a
+   * drawable.
+   *
+   * The defaults reproduce the original two-line caption exactly — a bold place over a lighter
+   * date — with the Immich-only lines tucked underneath, each a step smaller.
    */
-  data class Caption(
-      val place: String? = null,
-      val date: String? = null,
-      val description: String? = null,
-      val people: String? = null,
-      val tags: String? = null,
+  enum class Line(
+      /** Stable key used in prefs and on the wire. Never rename — it's persisted. */
+      val key: String,
+      /** Label for the settings screen. */
+      val label: String,
+      /** The glyph drawn ahead of the text when icons are on. */
+      val iconRes: Int,
+      val defaultSize: Int,
+      val defaultWeight: Weight,
   ) {
-    val isEmpty: Boolean
-      get() =
-          place.isNullOrBlank() &&
-              date.isNullOrBlank() &&
-              description.isNullOrBlank() &&
-              people.isNullOrBlank() &&
-              tags.isNullOrBlank()
+    LOCATION("location", "Location", R.drawable.ic_caption_location, 95, Weight.BOLD),
+    DATE("date", "Photo date", R.drawable.ic_caption_date, 70, Weight.LIGHT),
+    DESCRIPTION("description", "Description", R.drawable.ic_caption_description, 75, Weight.LIGHT),
+    PEOPLE("people", "People", R.drawable.ic_caption_people, 70, Weight.LIGHT),
+    TAGS("tags", "Tags", R.drawable.ic_caption_tags, 65, Weight.LIGHT);
+
+    val defaultStyle: LineStyle
+      get() = LineStyle(defaultSize, defaultWeight)
+
+    companion object {
+      fun fromKey(key: String?): Line? = entries.firstOrNull { it.key == key?.trim() }
+    }
   }
+
+  /**
+   * How heavy a line's type is. Rendered from the *face's own font* (see
+   * [FaceStyle.typeface]) rather than a face of its own, so the caption reads as part of the same
+   * overlay as the clock, date and weather: [LIGHT] takes the face's light variant, [BOLD] bolds
+   * the face's regular one.
+   */
+  enum class Weight(val key: String, val label: String) {
+    LIGHT("light", "Light"),
+    REGULAR("regular", "Regular"),
+    BOLD("bold", "Bold");
+
+    companion object {
+      fun fromKey(key: String?): Weight? = entries.firstOrNull { it.key == key?.trim() }
+    }
+  }
+
+  /** How one line is drawn: [size] as a percentage of the caption base size, plus its [weight]. */
+  data class LineStyle(val size: Int, val weight: Weight) {
+    companion object {
+      const val MIN_SIZE = 50
+      const val MAX_SIZE = 200
+      const val SIZE_STEP = 5
+    }
+  }
+
+  /** Keep a line size inside the range the settings stepper offers. */
+  fun clampSize(size: Int): Int = size.coerceIn(LineStyle.MIN_SIZE, LineStyle.MAX_SIZE)
+
+  /**
+   * One photo's caption: the text for each line that has something to say, in no particular
+   * order — the *drawing* order is the user's ([parseOrder]), not this map's.
+   */
+  data class Caption(val lines: Map<Line, String>) {
+    val isEmpty: Boolean
+      get() = lines.isEmpty()
+
+    operator fun get(line: Line): String? = lines[line]
+
+    companion object {
+      val EMPTY = Caption(emptyMap())
+
+      /**
+       * Build a caption from whatever the source could supply. Blank and null values are dropped
+       * here, once, so neither the controller nor the renderer has to keep re-checking them.
+       */
+      fun of(vararg values: Pair<Line, String?>): Caption =
+          Caption(
+              values
+                  .mapNotNull { (line, v) -> v?.trim()?.ifBlank { null }?.let { line to it } }
+                  .toMap())
+    }
+  }
+
+  // --- order and per-line style (persisted as compact strings) -----------------
+  // Both are stored as one string each rather than ten scalar prefs: they're a single editable
+  // unit owned by one screen (CaptionStyleActivity), the way the photo-source credentials are.
+  // Parsing is total — an unknown key, a missing line or outright garbage degrades to the
+  // defaults rather than losing the caption, because a bad string must never blank the frame.
+
+  /** The default top-to-bottom order, as declared in [Line]. */
+  val DEFAULT_ORDER: List<Line> = Line.entries.toList()
+
+  /** `"location,date,…"` → lines, de-duplicated, with anything missing appended in default order. */
+  fun parseOrder(raw: String?): List<Line> {
+    val named = raw.orEmpty().split(',').mapNotNull { Line.fromKey(it) }.distinct()
+    return named + DEFAULT_ORDER.filterNot { it in named }
+  }
+
+  fun serializeOrder(order: List<Line>): String = order.joinToString(",") { it.key }
+
+  /** `"location:95:bold,date:70:light,…"` → per-line style, falling back to each line's default. */
+  fun parseStyles(raw: String?): Map<Line, LineStyle> {
+    val out = LinkedHashMap<Line, LineStyle>()
+    Line.entries.forEach { out[it] = it.defaultStyle }
+    raw.orEmpty().split(',').forEach { part ->
+      val bits = part.split(':')
+      val line = Line.fromKey(bits.getOrNull(0)) ?: return@forEach
+      val size = bits.getOrNull(1)?.trim()?.toIntOrNull()?.let(::clampSize) ?: line.defaultSize
+      val weight = Weight.fromKey(bits.getOrNull(2)) ?: line.defaultWeight
+      out[line] = LineStyle(size, weight)
+    }
+    return out
+  }
+
+  fun serializeStyles(styles: Map<Line, LineStyle>): String =
+      Line.entries.joinToString(",") { line ->
+        val st = styles[line] ?: line.defaultStyle
+        "${line.key}:${st.size}:${st.weight.key}"
+      }
 
   /** Capture date (epoch millis) and GPS coordinates pulled from a photo's EXIF block. */
   data class Meta(val dateMillis: Long?, val lat: Double?, val lng: Double?) {

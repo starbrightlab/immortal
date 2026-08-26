@@ -619,7 +619,11 @@ class PhotoFrameController(
         if (meta.hasLocation && settings.captionLocation) PhotoCaption.placeName(meta.lat!!, meta.lng!!)
         else null
     val date = if (settings.captionDate) PhotoCaption.formatDate(meta.dateMillis) else null
-    val caption = PhotoCaption.Caption(place = place, date = date)
+    val caption =
+        PhotoCaption.Caption.of(
+            PhotoCaption.Line.LOCATION to place,
+            PhotoCaption.Line.DATE to date,
+        )
     ui.post { if (g == gen) faceRenderer.setCaption(caption) }
   }
 
@@ -646,14 +650,21 @@ class PhotoFrameController(
     }
   }
 
-  /** An Immich asset's detail, narrowed to the lines the user has left switched on. */
+  /**
+   * An Immich asset's detail, narrowed to the lines the user has left switched on. Which order
+   * they're drawn in, and at what size and weight, is the renderer's business (and the user's) —
+   * this only decides what there is to say.
+   */
   private fun captionFor(d: ImmichSource.Details): PhotoCaption.Caption =
-      PhotoCaption.Caption(
-          place = d.place.takeIf { settings.captionLocation },
-          date = if (settings.captionDate) PhotoCaption.formatDate(d.dateMillis) else null,
-          description = d.description.takeIf { settings.captionDescription },
-          people = if (settings.captionPeople) PhotoCaption.formatPeople(d.people) else null,
-          tags = if (settings.captionTags) PhotoCaption.formatTags(d.tags) else null,
+      PhotoCaption.Caption.of(
+          PhotoCaption.Line.LOCATION to d.place.takeIf { settings.captionLocation },
+          PhotoCaption.Line.DATE to
+              (if (settings.captionDate) PhotoCaption.formatDate(d.dateMillis) else null),
+          PhotoCaption.Line.DESCRIPTION to d.description.takeIf { settings.captionDescription },
+          PhotoCaption.Line.PEOPLE to
+              (if (settings.captionPeople) PhotoCaption.formatPeople(d.people) else null),
+          PhotoCaption.Line.TAGS to
+              (if (settings.captionTags) PhotoCaption.formatTags(d.tags) else null),
       )
 
   /** A clean upcoming-events panel top-right, over the photo. Its own translucent
