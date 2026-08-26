@@ -51,14 +51,21 @@ import com.immortal.launcher.ui.theme.SampleAppTheme
 
 /**
  * The photo-caption layout editor, on its own subpage (reached from the "Caption layout" row in
- * screensaver settings). Owns everything about *how* the caption is drawn — the top-to-bottom
- * order of the lines, each line's size and weight, and whether icons show — while the plain
- * on/off switches for each line stay in the settings registry, where they also reach the phone
- * remote.
+ * screensaver settings).
  *
- * This is a sub-screen rather than a pile of generic rows because reordering isn't a scalar: a
- * "move up / move down" affordance is the only way to express a permutation on a D-pad. Same
- * reasoning (and the same shape) as the clock-face picker.
+ * It holds **only what the settings registry can't express**: the top-to-bottom order of the
+ * lines, and each line's size and weight. Everything that *is* a plain scalar — which lines show
+ * at all, and whether icons draw — stays a `SettingSpec` on the screensaver settings screen, so
+ * it renders there once and reaches the phone remote for free. Duplicating those switches here
+ * would give the same setting two homes and no single source of truth.
+ *
+ * Which is why this lists only the lines that are currently switched on: arranging a line that
+ * isn't drawn is meaningless, and a disabled row here would just be the switch again in disguise.
+ * A line's place in the order survives being switched off and back on.
+ *
+ * A sub-screen rather than a pile of generic rows because reordering isn't a scalar: "move up /
+ * move down" is the only way to express a permutation on a D-pad. Same reasoning (and the same
+ * shape) as the clock-face picker.
  */
 class CaptionStyleActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,10 +81,9 @@ private fun CaptionStyleScreen() {
   val loaded = remember { ScreensaverConfig.load(context) }
   var order by remember { mutableStateOf(PhotoCaption.parseOrder(loaded.captionOrder)) }
   var styles by remember { mutableStateOf(PhotoCaption.parseStyles(loaded.captionStyles)) }
-  var icons by remember { mutableStateOf(loaded.captionIcons) }
-  // The per-line on/off switches live in the registry (so they also reach the phone remote); they
-  // are mirrored here because an editor you can't switch a line off from would be a strange one.
-  var enabled by remember { mutableStateOf(enabledLines(loaded)) }
+  // Read-only here: the switches live on the previous screen. Re-read on every entry, because
+  // that's where the user just came from.
+  val enabled = remember { enabledLines(loaded) }
 
   fun persistOrder(next: List<PhotoCaption.Line>) {
     order = next
@@ -106,23 +112,29 @@ private fun CaptionStyleScreen() {
     Column(modifier = Modifier.widthIn(max = 1100.dp)) {
       Text("Caption layout", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Choose which details show under your photos, what order they read in, and how big and " +
-              "bold each one is. Text follows your clock face's font and colour.",
+          "Arrange the details showing under your photos, and set how big and bold each one is. " +
+              "Text follows your clock face's font and colour.",
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
       )
       Spacer(Modifier.size(26.dp))
 
-      Card {
-        ToggleRow("Show icons", icons) { v ->
-          ScreensaverConfig.setCaptionIcons(context, v)
-          icons = v
+      val shown = order.filter { enabled[it] == true }
+      if (shown.isEmpty()) {
+        Card {
+          Text(
+              "No caption lines are switched on. Turn some on under Photo details in screensaver " +
+                  "settings, then come back to arrange them.",
+              color = Color(0xFF9A9A9A),
+              fontSize = 15.sp,
+              modifier = Modifier.padding(18.dp),
+          )
         }
+        Spacer(Modifier.size(22.dp))
       }
-      Spacer(Modifier.size(22.dp))
 
-      order.forEachIndexed { index, line ->
+      shown.forEachIndexed { index, line ->
         val style = styles[line] ?: line.defaultStyle
         SectionLabel(line.label)
         Card {
@@ -138,17 +150,19 @@ private fun CaptionStyleScreen() {
             )
             Spacer(Modifier.size(12.dp))
             Text(
-                "Line ${index + 1} of ${order.size}",
+                "Line ${index + 1} of ${shown.size}",
                 color = Color(0xFF9A9A9A),
                 fontSize = 14.sp,
                 modifier = Modifier.weight(1f),
             )
-            MoveButton("▲", enabled = index > 0) { persistOrder(order.moved(index, -1)) }
-            MoveButton("▼", enabled = index < order.lastIndex) { persistOrder(order.moved(index, +1)) }
-          }
-          ToggleRow("Show this line", enabled[line] == true) { v ->
-            setLineEnabled(context, line, v)
-            enabled = enabled + (line to v)
+            // Swapping with the neighbouring *shown* line leaves any switched-off line where it
+            // sits, so its position is still there when it comes back.
+            MoveButton("▲", enabled = index > 0) {
+              persistOrder(order.swapped(line, shown[index - 1]))
+            }
+            MoveButton("▼", enabled = index < shown.lastIndex) {
+              persistOrder(order.swapped(line, shown[index + 1]))
+            }
           }
           Divider()
           Stepper(
@@ -192,8 +206,9 @@ private fun CaptionStyleScreen() {
         runCatching { context.startActivity(Intent(context, PhotoFramePreviewActivity::class.java)) }
       }
       Text(
-          "A line only appears when the photo actually has that detail — and the whole caption is " +
-              "hidden on the full-screen flip clock, which owns the frame on its own.",
+          "Only the lines you've switched on under Photo details are listed here. A line still " +
+              "shows just when the photo has that detail, and the whole caption is hidden on the " +
+              "full-screen flip clock, which owns the frame on its own.",
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 14.dp, start = 4.dp, end = 4.dp),
@@ -202,12 +217,17 @@ private fun CaptionStyleScreen() {
   }
 }
 
-/** This line moved [delta] places, with the list closing up behind it. */
-private fun List<PhotoCaption.Line>.moved(index: Int, delta: Int): List<PhotoCaption.Line> {
-  val target = (index + delta).coerceIn(0, lastIndex)
-  if (target == index) return this
+/** The order with [a] and [b] trading places; everything else keeps its slot. */
+private fun List<PhotoCaption.Line>.swapped(
+    a: PhotoCaption.Line,
+    b: PhotoCaption.Line,
+): List<PhotoCaption.Line> {
+  val i = indexOf(a)
+  val j = indexOf(b)
+  if (i < 0 || j < 0 || i == j) return this
   val out = toMutableList()
-  out.add(target, out.removeAt(index))
+  out[i] = b
+  out[j] = a
   return out
 }
 
@@ -219,17 +239,6 @@ private fun enabledLines(s: ScreensaverConfig.Settings): Map<PhotoCaption.Line, 
         PhotoCaption.Line.PEOPLE to s.captionPeople,
         PhotoCaption.Line.TAGS to s.captionTags,
     )
-
-/** Write through to the same setters the registry specs bind to, so the two can't drift. */
-private fun setLineEnabled(context: android.content.Context, line: PhotoCaption.Line, on: Boolean) {
-  when (line) {
-    PhotoCaption.Line.LOCATION -> ScreensaverConfig.setCaptionLocation(context, on)
-    PhotoCaption.Line.DATE -> ScreensaverConfig.setCaptionDate(context, on)
-    PhotoCaption.Line.DESCRIPTION -> ScreensaverConfig.setCaptionDescription(context, on)
-    PhotoCaption.Line.PEOPLE -> ScreensaverConfig.setCaptionPeople(context, on)
-    PhotoCaption.Line.TAGS -> ScreensaverConfig.setCaptionTags(context, on)
-  }
-}
 
 /** A ▲/▼ reorder button, dimmed and inert at the ends of the list. */
 @Composable
