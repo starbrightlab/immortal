@@ -217,6 +217,37 @@ class SettingsDomainTest {
   }
 
   @Test
+  fun screensaverCaptionLines_onlyOfferWhatTheActiveSourceCanSupply() {
+    // The caption lines are declaratively gated so a control never promises something the source
+    // can't deliver: date + location wherever the photo carries them (own files via EXIF, Immich
+    // via the server), and description/people/tags only on Immich, which alone stores them.
+    val byKey = SettingsDomains.screensaver.specs.associateBy { it.key }
+    val fromImmichOnly = listOf("captionDescription", "captionPeople", "captionTags")
+    val fromAnyOwnPhotos = listOf("captionDate", "captionLocation")
+
+    fun visible(keys: List<String>, s: com.immortal.launcher.ScreensaverConfig.Settings) =
+        keys.filter { byKey.getValue(it).visibleWhen(ctx, s) }
+
+    val immich =
+        com.immortal.launcher.ScreensaverConfig.Settings(
+            source = com.immortal.launcher.ScreensaverConfig.SOURCE_IMMICH,
+            immichUrl = "http://immich:2283",
+            immichKey = "secret")
+    assertEquals(fromImmichOnly, visible(fromImmichOnly, immich))
+    assertEquals(fromAnyOwnPhotos, visible(fromAnyOwnPhotos, immich))
+
+    val folder =
+        com.immortal.launcher.ScreensaverConfig.Settings(
+            source = com.immortal.launcher.ScreensaverConfig.SOURCE_FOLDER, folderPath = "/sdcard/Pics")
+    assertEquals(emptyList<String>(), visible(fromImmichOnly, folder))
+    assertEquals(fromAnyOwnPhotos, visible(fromAnyOwnPhotos, folder))
+
+    // The built-in feed carries no metadata at all, so the whole group stays hidden.
+    val builtIn = com.immortal.launcher.ScreensaverConfig.Settings()
+    assertEquals(emptyList<String>(), visible(fromImmichOnly + fromAnyOwnPhotos, builtIn))
+  }
+
+  @Test
   fun immortalRegistry_coversEveryPersistedField_orExplicitlyAccountsForIt() {
     // The on-device Immortal screen now renders its top-level controls from this domain, so a new
     // ImmortalSettings.Settings field that nobody adds a spec for would silently never appear. Every

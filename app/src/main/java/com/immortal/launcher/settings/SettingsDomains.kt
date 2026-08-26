@@ -270,6 +270,44 @@ object SettingsDomains {
                       get = { it.blurBackground },
                       set = ScreensaverConfig::setBlurBackground,
                       help = "Fills letterbox sidebars in fit mode with a blurred copy of the photo instead of solid black."),
+                  // Photo caption lines. Date + location are available wherever the photo carries
+                  // them — your own files (EXIF) and Immich (the server knows); description, tags
+                  // and people only exist on Immich, so those three gate on it.
+                  BoolSpec(
+                      "captionDate",
+                      "Photo date",
+                      get = { it.captionDate },
+                      set = ScreensaverConfig::setCaptionDate,
+                      help = "Show when the photo was taken, under the place name.",
+                      visible = { _, s -> s.usesImmich || s.usesFolder || s.usesSmb }),
+                  BoolSpec(
+                      "captionLocation",
+                      "Location",
+                      get = { it.captionLocation },
+                      set = ScreensaverConfig::setCaptionLocation,
+                      help = "Show where the photo was taken, e.g. \"Arezzo, Italy\".",
+                      visible = { _, s -> s.usesImmich || s.usesFolder || s.usesSmb }),
+                  BoolSpec(
+                      "captionDescription",
+                      "Description",
+                      get = { it.captionDescription },
+                      set = ScreensaverConfig::setCaptionDescription,
+                      help = "Show the description you typed on the photo in Immich.",
+                      visible = { _, s -> s.usesImmich }),
+                  BoolSpec(
+                      "captionPeople",
+                      "People",
+                      get = { it.captionPeople },
+                      set = ScreensaverConfig::setCaptionPeople,
+                      help = "Show the names of the people Immich recognised in the photo.",
+                      visible = { _, s -> s.usesImmich }),
+                  BoolSpec(
+                      "captionTags",
+                      "Tags",
+                      get = { it.captionTags },
+                      set = ScreensaverConfig::setCaptionTags,
+                      help = "Show the tags the photo is filed under in Immich.",
+                      visible = { _, s -> s.usesImmich }),
                   // On-device cache: only meaningful for a network source that re-fetches the same
                   // assets every loop (Immich / WebDAV). Hidden for a local folder or the built-in
                   // feed, where there's nothing to save a round-trip on.
@@ -470,6 +508,11 @@ object SettingsDomains {
                   "ambientDashboard" to "Display",
                   "gestureWave" to "Display",
                   "welcomeEnabled" to "Display",
+                  "captionDate" to "Photo details",
+                  "captionLocation" to "Photo details",
+                  "captionDescription" to "Photo details",
+                  "captionPeople" to "Photo details",
+                  "captionTags" to "Photo details",
                   "batterySaver" to "Power & sleep",
                   "presenceMode" to "Power & sleep",
                   "idleSleepMin" to "Power & sleep",
