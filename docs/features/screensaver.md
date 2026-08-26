@@ -85,12 +85,18 @@ it. Sizes are a percentage of a shared base, scaled again by the face's own size
 clock bigger carries the caption with it. A bold line sits at the face's full opacity and lighter
 ones step back, which is what keeps a five-line block legible.
 
-**Photo details → Caption layout** opens an editor (`CaptionStyleActivity`) for the rest:
+**Photo details → Caption layout** opens an editor (`CaptionStyleActivity`) for what a settings
+row can't express:
 
 - **Order** — move any line up or down; the caption is drawn top to bottom in that order.
 - **Size** — 50–200% per line, in 5% steps.
 - **Weight** — Light, Regular or Bold per line, taken from the face's own font.
 - **Reset layout to defaults** — back to the shipped order and sizes.
+
+It lists only the lines you've switched on, since arranging a line that isn't drawn is meaningless
+— a line keeps its place in the order while it's switched off. Everything that *is* a plain switch
+(which lines show, and **Show icons**) stays on the screensaver settings screen, so it has one home
+and also reaches the [phone remote](remote.md).
 
 The defaults reproduce the original caption exactly: a bold place over a lighter date, with the
 Immich-only lines beneath, each a step smaller.
