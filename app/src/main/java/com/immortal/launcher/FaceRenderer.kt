@@ -8,6 +8,7 @@
 package com.immortal.launcher
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
@@ -114,14 +115,11 @@ class FaceRenderer(
   private var lastArtBitmap: Bitmap? = null
   private var npListener: NowPlayingHub.Listener? = null
 
-  // Photo caption (place / date / description / people / tags). A grid element like the rest, fed
-  // per-photo via [setCaption]; each line hides itself when that photo has nothing for it.
+  // Photo caption. A grid element like the rest, fed per-photo via [setCaption]; each line hides
+  // itself when that photo has nothing for it. Insertion order IS the user's chosen draw order
+  // (see [buildCaption]), so this is a LinkedHashMap and never a plain map.
   private var captionPanel: LinearLayout? = null
-  private var captionPlace: TextView? = null
-  private var captionDate: TextView? = null
-  private var captionDescription: TextView? = null
-  private var captionPeople: TextView? = null
-  private var captionTags: TextView? = null
+  private val captionLines = LinkedHashMap<PhotoCaption.Line, TextView>()
 
   fun start(face: Face) {
     this.face = face
@@ -152,11 +150,7 @@ class FaceRenderer(
     // Caption views are rebuilt below (or not, on a full-bleed face) — drop stale refs so a
     // late setCaption() can't poke a detached view from the previous face.
     captionPanel = null
-    captionPlace = null
-    captionDate = null
-    captionDescription = null
-    captionPeople = null
-    captionTags = null
+    captionLines.clear()
 
     buildClockCluster(face.clock)
     val fullBleed = clockFace?.fullBleed == true
@@ -478,48 +472,97 @@ class FaceRenderer(
    * The photo caption as a grid element, so it stacks with whatever else lands in the same cell
    * (notably the now-playing card — both default to bottom-right) instead of overlapping it.
    *
-   * Up to five stacked lines: the place in bold over a lighter date (the original pair, from EXIF
-   * or from Immich), then the Immich-only detail — the description the user typed, who's in the
-   * shot, and its tags. Each is a step smaller and dimmer than the line above, so the block reads
-   * as one caption rather than five competing rows, and each hides itself when that photo has
-   * nothing for it. Hidden entirely until [setCaption] gets real metadata.
+   * One [TextView] per [PhotoCaption.Line], added in the user's chosen order, each with its own
+   * size and weight and an optional leading glyph. Every line is drawn from the **face's** clock
+   * spec — same font family, colour, opacity and shadow as the clock, date and weather — so the
+   * caption reads as part of one overlay rather than a panel bolted onto it. Hidden entirely
+   * until [setCaption] gets real metadata; individual lines hide when that photo has nothing for
+   * them.
    */
   private fun buildCaption(spec: CaptionSpec) {
+    val cfg = ScreensaverConfig.load(context)
     val align = horizontalGravity(spec.position)
+    val styles = PhotoCaption.parseStyles(cfg.captionStyles)
     val col = LinearLayout(context)
     col.orientation = LinearLayout.VERTICAL
     col.gravity = align
     col.visibility = View.GONE
+    // The glyphs overhang the text box; let them draw rather than be clipped to the column.
+    col.clipChildren = false
+    col.clipToPadding = false
 
-    // A caption line: hidden until it has text, capped in width so a long description (or a photo
-    // full of named faces) wraps/ellipsizes instead of stretching the column across the frame.
-    fun line(sizeSp: Float, color: Int, lightFont: Boolean, maxLines: Int = 1): TextView {
-      val t = text(sizeSp, color, lightFont)
-      t.maxLines = maxLines
-      t.ellipsize = TextUtils.TruncateAt.END
-      t.gravity = align
-      t.maxWidth = dp(560)
-      t.visibility = View.GONE
+    PhotoCaption.parseOrder(cfg.captionOrder).forEach { line ->
+      val style = styles[line] ?: line.defaultStyle
+      val t = captionLine(line, style, align, cfg.captionIcons)
       col.addView(t, LinearLayout.LayoutParams(WRAP, WRAP))
-      return t
+      captionLines[line] = t
     }
-
-    val place = line(19f, Color.WHITE, false).apply { typeface = Typeface.DEFAULT_BOLD }
-    val date = line(14f, 0xCCFFFFFF.toInt(), true)
-    val description = line(15f, 0xE6FFFFFF.toInt(), true, maxLines = 2)
-    val people = line(14f, 0xCCFFFFFF.toInt(), true)
-    val tags = line(13f, 0x99FFFFFF.toInt(), true)
 
     // Top margin gives breathing room from whatever sits above in the same cell (the now-playing
     // card). A GONE sibling contributes no space, so a lone caption isn't pushed off the bottom.
     bucket(spec.position)
         .addView(col, LinearLayout.LayoutParams(WRAP, WRAP).apply { topMargin = dp(18) })
     captionPanel = col
-    captionPlace = place
-    captionDate = date
-    captionDescription = description
-    captionPeople = people
-    captionTags = tags
+  }
+
+  /**
+   * One caption line, styled from the face so it matches the clock/date/weather: the face's font
+   * (its light variant for [PhotoCaption.Weight.LIGHT], bolded for [PhotoCaption.Weight.BOLD]),
+   * its colour, and its shadow. Size is the caption base scaled by the line's own percentage and
+   * again by the face's `sizeScale`, so bumping the clock size carries the caption with it.
+   *
+   * The alpha ramp by weight is what keeps a five-line block legible: a bold line reads at the
+   * face's full opacity, lighter ones sit back, which is the hierarchy the original hardcoded
+   * caption got from fixed colours — now derived, so it follows a recoloured face.
+   */
+  private fun captionLine(
+      line: PhotoCaption.Line,
+      style: PhotoCaption.LineStyle,
+      align: Int,
+      icons: Boolean,
+  ): TextView {
+    val clock = face.clock
+    val fade =
+        when (style.weight) {
+          PhotoCaption.Weight.BOLD -> 1f
+          PhotoCaption.Weight.REGULAR -> 0.9f
+          PhotoCaption.Weight.LIGHT -> 0.8f
+        }
+    val color = FaceStyle.colorWithOpacity(clock.color, clock.opacity * fade)
+    val t = TextView(context)
+    t.textSize = CAPTION_BASE_SP * style.size / 100f * clock.sizeScale / 100f
+    t.setTextColor(color)
+    t.typeface = captionTypeface(style.weight)
+    FaceStyle.applyShadow(t, clock.shadow, clock.color)
+    // A description can run long and a crowd of names longer; cap the width so the column can't
+    // stretch across the frame, and let the description use a second row before it ellipsizes.
+    t.maxLines = if (line == PhotoCaption.Line.DESCRIPTION) 2 else 1
+    t.ellipsize = TextUtils.TruncateAt.END
+    t.gravity = align
+    t.maxWidth = dp(560)
+    t.visibility = View.GONE
+    if (icons) applyCaptionIcon(t, line, color)
+    return t
+  }
+
+  /** The face's own typeface, taken light or bolded to hit the line's weight. */
+  private fun captionTypeface(weight: PhotoCaption.Weight): Typeface {
+    val base = FaceStyle.typeface(assets, face.clock, light = weight == PhotoCaption.Weight.LIGHT)
+    return if (weight == PhotoCaption.Weight.BOLD) Typeface.create(base, Typeface.BOLD) else base
+  }
+
+  /**
+   * Put the line's glyph ahead of its text, sized to the text and tinted to match it — so an icon
+   * tracks a size or colour change instead of drifting out of proportion. Best-effort: a drawable
+   * that won't load simply leaves the line text-only.
+   */
+  private fun applyCaptionIcon(t: TextView, line: PhotoCaption.Line, color: Int) {
+    val icon = runCatching { context.getDrawable(line.iconRes) }.getOrNull()?.mutate() ?: return
+    val px = (t.textSize * 1.05f).toInt().coerceAtLeast(1)
+    icon.setBounds(0, 0, px, px)
+    t.setCompoundDrawablesRelative(icon, null, null, null)
+    t.compoundDrawableTintList = ColorStateList.valueOf(color)
+    t.compoundDrawablePadding = dp(8)
   }
 
   /**
@@ -533,16 +576,11 @@ class FaceRenderer(
       col.visibility = View.GONE
       return
     }
-    fun line(v: TextView?, s: String?) {
-      val t = s?.trim()?.ifBlank { null }
-      v?.visibility = if (t == null) View.GONE else View.VISIBLE
-      v?.text = t ?: ""
+    captionLines.forEach { (line, view) ->
+      val text = caption[line]
+      view.visibility = if (text == null) View.GONE else View.VISIBLE
+      view.text = text ?: ""
     }
-    line(captionPlace, caption.place)
-    line(captionDate, caption.date)
-    line(captionDescription, caption.description)
-    line(captionPeople, caption.people)
-    line(captionTags, caption.tags)
     col.visibility = View.VISIBLE
   }
 
@@ -704,4 +742,13 @@ class FaceRenderer(
   private val MATCH = FrameLayout.LayoutParams.MATCH_PARENT
   private val WRAP = FrameLayout.LayoutParams.WRAP_CONTENT
   private fun dp(v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
+
+  private companion object {
+    /**
+     * The caption's 100% size, in sp. Every line is a percentage of this (see
+     * [PhotoCaption.LineStyle.size]), so the shipped defaults land on the sizes the original
+     * hardcoded caption used: 95% = 19sp for the place, 70% = 14sp for the date.
+     */
+    const val CAPTION_BASE_SP = 20f
+  }
 }

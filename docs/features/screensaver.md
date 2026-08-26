@@ -60,6 +60,9 @@ has something for it:
 | **People** | The people Immich recognised — "Alice, Bob & Carol" |
 | **Tags** | The tags the photo is filed under in Immich |
 
+Each line can carry a small glyph — a pin, a calendar, a note, people, a tag — sized and tinted to
+match its text. Turn them off with **Show icons**.
+
 Which sources can fill these in depends on what survives to the Portal:
 
 - **Immich** supplies all five. The frame asks the server for each photo as it comes up
@@ -73,6 +76,24 @@ Each line has its own switch under **Photo details** in the screensaver settings
 from the [phone remote](remote.md)); a switch only appears when the active source can actually
 supply that line. All five are on by default. Captions are hidden on a full-bleed clock face
 (which owns the whole frame) and while a video is playing.
+
+### Layout and type
+
+The caption is drawn in your **clock face's own font, colour, opacity and shadow** — the same type
+as the clock, date and weather — so it reads as part of one overlay rather than a panel bolted onto
+it. Sizes are a percentage of a shared base, scaled again by the face's own size, so making the
+clock bigger carries the caption with it. A bold line sits at the face's full opacity and lighter
+ones step back, which is what keeps a five-line block legible.
+
+**Photo details → Caption layout** opens an editor (`CaptionStyleActivity`) for the rest:
+
+- **Order** — move any line up or down; the caption is drawn top to bottom in that order.
+- **Size** — 50–200% per line, in 5% steps.
+- **Weight** — Light, Regular or Bold per line, taken from the face's own font.
+- **Reset layout to defaults** — back to the shipped order and sizes.
+
+The defaults reproduce the original caption exactly: a bold place over a lighter date, with the
+Immich-only lines beneath, each a step smaller.
 
 ## Presence-aware behaviour
 

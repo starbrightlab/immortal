@@ -1,0 +1,18 @@
+<!-- Copyright (c) 2026 Starbright Lab.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<!-- Photo-caption glyph: a map pin (teardrop outline with a solid centre). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="2"
+      android:strokeLineJoin="round"
+      android:pathData="M12,21.5 C12,21.5 19,14.5 19,9.5 C19,5.63 15.87,2.5 12,2.5 C8.13,2.5 5,5.63 5,9.5 C5,14.5 12,21.5 12,21.5 Z" />
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M12,7 C13.38,7 14.5,8.12 14.5,9.5 C14.5,10.88 13.38,12 12,12 C10.62,12 9.5,10.88 9.5,9.5 C9.5,8.12 10.62,7 12,7 Z" />
+</vector>
