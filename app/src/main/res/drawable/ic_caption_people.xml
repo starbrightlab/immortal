@@ -1,0 +1,21 @@
+<!-- Copyright (c) 2026 Starbright Lab.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<!-- Photo-caption glyph: two people (head + shoulders, one behind). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="2"
+      android:strokeLineJoin="round"
+      android:strokeLineCap="round"
+      android:pathData="M9,4.5 C10.93,4.5 12.5,6.07 12.5,8 C12.5,9.93 10.93,11.5 9,11.5 C7.07,11.5 5.5,9.93 5.5,8 C5.5,6.07 7.07,4.5 9,4.5 Z M2.5,20 C2.5,16.41 5.41,13.5 9,13.5 C12.59,13.5 15.5,16.41 15.5,20" />
+  <path
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="2"
+      android:strokeLineCap="round"
+      android:pathData="M16,5.4 C17.49,6.02 18.5,7.49 18.5,9.15 C18.5,10.4 17.93,11.55 17,12.3 M17.5,14.4 C19.86,15.13 21.5,17.34 21.5,20" />
+</vector>

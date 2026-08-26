@@ -73,10 +73,84 @@ class PhotoCaptionTest {
   }
 
   @Test
-  fun caption_isEmptyUntilSomeLineHasContent() {
-    assertTrue(PhotoCaption.Caption().isEmpty)
-    assertTrue(PhotoCaption.Caption(place = "   ", date = "").isEmpty)
-    assertFalse(PhotoCaption.Caption(tags = "Beach").isEmpty)
-    assertFalse(PhotoCaption.Caption(place = "Arezzo, Italy").isEmpty)
+  fun caption_dropsBlanksAndIsEmptyUntilSomeLineHasContent() {
+    assertTrue(PhotoCaption.Caption.EMPTY.isEmpty)
+    assertTrue(
+        PhotoCaption.Caption.of(
+                PhotoCaption.Line.LOCATION to "   ",
+                PhotoCaption.Line.DATE to "",
+                PhotoCaption.Line.TAGS to null,
+            )
+            .isEmpty)
+    val c =
+        PhotoCaption.Caption.of(
+            PhotoCaption.Line.LOCATION to "  Arezzo, Italy  ",
+            PhotoCaption.Line.DATE to null,
+        )
+    assertFalse(c.isEmpty)
+    assertEquals("Arezzo, Italy", c[PhotoCaption.Line.LOCATION]) // trimmed
+    assertNull(c[PhotoCaption.Line.DATE]) // absent, not blank
+  }
+
+  // --- caption layout (order + per-line style) --------------------------------
+
+  @Test
+  fun parseOrder_defaultsAndRoundTrips() {
+    assertEquals(PhotoCaption.DEFAULT_ORDER, PhotoCaption.parseOrder(null))
+    assertEquals(PhotoCaption.DEFAULT_ORDER, PhotoCaption.parseOrder(""))
+    val custom = listOf(PhotoCaption.Line.TAGS, PhotoCaption.Line.PEOPLE, PhotoCaption.Line.DATE,
+        PhotoCaption.Line.LOCATION, PhotoCaption.Line.DESCRIPTION)
+    assertEquals(custom, PhotoCaption.parseOrder(PhotoCaption.serializeOrder(custom)))
+  }
+
+  @Test
+  fun parseOrder_repairsAPartialOrGarbageString() {
+    // A line the string forgot is appended in default order rather than vanishing from the frame.
+    assertEquals(
+        listOf(PhotoCaption.Line.TAGS, PhotoCaption.Line.LOCATION, PhotoCaption.Line.DATE,
+            PhotoCaption.Line.DESCRIPTION, PhotoCaption.Line.PEOPLE),
+        PhotoCaption.parseOrder("tags,location"))
+    // Unknown keys and duplicates are dropped, not honoured twice.
+    assertEquals(
+        listOf(PhotoCaption.Line.DATE, PhotoCaption.Line.LOCATION, PhotoCaption.Line.DESCRIPTION,
+            PhotoCaption.Line.PEOPLE, PhotoCaption.Line.TAGS),
+        PhotoCaption.parseOrder("date,nonsense,date"))
+    assertEquals(PhotoCaption.DEFAULT_ORDER, PhotoCaption.parseOrder("!!!"))
+  }
+
+  @Test
+  fun parseStyles_defaultsMatchTheOriginalCaption() {
+    val d = PhotoCaption.parseStyles(null)
+    // 95% and 70% of the 20sp base are the 19sp/14sp the hardcoded caption used.
+    assertEquals(95, d.getValue(PhotoCaption.Line.LOCATION).size)
+    assertEquals(PhotoCaption.Weight.BOLD, d.getValue(PhotoCaption.Line.LOCATION).weight)
+    assertEquals(70, d.getValue(PhotoCaption.Line.DATE).size)
+    assertEquals(PhotoCaption.Weight.LIGHT, d.getValue(PhotoCaption.Line.DATE).weight)
+    assertEquals(PhotoCaption.Line.entries.size, d.size)
+  }
+
+  @Test
+  fun parseStyles_roundTripsAndFallsBackPerField() {
+    val custom =
+        PhotoCaption.parseStyles(null) +
+            (PhotoCaption.Line.TAGS to PhotoCaption.LineStyle(120, PhotoCaption.Weight.REGULAR))
+    assertEquals(custom, PhotoCaption.parseStyles(PhotoCaption.serializeStyles(custom)))
+    // A malformed entry falls back to that line's default without taking the others with it.
+    val patched = PhotoCaption.parseStyles("tags:oops:nope,people:130:bold")
+    assertEquals(PhotoCaption.Line.TAGS.defaultStyle, patched.getValue(PhotoCaption.Line.TAGS))
+    assertEquals(
+        PhotoCaption.LineStyle(130, PhotoCaption.Weight.BOLD),
+        patched.getValue(PhotoCaption.Line.PEOPLE))
+  }
+
+  @Test
+  fun clampSize_keepsALineInsideTheStepperRange() {
+    assertEquals(PhotoCaption.LineStyle.MIN_SIZE, PhotoCaption.clampSize(0))
+    assertEquals(PhotoCaption.LineStyle.MAX_SIZE, PhotoCaption.clampSize(9999))
+    assertEquals(100, PhotoCaption.clampSize(100))
+    // Out-of-range values in a persisted string are clamped, never taken literally.
+    assertEquals(
+        PhotoCaption.LineStyle.MAX_SIZE,
+        PhotoCaption.parseStyles("tags:9999:bold").getValue(PhotoCaption.Line.TAGS).size)
   }
 }

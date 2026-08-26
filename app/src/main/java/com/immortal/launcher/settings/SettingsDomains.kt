@@ -11,6 +11,7 @@ import android.content.Context
 import android.os.Build
 import com.immortal.launcher.CalendarFeed
 import com.immortal.launcher.CalendarUrlEntryActivity
+import com.immortal.launcher.CaptionStyleActivity
 import com.immortal.launcher.SunriseConfig
 import com.immortal.launcher.SunriseScheduler
 import com.immortal.launcher.ChimeConfig
@@ -24,6 +25,7 @@ import com.immortal.launcher.FleetCalendar
 import com.immortal.launcher.FleetConfig
 import com.immortal.launcher.FleetScreensaver
 import com.immortal.launcher.FrameMode
+import com.immortal.launcher.PhotoCaption
 import com.immortal.launcher.PhotoFramePreviewActivity
 import com.immortal.launcher.PortalPresenceDetector
 import com.immortal.launcher.ScreensaverDismiss
@@ -193,6 +195,28 @@ object SettingsDomains {
       }
 
   /**
+   * The caption-layout row's summary: the lines currently switched on, in the order they'll be
+   * drawn, so the row says what the caption will look like without opening the editor.
+   */
+  private fun captionLayoutLabel(s: ScreensaverConfig.Settings): String {
+    val on =
+        PhotoCaption.parseOrder(s.captionOrder).filter { line ->
+          when (line) {
+            PhotoCaption.Line.LOCATION -> s.captionLocation
+            PhotoCaption.Line.DATE -> s.captionDate
+            PhotoCaption.Line.DESCRIPTION -> s.captionDescription
+            PhotoCaption.Line.PEOPLE -> s.captionPeople
+            PhotoCaption.Line.TAGS -> s.captionTags
+          }
+        }
+    return when {
+      on.isEmpty() -> "No caption"
+      on.size <= 2 -> on.joinToString(", ") { it.label }
+      else -> on.take(2).joinToString(", ") { it.label } + " +${on.size - 2}"
+    }
+  }
+
+  /**
    * The photo-frame display settings — the slice the legacy `FleetScreensaver.toJson` reports.
    * Mirrors that flat wire format exactly (16 keys). The 13 plain display controls are writable
    * specs bound to the proven `ScreensaverConfig` setters; `source`/`folderPath`/`albumUrl` are
@@ -336,6 +360,26 @@ object SettingsDomains {
                       set = ScreensaverConfig::setCaptionTags,
                       help = "Show the tags the photo is filed under in Immich.",
                       visible = { _, s -> s.usesImmich }),
+                  BoolSpec(
+                      "captionIcons",
+                      "Show icons",
+                      get = { it.captionIcons },
+                      set = ScreensaverConfig::setCaptionIcons,
+                      help = "Put a small glyph in front of each line - a pin, a calendar, a tag.",
+                      visible = { _, s -> s.usesImmich || s.usesFolder || s.usesSmb }),
+                  // Order and per-line size/weight are a permutation plus ten coupled values -
+                  // not scalars a generic row can express - so they get their own editor, the way
+                  // the clock face does. The switches above stay specs so the phone remote keeps
+                  // the coarse control.
+                  NavSpec(
+                      "captionLayout",
+                      "Caption layout",
+                      value = { _, s -> captionLayoutLabel(s) },
+                      activity = CaptionStyleActivity::class.java,
+                      help =
+                          "Reorder the caption's lines and set how big and bold each one is. Text " +
+                              "follows your clock face's font and colour.",
+                      visible = { _, s -> s.usesImmich || s.usesFolder || s.usesSmb }),
                   // On-device cache: only meaningful for a network source that re-fetches the same
                   // assets every loop (Immich / WebDAV). Hidden for a local folder or the built-in
                   // feed, where there's nothing to save a round-trip on.
@@ -571,6 +615,8 @@ object SettingsDomains {
                   "captionDescription" to "Photo details",
                   "captionPeople" to "Photo details",
                   "captionTags" to "Photo details",
+                  "captionIcons" to "Photo details",
+                  "captionLayout" to "Photo details",
                   "batterySaver" to "Power & sleep",
                   "presenceMode" to "Power & sleep",
                   "idleSleepMin" to "Power & sleep",

@@ -1,0 +1,18 @@
+<!-- Copyright (c) 2026 Starbright Lab.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<!-- Photo-caption glyph: a luggage-style tag with its eyelet. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:strokeColor="#FFFFFFFF"
+      android:strokeWidth="2"
+      android:strokeLineJoin="round"
+      android:pathData="M3.5,3.5 L11,3.5 L20.5,13 L13,20.5 L3.5,11 Z" />
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M7,5.6 C7.77,5.6 8.4,6.23 8.4,7 C8.4,7.77 7.77,8.4 7,8.4 C6.23,8.4 5.6,7.77 5.6,7 C5.6,6.23 6.23,5.6 7,5.6 Z" />
+</vector>
