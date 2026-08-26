@@ -40,11 +40,66 @@ you don't type URLs and credentials on the Portal:
 | iCloud shared album | Paste a shared-album link (supports Apple's newer CloudKit link format). |
 | Google Photos | Paste a public shared-album link. |
 | Synology Photos | Paste a public album share link. For a local HTTPS address, the NAS certificate must be trusted by the Portal. |
-| [Immich](https://immich.app/) | A self-hosted photo library. Photos **and** videos (with "Play videos" on), from an album or the whole library. |
+| [Immich](https://immich.app/) | A self-hosted photo library. Photos **and** videos (with "Play videos" on), from an album or the whole library. Photos can carry a [caption](#photo-captions) with their date, description, location, people and tags. |
 | Network share (SMB) | A file server on your LAN. |
 | WebDAV | Any WebDAV server. |
 | Web page | Pull images from any web page. |
 | Built-in feed | Keyless. Pick between Lorem Picsum (stock photography), the Met Museum and Art Institute of Chicago collections, Wikimedia featured landscapes, or NASA's Astronomy Picture of the Day. Unsplash-ready with a key. |
+
+## Photo captions
+
+The frame can label the photo it's showing, tvOS-style, in the corner of the overlay — under the
+now-playing card when both are up. Up to five lines, each of which appears only when that photo
+has something for it:
+
+| Line | What it shows |
+| --- | --- |
+| **Location** | Where the photo was taken — "Arezzo, Italy" |
+| **Photo date** | When it was taken — "June 22, 2026" |
+| **Description** | The description you typed on the photo in Immich |
+| **People** | The people Immich recognised — "Alice, Bob & Carol" |
+| **Tags** | The tags the photo is filed under in Immich |
+
+Each line can carry a small glyph — a pin, a calendar, a note, people, a tag — sized and tinted to
+match its text. Turn them off with **Show icons**.
+
+Which sources can fill these in depends on what survives to the Portal:
+
+- **Immich** supplies all five. The frame asks the server for each photo as it comes up
+  (`GET /api/assets/{id}`) and caches the answer, so a looping album asks once per photo.
+- **Your own folder** and a **network share (SMB)** supply the date and location, read from the
+  photo's own EXIF block; the location is reverse-geocoded to a place name.
+- The remaining sources (built-in feed, iCloud/Google shared albums, WebDAV) serve re-encoded
+  images with EXIF stripped and have no metadata API, so they show no caption.
+
+Each line has its own switch under **Photo details** in the screensaver settings (on the Portal or
+from the [phone remote](remote.md)); a switch only appears when the active source can actually
+supply that line. All five are on by default. Captions are hidden on a full-bleed clock face
+(which owns the whole frame) and while a video is playing.
+
+### Layout and type
+
+The caption is drawn in your **clock face's own font, colour, opacity and shadow** — the same type
+as the clock, date and weather — so it reads as part of one overlay rather than a panel bolted onto
+it. Sizes are a percentage of a shared base, scaled again by the face's own size, so making the
+clock bigger carries the caption with it. A bold line sits at the face's full opacity and lighter
+ones step back, which is what keeps a five-line block legible.
+
+**Photo details → Caption layout** opens an editor (`CaptionStyleActivity`) for what a settings
+row can't express:
+
+- **Order** — move any line up or down; the caption is drawn top to bottom in that order.
+- **Size** — 50–200% per line, in 5% steps.
+- **Weight** — Light, Regular or Bold per line, taken from the face's own font.
+- **Reset layout to defaults** — back to the shipped order and sizes.
+
+It lists only the lines you've switched on, since arranging a line that isn't drawn is meaningless
+— a line keeps its place in the order while it's switched off. Everything that *is* a plain switch
+(which lines show, and **Show icons**) stays on the screensaver settings screen, so it has one home
+and also reaches the [phone remote](remote.md).
+
+The defaults reproduce the original caption exactly: a bold place over a lighter date, with the
+Immich-only lines beneath, each a step smaller.
 
 ## Presence-aware behaviour
 

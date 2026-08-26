@@ -39,6 +39,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import kotlin.math.abs
 import org.json.JSONArray
@@ -110,9 +111,11 @@ class PhotoFrameController(
   private var kenBurns: AnimatorSet? = null
   private var kenBurnsStyle = 0
 
-  // The "place · date" caption is now a FaceRenderer grid element (so it stacks with the
-  // now-playing card instead of overlapping it). This controller still reads the EXIF here
-  // (own photos only — local folder / SMB) and pushes it via [FaceRenderer.setCaption].
+  // The photo caption is a FaceRenderer grid element (so it stacks with the now-playing card
+  // instead of overlapping it). This controller still gathers the metadata: EXIF for the user's
+  // own files (local folder / SMB), and a per-asset server lookup for Immich, which knows the
+  // description, people and tags on top of the date and place. Pushed via
+  // [FaceRenderer.setCaption]; see [publishCaption] / [loadCaptionForImmich].
 
   // The overlay (clock / date / weather / battery / now-playing) is built and driven by the
   // FaceRenderer from a Face descriptor; this controller owns only the photo/video layer.
@@ -183,6 +186,13 @@ class PhotoFrameController(
   // public shares, the x-api-key for Immich. Applied in [advanceRemote]/[downloadBitmap]/
   // [showRemoteVideo].
   private var remoteHeaders: Map<String, String> = emptyMap()
+  // Immich captions: the asset id behind each remote URL, so a displayed photo can be traced back
+  // to the server and asked for its stored detail (date / description / place / people / tags).
+  // Non-empty exactly while Immich is the live source. The fetched detail is cached for the
+  // session — a frame loops the same album for days and a photo's detail doesn't change under it,
+  // so each asset is asked for once. Bounded by the listing cap (1000 assets of short strings).
+  private var immichAssetIds: Map<String, String> = emptyMap()
+  private val immichDetails = ConcurrentHashMap<String, ImmichSource.Details>()
   // The subset of [remoteUrls] that are videos (Immich with "Play videos" on); these stream
   // through the VideoView instead of the bitmap download. See [showRemoteVideo].
   private var remoteVideos: Set<String> = emptySet()
@@ -387,6 +397,7 @@ class PhotoFrameController(
               val ordered = if (source.shuffle) media.shuffled() else media
               remoteUrls = ordered.map { it.url }
               remoteVideos = media.filter { it.isVideo }.mapTo(HashSet()) { it.url }
+              immichAssetIds = ordered.associate { it.url to it.id }
               remoteHeaders = ImmichSource.authHeaders(source.key)
               remoteMode = true
               remoteIndex = -1
@@ -599,14 +610,62 @@ class PhotoFrameController(
 
   private fun publishCaption(meta: PhotoCaption.Meta?, g: Int) {
     if (meta == null || meta.isEmpty) {
-      ui.post { if (g == gen) faceRenderer.setCaption(null, null) }
+      ui.post { if (g == gen) faceRenderer.setCaption(null) }
       return
     }
-    // Resolve the place name on this background thread (network) before touching the UI.
-    val place = if (meta.hasLocation) PhotoCaption.placeName(meta.lat!!, meta.lng!!) else null
-    val date = PhotoCaption.formatDate(meta.dateMillis)
-    ui.post { if (g == gen) faceRenderer.setCaption(place, date) }
+    // Resolve the place name on this background thread (network) before touching the UI. Both
+    // lines honour the user's switches; with both off there's nothing left and the block hides.
+    val place =
+        if (meta.hasLocation && settings.captionLocation) PhotoCaption.placeName(meta.lat!!, meta.lng!!)
+        else null
+    val date = if (settings.captionDate) PhotoCaption.formatDate(meta.dateMillis) else null
+    val caption =
+        PhotoCaption.Caption.of(
+            PhotoCaption.Line.LOCATION to place,
+            PhotoCaption.Line.DATE to date,
+        )
+    ui.post { if (g == gen) faceRenderer.setCaption(caption) }
   }
+
+  /**
+   * Ask Immich for the displayed photo's stored detail off [metaIo] and publish it as the caption
+   * — date, description, place, people and tags, none of which survive into the preview JPEG the
+   * frame actually draws. Guarded by [gen] like the EXIF paths, so a slow fetch for a superseded
+   * photo is dropped, and served from [immichDetails] on every loop after the first.
+   */
+  private fun loadCaptionForImmich(url: String, g: Int) {
+    val assetId = immichAssetIds[url]
+    val base = settings.immichUrl
+    val key = settings.immichKey
+    if (assetId == null || base.isNullOrBlank() || key.isNullOrBlank()) {
+      faceRenderer.setCaption(null)
+      return
+    }
+    metaIo.execute {
+      val details =
+          immichDetails[assetId]
+              ?: ImmichSource.details(base, key, assetId)?.also { immichDetails[assetId] = it }
+      val caption = details?.takeIf { !it.isEmpty }?.let { captionFor(it) }
+      ui.post { if (g == gen) faceRenderer.setCaption(caption) }
+    }
+  }
+
+  /**
+   * An Immich asset's detail, narrowed to the lines the user has left switched on. Which order
+   * they're drawn in, and at what size and weight, is the renderer's business (and the user's) —
+   * this only decides what there is to say.
+   */
+  private fun captionFor(d: ImmichSource.Details): PhotoCaption.Caption =
+      PhotoCaption.Caption.of(
+          PhotoCaption.Line.LOCATION to d.place.takeIf { settings.captionLocation },
+          PhotoCaption.Line.DATE to
+              (if (settings.captionDate) PhotoCaption.formatDate(d.dateMillis) else null),
+          PhotoCaption.Line.DESCRIPTION to d.description.takeIf { settings.captionDescription },
+          PhotoCaption.Line.PEOPLE to
+              (if (settings.captionPeople) PhotoCaption.formatPeople(d.people) else null),
+          PhotoCaption.Line.TAGS to
+              (if (settings.captionTags) PhotoCaption.formatTags(d.tags) else null),
+      )
 
   /** A clean upcoming-events panel top-right, over the photo. Its own translucent
    *  rounded backing keeps it legible without a full-screen scrim. Hidden until a
@@ -1241,7 +1300,7 @@ class PhotoFrameController(
 
   private fun showVideo(path: String, g: Int) {
     cancelKenBurns()
-    faceRenderer.setCaption(null, null)
+    faceRenderer.setCaption(null)
     photo.setImageDrawable(null)
     photo.visibility = View.GONE
     blurPhoto.setImageDrawable(null)
@@ -1361,9 +1420,14 @@ class PhotoFrameController(
         remoteReresolveStreak = 0
         photo.visibility = View.VISIBLE
         show(bmp)
-        // EXIF caption only for SMB here — it reads the user's own files. The HTTP remote sources
-        // (iCloud/Google/Immich/DAV) serve EXIF-stripped images, so they carry no caption.
-        if (smbSource != null) loadCaptionForSmb(url, g) else faceRenderer.setCaption(null, null)
+        // Captions on the remote path: SMB reads EXIF straight off the user's own files, and
+        // Immich is asked for the detail it stores server-side. The rest (iCloud/Google/DAV)
+        // serve EXIF-stripped images with no metadata API, so they carry no caption.
+        when {
+          smbSource != null -> loadCaptionForSmb(url, g)
+          immichAssetIds.isNotEmpty() -> loadCaptionForImmich(url, g)
+          else -> faceRenderer.setCaption(null)
+        }
         ui.postDelayed(remoteTick, intervalMs())
       }
     }
@@ -1394,7 +1458,7 @@ class PhotoFrameController(
       }
     }
     cancelKenBurns()
-    faceRenderer.setCaption(null, null)
+    faceRenderer.setCaption(null)
     photo.setImageDrawable(null)
     photo.visibility = View.GONE
     blurPhoto.setImageDrawable(null)
@@ -1484,6 +1548,7 @@ class PhotoFrameController(
     remoteMode = false
     remoteHeaders = emptyMap()
     remoteVideos = emptySet()
+    immichAssetIds = emptyMap()
     remoteFetch = null
     smbSource?.let { s -> io.execute { runCatching { s.close() } } }
     smbSource = null
@@ -1583,7 +1648,7 @@ class PhotoFrameController(
   }
 
   private fun show(bmp: Bitmap) {
-    faceRenderer.setCaption(null, null)
+    faceRenderer.setCaption(null)
 
     val targetLayer = incomingLayer
     val outgoingLayer = currentLayer

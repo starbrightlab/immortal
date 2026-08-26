@@ -207,6 +207,9 @@ class SettingsDomainTest {
             "smbHost", "smbShare", "smbPath", "smbUser", "smbPass",
             "davUrl", "davUser", "davPass", "webUrl",
             "facesEnabled", "faceId", "faceSizeIndex",
+            // Caption order + per-line size/weight: a permutation and ten coupled values, edited
+            // as one unit in CaptionStyleActivity (reached via the "captionLayout" NavSpec).
+            "captionOrder", "captionStyles",
             "dismissAppComponent", "dismissHaDashboard",
             "calendarUrl", "calendarEnabled", "calendarRange", "calendarSize", "calendarSide",
         )
@@ -214,6 +217,67 @@ class SettingsDomainTest {
     assertTrue(
         "ScreensaverConfig.Settings has persisted fields neither in the registry nor accounted for: $uncovered",
         uncovered.isEmpty())
+  }
+
+  @Test
+  fun screensaverCaptionLines_onlyOfferWhatTheActiveSourceCanSupply() {
+    // The caption lines are declaratively gated so a control never promises something the source
+    // can't deliver: date + location wherever the photo carries them (own files via EXIF, Immich
+    // via the server), and description/people/tags only on Immich, which alone stores them.
+    val byKey = SettingsDomains.screensaver.specs.associateBy { it.key }
+    val fromImmichOnly = listOf("captionDescription", "captionPeople", "captionTags")
+    val fromAnyOwnPhotos = listOf("captionDate", "captionLocation", "captionIcons", "captionLayout")
+
+    fun visible(keys: List<String>, s: com.immortal.launcher.ScreensaverConfig.Settings) =
+        keys.filter { byKey.getValue(it).visibleWhen(ctx, s) }
+
+    val immich =
+        com.immortal.launcher.ScreensaverConfig.Settings(
+            source = com.immortal.launcher.ScreensaverConfig.SOURCE_IMMICH,
+            immichUrl = "http://immich:2283",
+            immichKey = "secret")
+    assertEquals(fromImmichOnly, visible(fromImmichOnly, immich))
+    assertEquals(fromAnyOwnPhotos, visible(fromAnyOwnPhotos, immich))
+
+    val folder =
+        com.immortal.launcher.ScreensaverConfig.Settings(
+            source = com.immortal.launcher.ScreensaverConfig.SOURCE_FOLDER, folderPath = "/sdcard/Pics")
+    assertEquals(emptyList<String>(), visible(fromImmichOnly, folder))
+    assertEquals(fromAnyOwnPhotos, visible(fromAnyOwnPhotos, folder))
+
+    // The built-in feed carries no metadata at all, so the whole group stays hidden.
+    val builtIn = com.immortal.launcher.ScreensaverConfig.Settings()
+    assertEquals(emptyList<String>(), visible(fromImmichOnly + fromAnyOwnPhotos, builtIn))
+  }
+
+  @Test
+  fun captionLayoutRow_summarisesTheLinesInTheOrderTheyWillBeDrawn() {
+    // The nav row has to say what the caption looks like without opening the editor, so it reads
+    // the SNAPSHOT (no prefs I/O) - which is also why a mock Context is enough here.
+    val nav =
+        SettingsDomains.screensaver.specs.first { it.key == "captionLayout" }
+            as NavSpec<com.immortal.launcher.ScreensaverConfig.Settings>
+
+    val allOn = com.immortal.launcher.ScreensaverConfig.Settings()
+    assertEquals("Location, Photo date +3", nav.value(ctx, allOn))
+
+    // Reordered, and down to two lines: both are reflected, in the user's order.
+    val reordered =
+        allOn.copy(
+            captionOrder = "tags,location,date,description,people",
+            captionDate = false,
+            captionDescription = false,
+            captionPeople = false)
+    assertEquals("Tags, Location", nav.value(ctx, reordered))
+
+    val nothing =
+        allOn.copy(
+            captionLocation = false,
+            captionDate = false,
+            captionDescription = false,
+            captionPeople = false,
+            captionTags = false)
+    assertEquals("No caption", nav.value(ctx, nothing))
   }
 
   @Test

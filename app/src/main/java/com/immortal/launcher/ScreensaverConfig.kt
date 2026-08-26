@@ -159,6 +159,22 @@ object ScreensaverConfig {
       // The legibility gradient under the bottom widget cluster. On by default (the original
       // frame look); off shows the photo clean edge-to-edge (issue #144).
       val showGradient: Boolean = true,
+      // Which lines the photo caption may show (see [PhotoCaption]). Date and location come from
+      // EXIF for your own files (folder / SMB) and from the server for Immich; description, tags
+      // and people are Immich-only, because it's the only source that knows them. All on by
+      // default — a photo with nothing to say still shows no caption.
+      val captionDate: Boolean = true,
+      val captionLocation: Boolean = true,
+      val captionDescription: Boolean = true,
+      val captionTags: Boolean = true,
+      val captionPeople: Boolean = true,
+      // Draw a small glyph ahead of each caption line (pin / calendar / note / people / tag).
+      val captionIcons: Boolean = true,
+      // The caption's layout, owned by CaptionStyleActivity and stored as two compact strings
+      // (see PhotoCaption.parseOrder / parseStyles): the top-to-bottom line order, and each
+      // line's size-percentage + weight. Blank = every line at its default.
+      val captionOrder: String = "",
+      val captionStyles: String = "",
       // Whether to draw a clock face at all. Off = photos only (the now-playing card still follows
       // its own [showNowPlaying] switch). On by default.
       val facesEnabled: Boolean = true,
@@ -296,6 +312,14 @@ object ScreensaverConfig {
         showNowPlaying = p.getBoolean("show_now_playing", true),
         antiBurnIn = p.getBoolean("anti_burn_in", true),
         showGradient = p.getBoolean("show_gradient", true),
+        captionDate = p.getBoolean("caption_date", true),
+        captionLocation = p.getBoolean("caption_location", true),
+        captionDescription = p.getBoolean("caption_description", true),
+        captionTags = p.getBoolean("caption_tags", true),
+        captionPeople = p.getBoolean("caption_people", true),
+        captionIcons = p.getBoolean("caption_icons", true),
+        captionOrder = p.getString("caption_order", "") ?: "",
+        captionStyles = p.getString("caption_styles", "") ?: "",
         facesEnabled = p.getBoolean("faces_enabled", true),
         faceId = p.getString("face_id", "immortal-classic") ?: "immortal-classic",
         faceSizeIndex = p.getInt("face_size_index", 1),
@@ -322,6 +346,36 @@ object ScreensaverConfig {
         blurBackground = p.getBoolean("blur_background", true),
     )
   }
+
+  fun setCaptionDate(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("caption_date", on).apply()
+
+  fun setCaptionLocation(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("caption_location", on).apply()
+
+  fun setCaptionDescription(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("caption_description", on).apply()
+
+  fun setCaptionTags(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("caption_tags", on).apply()
+
+  fun setCaptionPeople(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("caption_people", on).apply()
+
+  fun setCaptionIcons(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("caption_icons", on).apply()
+
+  /** Persist the caption's top-to-bottom line order (see [PhotoCaption.serializeOrder]). */
+  fun setCaptionOrder(c: Context, order: List<PhotoCaption.Line>) =
+      prefs(c).edit().putString("caption_order", PhotoCaption.serializeOrder(order)).apply()
+
+  /** Persist every line's size + weight (see [PhotoCaption.serializeStyles]). */
+  fun setCaptionStyles(c: Context, styles: Map<PhotoCaption.Line, PhotoCaption.LineStyle>) =
+      prefs(c).edit().putString("caption_styles", PhotoCaption.serializeStyles(styles)).apply()
+
+  /** Drop every caption layout tweak — order, sizes and weights all back to the defaults. */
+  fun resetCaptionLayout(c: Context) =
+      prefs(c).edit().remove("caption_order").remove("caption_styles").apply()
 
   fun setCropVertical(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("crop_vertical", on).apply()

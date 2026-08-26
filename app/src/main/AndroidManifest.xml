@@ -183,6 +183,12 @@
             android:exported="false"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- Photo-caption layout subpage (line order, per-line size/weight, icons). -->
+        <activity
+            android:name=".CaptionStyleActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- "Control from your phone": pairing screen for the phone web remote. -->
         <activity
             android:name=".RemotePairActivity"

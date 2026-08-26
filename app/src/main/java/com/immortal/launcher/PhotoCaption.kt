@@ -17,16 +17,146 @@ import java.util.concurrent.ConcurrentHashMap
 import org.json.JSONObject
 
 /**
- * Photo metadata for the screensaver caption — the "taken at <place> · <date>" line,
- * tvOS-style. Read from EXIF, so it only exists for the user's *own* photos: the local
- * folder and SMB (NAS) sources, which decode real image files. The web/CDN sources
- * (Picsum/Unsplash, iCloud/Google shared albums, Immich) serve re-encoded images with
- * EXIF stripped, so there's nothing to show there and the caption is simply hidden.
+ * Photo metadata for the screensaver caption — the "taken at <place> · <date>" block,
+ * tvOS-style — plus the formatting of every line the frame draws ([Caption]).
+ *
+ * Two things can fill it in:
+ *  - **EXIF**, for the user's *own* photo files: the local folder and SMB (NAS) sources, which
+ *    decode real images. That yields the capture date and (reverse-geocoded) place.
+ *  - **Immich**, which is asked for each photo's stored detail directly
+ *    ([ImmichSource.details]) — date, description, place, people and tags. Its previews are
+ *    re-encoded with EXIF stripped, so the server is the only thing that knows them.
+ *
+ * The remaining web/CDN sources (Picsum/Unsplash, iCloud/Google shared albums, WebDAV) serve
+ * stripped images with no companion API, so there's nothing to show and the caption stays hidden.
  *
  * Everything is best-effort: a missing date, absent GPS, or a failed lookup just means
  * less (or no) caption — never a crash and never a blocked slideshow.
  */
 object PhotoCaption {
+
+  /**
+   * The five things a caption can say about a photo. This is the identity the whole feature is
+   * keyed on: the user's chosen [order], the per-line [LineStyle], the settings toggles, and the
+   * icon each line draws all hang off it, so adding a sixth line is one entry here plus a
+   * drawable.
+   *
+   * The defaults reproduce the original two-line caption exactly — a bold place over a lighter
+   * date — with the Immich-only lines tucked underneath, each a step smaller.
+   */
+  enum class Line(
+      /** Stable key used in prefs and on the wire. Never rename — it's persisted. */
+      val key: String,
+      /** Label for the settings screen. */
+      val label: String,
+      /** The glyph drawn ahead of the text when icons are on. */
+      val iconRes: Int,
+      val defaultSize: Int,
+      val defaultWeight: Weight,
+  ) {
+    LOCATION("location", "Location", R.drawable.ic_caption_location, 95, Weight.BOLD),
+    DATE("date", "Photo date", R.drawable.ic_caption_date, 70, Weight.LIGHT),
+    DESCRIPTION("description", "Description", R.drawable.ic_caption_description, 75, Weight.LIGHT),
+    PEOPLE("people", "People", R.drawable.ic_caption_people, 70, Weight.LIGHT),
+    TAGS("tags", "Tags", R.drawable.ic_caption_tags, 65, Weight.LIGHT);
+
+    val defaultStyle: LineStyle
+      get() = LineStyle(defaultSize, defaultWeight)
+
+    companion object {
+      fun fromKey(key: String?): Line? = entries.firstOrNull { it.key == key?.trim() }
+    }
+  }
+
+  /**
+   * How heavy a line's type is. Rendered from the *face's own font* (see
+   * [FaceStyle.typeface]) rather than a face of its own, so the caption reads as part of the same
+   * overlay as the clock, date and weather: [LIGHT] takes the face's light variant, [BOLD] bolds
+   * the face's regular one.
+   */
+  enum class Weight(val key: String, val label: String) {
+    LIGHT("light", "Light"),
+    REGULAR("regular", "Regular"),
+    BOLD("bold", "Bold");
+
+    companion object {
+      fun fromKey(key: String?): Weight? = entries.firstOrNull { it.key == key?.trim() }
+    }
+  }
+
+  /** How one line is drawn: [size] as a percentage of the caption base size, plus its [weight]. */
+  data class LineStyle(val size: Int, val weight: Weight) {
+    companion object {
+      const val MIN_SIZE = 50
+      const val MAX_SIZE = 200
+      const val SIZE_STEP = 5
+    }
+  }
+
+  /** Keep a line size inside the range the settings stepper offers. */
+  fun clampSize(size: Int): Int = size.coerceIn(LineStyle.MIN_SIZE, LineStyle.MAX_SIZE)
+
+  /**
+   * One photo's caption: the text for each line that has something to say, in no particular
+   * order — the *drawing* order is the user's ([parseOrder]), not this map's.
+   */
+  data class Caption(val lines: Map<Line, String>) {
+    val isEmpty: Boolean
+      get() = lines.isEmpty()
+
+    operator fun get(line: Line): String? = lines[line]
+
+    companion object {
+      val EMPTY = Caption(emptyMap())
+
+      /**
+       * Build a caption from whatever the source could supply. Blank and null values are dropped
+       * here, once, so neither the controller nor the renderer has to keep re-checking them.
+       */
+      fun of(vararg values: Pair<Line, String?>): Caption =
+          Caption(
+              values
+                  .mapNotNull { (line, v) -> v?.trim()?.ifBlank { null }?.let { line to it } }
+                  .toMap())
+    }
+  }
+
+  // --- order and per-line style (persisted as compact strings) -----------------
+  // Both are stored as one string each rather than ten scalar prefs: they're a single editable
+  // unit owned by one screen (CaptionStyleActivity), the way the photo-source credentials are.
+  // Parsing is total — an unknown key, a missing line or outright garbage degrades to the
+  // defaults rather than losing the caption, because a bad string must never blank the frame.
+
+  /** The default top-to-bottom order, as declared in [Line]. */
+  val DEFAULT_ORDER: List<Line> = Line.entries.toList()
+
+  /** `"location,date,…"` → lines, de-duplicated, with anything missing appended in default order. */
+  fun parseOrder(raw: String?): List<Line> {
+    val named = raw.orEmpty().split(',').mapNotNull { Line.fromKey(it) }.distinct()
+    return named + DEFAULT_ORDER.filterNot { it in named }
+  }
+
+  fun serializeOrder(order: List<Line>): String = order.joinToString(",") { it.key }
+
+  /** `"location:95:bold,date:70:light,…"` → per-line style, falling back to each line's default. */
+  fun parseStyles(raw: String?): Map<Line, LineStyle> {
+    val out = LinkedHashMap<Line, LineStyle>()
+    Line.entries.forEach { out[it] = it.defaultStyle }
+    raw.orEmpty().split(',').forEach { part ->
+      val bits = part.split(':')
+      val line = Line.fromKey(bits.getOrNull(0)) ?: return@forEach
+      val size = bits.getOrNull(1)?.trim()?.toIntOrNull()?.let(::clampSize) ?: line.defaultSize
+      val weight = Weight.fromKey(bits.getOrNull(2)) ?: line.defaultWeight
+      out[line] = LineStyle(size, weight)
+    }
+    return out
+  }
+
+  fun serializeStyles(styles: Map<Line, LineStyle>): String =
+      Line.entries.joinToString(",") { line ->
+        val st = styles[line] ?: line.defaultStyle
+        "${line.key}:${st.size}:${st.weight.key}"
+      }
 
   /** Capture date (epoch millis) and GPS coordinates pulled from a photo's EXIF block. */
   data class Meta(val dateMillis: Long?, val lat: Double?, val lng: Double?) {
@@ -58,6 +188,39 @@ object PhotoCaption {
   /** Friendly capture date, e.g. "June 22, 2026" in the device locale. Null when absent. */
   fun formatDate(millis: Long?): String? =
       millis?.let { SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(Date(it)) }
+
+  // A caption line has to stay one row on a 1280px-wide Portal, and a well-tagged photo of a
+  // family gathering can carry a dozen of each — so both lists are capped and the remainder is
+  // summarised rather than truncated mid-name.
+  private const val MAX_PEOPLE = 4
+  private const val MAX_TAGS = 5
+
+  /**
+   * The people line: "Alice, Bob & Carol", or "Alice, Bob, Carol, Dave +3" past [MAX_PEOPLE].
+   * Null when nobody is named.
+   */
+  fun formatPeople(names: List<String>): String? {
+    val list = cleaned(names)
+    return when {
+      list.isEmpty() -> null
+      list.size > MAX_PEOPLE -> list.take(MAX_PEOPLE).joinToString(", ") + " +${list.size - MAX_PEOPLE}"
+      list.size == 1 -> list[0]
+      else -> list.dropLast(1).joinToString(", ") + " & " + list.last()
+    }
+  }
+
+  /** The tags line: "Beach · Sunset · Italy", with a "+n" tail past [MAX_TAGS]. Null when none. */
+  fun formatTags(names: List<String>): String? {
+    val list = cleaned(names)
+    if (list.isEmpty()) return null
+    val more = list.size - MAX_TAGS
+    val shown = list.take(MAX_TAGS) + (if (more > 0) listOf("+$more") else emptyList())
+    return shown.joinToString("  ·  ")
+  }
+
+  /** Trimmed, de-duplicated, blanks dropped — what both lines start from. */
+  private fun cleaned(names: List<String>): List<String> =
+      names.mapNotNull { it.trim().ifBlank { null } }.distinct()
 
   // --- reverse geocoding (keyless) -------------------------------------------
   // BigDataCloud's reverse-geocode-client endpoint needs no key — the same keyless-web-service
