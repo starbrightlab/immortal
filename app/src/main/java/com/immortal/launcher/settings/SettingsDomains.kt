@@ -29,6 +29,8 @@ import com.immortal.launcher.ScreensaverDismiss
 import com.immortal.launcher.ScreensaverDismissAppActivity
 import com.immortal.launcher.ScreensaverSourcesActivity
 import com.immortal.launcher.ImmortalSettings
+import com.immortal.launcher.IntercomPolicy
+import com.immortal.launcher.IntercomService
 import com.immortal.launcher.MqttConfig
 import com.immortal.launcher.MqttService
 import com.immortal.launcher.MultiRoomService
@@ -626,6 +628,30 @@ object SettingsDomains {
                       set = ImmortalSettings::setMaPassword,
                       secret = true,
                       visible = { _, s -> s.multiRoomEnabled }),
+                  EnumSpec(
+                      "intercomMode",
+                      "Room link",
+                      get = { it.intercomMode },
+                      set = ImmortalSettings::setIntercomMode,
+                      options =
+                          listOf(
+                              ImmortalSettings.INTERCOM_MODE_OFF to "Off",
+                              ImmortalSettings.INTERCOM_MODE_BROADCAST to "Broadcast",
+                              ImmortalSettings.INTERCOM_MODE_RECEIVE to "Receive"),
+                      coerce = IntercomPolicy::normalizeMode,
+                      help =
+                          "Broadcast sends this Portal's microphone to other Portals. Receive " +
+                              "plays the selected Portal's room audio."),
+                  StringSpec(
+                      "intercomPeerHost",
+                      "Portal address",
+                      get = { it.intercomPeerHost },
+                      set = ImmortalSettings::setIntercomPeerHost,
+                      applyWhen = { !it.isBlank() && IntercomPolicy.normalizePeerHost(it) != null },
+                      // The manager applies receive mode and address as one coherent batch while
+                      // the Portal is still off. The field must be admitted for first setup.
+                      visible = { _, _ -> true },
+                      help = "IP address or LAN name of the Portal broadcasting its room audio."),
               ),
           sections =
               mapOf(
@@ -641,7 +667,9 @@ object SettingsDomains {
                   "snapcastHost" to "Audio",
                   "maPort" to "Audio",
                   "maUsername" to "Audio",
-                  "maPassword" to "Audio"),
+                  "maPassword" to "Audio",
+                  "intercomMode" to "Room link",
+                  "intercomPeerHost" to "Room link"),
           defaults = { ImmortalSettings.Settings() },
           onApplied = { c, keys ->
             if ("hideStatusBar" in keys) SettingsGuard.applyStatusBar(c)
@@ -650,6 +678,7 @@ object SettingsDomains {
             // publisher has to re-read it rather than wait for the next reconnect.
             if (keys.any { it in setOf("multiRoomEnabled", "snapcastHost", "maPort", "maUsername", "maPassword") })
                 MultiRoomService.sync(c)
+            if ("intercomMode" in keys || "intercomPeerHost" in keys) IntercomService.sync(c)
           },
       )
 

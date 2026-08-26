@@ -236,6 +236,14 @@ class SettingsDomainTest {
   }
 
   @Test
+  fun immortalRoomLinkPeerHost_isAdmittedBeforeReceiveModeIsSelected() {
+    // The manager applies receive mode and its source address together while the Portal is still
+    // off. Hiding the address until after the mode changed would fail first-time remote setup.
+    val spec = SettingsDomains.immortal.specs.first { it.key == "intercomPeerHost" }
+    assertTrue(spec.visibleWhen(ctx, com.immortal.launcher.ImmortalSettings.Settings()))
+  }
+
+  @Test
   fun allDomains_sectionKeysMatchRealSpecs() {
     SettingsRegistry.domains.forEach { dom ->
       val specKeys = dom.specs.map { it.key }.toSet()
@@ -256,7 +264,15 @@ class SettingsDomainTest {
             SettingsDomains.screensaver to setOf("enabled"),
             SettingsDomains.calendar to emptySet(),
             SettingsDomains.immortal to
-                setOf("multiRoomEnabled", "snapcastHost", "maPort", "maUsername", "maPassword"),
+                setOf(
+                    "multiRoomEnabled",
+                    "snapcastHost",
+                    "maPort",
+                    "maUsername",
+                    "maPassword",
+                    // Room Link is configured from the Mac manager or dedicated device tool.
+                    "intercomMode",
+                    "intercomPeerHost"),
             SettingsDomains.chime to emptySet(),
             SettingsDomains.digitalclock to emptySet(),
             SettingsDomains.welcome to emptySet(),

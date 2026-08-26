@@ -43,6 +43,9 @@
     <!-- Fleet Agent: a foreground service so WiFi device management survives a
          reboot on these non-root Portals (where adb-over-WiFi can't). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Process-owned LAN room link: broadcast captures the microphone in a foreground
+         service. Runtime RECORD_AUDIO remains required before any capture starts. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- Wake the screen on demand (Home Assistant "wake the panel" via the MQTT screen
          switch). A normal permission; ScreenControl.wake uses a wake lock. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -512,6 +515,14 @@
             android:name=".MultiRoomService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- LAN room link (intercom): broadcasts the shared microphone capture or receives
+           another Portal's raw PCM stream. Started/stopped by the immortal settings domain;
+           never exported. -->
+        <service
+            android:name=".IntercomService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|mediaPlayback" />
 
         <!-- Auto-confirms the package-installer dialog so fleet/agent installs need
              no human tap. Scoped to the installer package (see the xml config).

@@ -1,0 +1,1133 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create `macos/PortalManager.xcodeproj` with `PortalManager`, `PortalManagerTests`, and `PortalManagerUITests` targets and the `App`, `Domain`, `Application`, `Infrastructure`, `UI`, `Resources`, and fixture layouts defined by the design.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342392
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159354430
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159631811
+      }
+    ],
+    "1.2 Configure macOS 13+ Debug/Release schemes, arm64-capable settings, resource/localization handling, App Sandbox network-client access, user-selected local-file access, security-scoped bookmarks, and hardened-runtime-ready build settings.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342441
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159640225
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787162879382
+      }
+    ],
+    "1.3 Add the native application shell and dependency container with typed ports for DNS, Bonjour, Fleet HTTP, Keychain, registry, ADB, artifact verification, Music Assistant, Snapcast, clocks, redaction, and evidence storage.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342469
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159644817
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787162882516
+      }
+    ],
+    "1.4 Add a macOS-only build/test entry point for the Portal Manager Xcode scheme and a scope check that keeps Xcode validation separate from Gradle while rejecting cloud/download dependencies and Android-runtime edits.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342501
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787162889056
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163205910
+      }
+    ],
+    "2.1 Implement `PortalID`, `PortalIdentity`, `LANEndpoint`, endpoint sources, credential references, `PortalRegistryEntry`, `PortalStatus`, `PortalCapabilities`, `ConnectionState`, and typed `ManagerError` values.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342534
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159646914
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787162885247
+      }
+    ],
+    "2.2 Implement `ManualEndpointParser` and the pure shared `LANPolicy` for Portal, Music Assistant, Snapcast, discovery, manual endpoints, reconnects, and provisioning verification.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342559
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787162893077
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163208701
+      }
+    ],
+    "2.3 Implement injected DNS resolution, permitted-address selection, `ConnectionAdmission`, and `TrustWarningScope` handling.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342592
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163213392
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163603076
+      }
+    ],
+    "2.4 Implement authenticated `/info` model-family and capability classification.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342624
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787162896296
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163211098
+      }
+    ],
+    "3. Checkpoint - Run the independent Xcode bootstrap and pure domain/LAN tests before adding persistence or protocol orchestration.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342653
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787165730649
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787165823971
+      }
+    ],
+    "4.1 Define `RegistryStore`, `CredentialStore`, `Clock`, `Redactor`, and secure-input protocols; implement `JSONRegistryStore` for non-secret identity, endpoint history, last-confirmed status, policy/capability metadata, and opaque Keychain references only.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342685
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163646698
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163942868
+      }
+    ],
+    "4.2 Implement `KeychainCredentialStore` with bundle-scoped generic-password items and account derivation that includes Portal/service/credential kind and, for source secrets, `PortalID + sourceID + SourceSecretField`.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342715
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163946591
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787164203099
+      }
+    ],
+    "4.3 Implement structured and free-form redaction plus transient secure-input lifecycle helpers.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342751
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163949804
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163960084
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787164206896
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787164548695
+      }
+    ],
+    "4.4 Implement the private source wire DTO, sanitized source snapshot, `SourceSecretKey`, field-status model, and explicit per-Portal/per-source legacy migration/replacement operation.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342783
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787165386562
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787165705165
+      }
+    ],
+    "4.5 Add deterministic fake implementations for the clock, registry, Keychain, redactor, DNS/transport ports, Bonjour, ADB/process, Music Assistant, Snapcast, and evidence stores.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342810
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163953136
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163962511
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787164555821
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787164917555
+      }
+    ],
+    "4.6 Implement registry reconciliation and removal/offline retention.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342842
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163955363
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163965040
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787164940565
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787165380518
+      }
+    ],
+    "5. Checkpoint - Run persistence, Keychain, source-secret, redaction, and reconciliation tests before implementing Fleet routes.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342877
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787165831095
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166141792
+      }
+    ],
+    "6.1 Implement `FleetRoute`, `ApprovedAction`, `CredentialRequirement`, `RemoteOperationApproval`, `RouteCredentialPlan`, and `OperationPlanner` for the exact credential matrix.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342910
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166162356
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166446362
+      }
+    ],
+    "6.2 Implement `HTTPTransport` and connection execution with redirect following disabled.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342941
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166450279
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166762286
+      }
+    ],
+    "6.3 Implement `FleetHTTPClient` and response classification over the injected transport.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342968
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166765551
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787170924079
+      }
+    ],
+    "6.4 Implement `PortalSessionCoordinator` for bearer verification, exact-once PIN redemption, remote-session limits, per-Portal credential choice, reauthentication, and removal cleanup.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159342999
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787170928460
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787171699313
+      }
+    ],
+    "7.1 Implement `BonjourBrowser` over `NWBrowser`/Bonjour for `_immortal-remote._tcp.` on active LAN interfaces.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343027
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787171721540
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787174658956
+      }
+    ],
+    "7.2 Implement discovery candidate normalization and resolved-address admission.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343061
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787174663531
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787174969469
+      }
+    ],
+    "7.3 Implement `DiscoveryCoordinator` refresh/probe/reconcile flow.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343092
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787174974232
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787175665783
+      }
+    ],
+    "7.4 Implement Manual-IP onboarding and endpoint editing using `host[:port]`/bracketed IPv6 parsing, the same DNS/LAN/trust checks, `.manual` source, authenticated `/info` verification, and direct mDNS-independent `/remote/pair` redemption.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343125
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787175672804
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176092016
+      }
+    ],
+    "8.1 Define `ADBDeviceSnapshot`, `ProvisioningMode`, `EnablementRecoveryPlan`, `FullUSBProvisioningPlan`, `LocalArtifact`, `ProvisioningStepID`, `ProvisioningEvent`, `AgentManifest`, and typed sanitized failures.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343158
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176114511
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176513993
+      }
+    ],
+    "8.2 Implement the restricted finite-enum `ADBCommand` runner and process boundary.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343185
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176524447
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188016814
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188037611
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190046041
+      }
+    ],
+    "8.3 Implement `LocalArtifactVerifier` before any install command.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343218
+      },
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176524620
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188016867
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190049822
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190417837
+      }
+    ],
+    "8.4 Implement the per-operation sandbox/temp workspace and no-download boundary.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343244
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188016901
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190428710
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190778902
+      }
+    ],
+    "8.5 Implement `ProvisioningCoordinator` with mode-specific step gates, retries, cancellation, generation-specific setup steps, `provision.json` handoff, `agent.json` recovery, immediate Keychain storage, LAN revalidation, bearer `/info` verification, and registry commit.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343277
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188016934
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190814410
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787192671787
+      }
+    ],
+    "9. Checkpoint - Run Fleet, discovery, and both provisioning-mode tests before adding settings and bulk mutation planning.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343307
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188016978
+      }
+    ],
+    "10.1 Implement additive `SettingsRegistrySchema`, `SettingsDomainSchema`, `SettingsControlSchema`, `DecodedControlType`, `JSONValue`, enum options, constraints, visibility, and unknown metadata decoding.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343335
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017028
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787192688425
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787192972695
+      }
+    ],
+    "10.2 Implement explicit `SettingsPolicyClassification` and default-deny policy lookup.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343369
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017065
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787193006437
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787193285671
+      }
+    ],
+    "10.3 Implement `SettingsCoordinator` draft validation, domain-batch apply, applied-key handling, and authoritative read-back.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343401
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017103
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787193295053
+      }
+    ],
+    "10.4 Implement `SourceAdapter` and `SourceSecretCoordinator` over `/remote/sources` with legacy stripping, explicit migration/replacement, blank-preserve field presence, configured-state metadata, and authoritative source read-back.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343432
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017135
+      }
+    ],
+    "10.5 Implement separate `ScreensaverAdapter` and `CalendarAdapter` over their documented bearer-only routes.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343459
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017186
+      }
+    ],
+    "10.6 Implement the policy-approved Portal multi-room settings bridge for `multiRoomEnabled`, `snapcastHost`, `maPort`, `maUsername`, and masked `maPassword`.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343492
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017242
+      }
+    ],
+    "11.1 Implement individual-operation planning and target-specific bulk preflight only after `PortalSessionCoordinator`, `SettingsCoordinator`, and approved source/calendar/screensaver adapters are available and before any dispatch path.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343526
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017284
+      }
+    ],
+    "11.2 Implement explicit confirmation for divergent schemas, reduced per-target operations, and sensitive bulk changes.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343558
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017318
+      }
+    ],
+    "11.3 Implement `BulkOperationEngine` with bounded independent fan-out, per-Portal route plans/Keychain reads, cancellation boundaries, terminal per-target events, authoritative read-back, and truthful aggregation.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343593
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017350
+      }
+    ],
+    "12.1 Implement `GateID`, `GateStatus`, `ReleaseEvidenceRecord`, `ReleaseGateReport`, and `ReleaseEvidenceStore` for sanitized evidence IDs, test outcomes, model/service claims, and unresolved deviations only.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343635
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017382
+      }
+    ],
+    "12.2 Implement `ReleaseEvidenceCoordinator` and the gate evaluator.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343669
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017416
+      }
+    ],
+    "12.3 Implement machine-readable release reports and CI/task projections for `missing`, `pending`, `passed`, `failed`, and `withheld` states.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343702
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017450
+      }
+    ],
+    "13.1 Define independent Music Assistant/Snapcast configuration, service endpoint, credential references, authentication/connection states, player/client/group/stream models, and topology snapshots.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343732
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017506
+      }
+    ],
+    "13.2 Implement the read-only Music Assistant WebSocket adapter.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343765
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017537
+      }
+    ],
+    "13.3 Implement the read-only Snapcast newline-delimited JSON-RPC adapter.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343802
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017577
+      }
+    ],
+    "13.4 Implement service authentication-state handling, Portal-to-player/client reconciliation, and ambiguity/offline reporting.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343837
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017610
+      }
+    ],
+    "13.5 Implement default-deny `MusicCapabilityResolver` and UI/operation projections for group mutations.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343868
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017643
+      }
+    ],
+    "13.6 Implement only explicitly enabled service-specific Music mutation branches.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343900
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017677
+      }
+    ],
+    "14.1 Implement the `@MainActor PortalManagerStore`, navigation state, immutable non-secret snapshots, command state, coordinator event routing, and explicit selected-Portal semantics.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343933
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017715
+      }
+    ],
+    "14.2 Implement `NavigationSplitView`/sidebar/detail overview UI for discovery candidates, Portal Registry entries, assurance/credential badges, model/API/capability summaries, last refresh/contact, Music hosts, and sanitized errors/recovery actions.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159343968
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017751
+      }
+    ],
+    "14.3 Implement schema-driven settings, source, calendar, and screensaver views.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344001
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017782
+      }
+    ],
+    "14.4 Implement provisioning/recovery, Bulk Operation, read-only Music Groups, conditional named mutation, and release-evidence detail views.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344033
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017815
+      }
+    ],
+    "14.5 Implement `AppDelegate`, AppKit `Commands`/`NSMenu`, key equivalents, `NSOpenPanel`, security-scoped bookmarks, and typed command enablement for discovery refresh, Manual-IP onboarding, navigation/selection, status refresh, identify/reaffirm, apply/retry, provisioning, Music refresh, and Bulk Operation confirmation/cancellation.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344066
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017848
+      }
+    ],
+    "14.6 Add reusable progress, error, confirmation, accessibility/VoiceOver, and Portal TV no-touch presentation components.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344092
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017879
+      }
+    ],
+    "15.1 Add automated macOS integration/smoke checks for Xcode build/test separation, startup/resume without cloud registration, Keychain-only restoration, admitted LAN/public rejection, DNS-before-credential ordering, every-reconnect revalidation, no-follow redirects, closed route/UI allowlists, no-download provisioning, and unchanged Android/Gradle boundaries.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344127
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017929
+      }
+    ],
+    "15.2 Add **mandatory Security Release Validation** and emit a passing/failing `security` gate evidence record.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344159
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188017970
+      }
+    ],
+    "15.3 Add **mandatory LAN Release Validation** and emit a passing/failing `lan` gate evidence record.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344193
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188018000
+      }
+    ],
+    "15.4 Add **mandatory Provisioning Release Validation** and emit a passing/failing `provisioning` gate evidence record.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344226
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188018034
+      }
+    ],
+    "15.5 Add **mandatory Model Matrix Validation** and emit evidence for every claimed Compatible Portal family and applicable Android API level.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344260
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188018068
+      }
+    ],
+    "15.6 Add **mandatory Portal TV Validation** and emit a passing/failing `portalTV` gate evidence record.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344292
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188018124
+      }
+    ],
+    "15.7 Add **conditional mandatory Music Mutation Release Validation** for every enabled named mutation.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344326
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188018170
+      }
+    ],
+    "16. Final checkpoint - Run the complete required validation set and produce the release report.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787159344374
+      },
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787188018204
+      }
+    ],
+    "1. Bootstrap the independent macOS Xcode project and test boundary": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163205950
+      }
+    ],
+    "2. Implement domain identity, assurance states, and shared LAN admission": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163603176
+      }
+    ],
+    "2.5 Add the property test for LAN endpoint parsing and admission.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163628231
+      }
+    ],
+    "2.6 Add the property test for model and capability decisions.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163631298
+      }
+    ],
+    "2.7 Add pure domain tests for IPv4/private/link-local and IPv6/zone parsing, ambiguous endpoint rejection, connection-state transitions, trust-scope normalization, model families, API levels, and Portal TV/unknown-model examples.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787163634463
+      }
+    ],
+    "4. Implement registry, Keychain, source-secret migration, and redaction boundaries": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787165705195
+      }
+    ],
+    "4.7 Add the property test for registry reconciliation and offline retention.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166151354
+      }
+    ],
+    "4.8 Add the property test for sensitive-value persistence and diagnostic fallback.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166153361
+      }
+    ],
+    "4.9 Add secure-persistence unit tests for Keychain isolation, registry serialization, per-Portal/per-source account derivation, migration failure, removal cleanup, nested redaction, and transient secret clearing.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787166155499
+      }
+    ],
+    "6. Implement the closed Fleet route surface, no-follow transport, and credential-matrix session coordinator": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787171699353
+      }
+    ],
+    "6.5 Add the property test for the exact route credential matrix.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787171711041
+      }
+    ],
+    "6.6 Add the property test for pairing and reauthentication fail-closed behavior.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787171712865
+      }
+    ],
+    "6.7 Add the property test for DNS ordering, reconnect revalidation, scoped trust warnings, and redirect refusal.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787171714500
+      }
+    ],
+    "6.8 Add Fleet protocol fixture tests for exact methods/paths/bodies/headers, manual PIN body presence, status deadlines, redirect cancellation, response categories, and absence of excluded route serialization.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787171716286
+      }
+    ],
+    "7. Implement mDNS discovery, manual-IP onboarding, and authenticated reconciliation": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176092076
+      }
+    ],
+    "7.5 Add the property test for discovery promotion.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176100945
+      }
+    ],
+    "7.6 Add the property test for mDNS-independent manual PIN pairing limits.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176104333
+      }
+    ],
+    "7.7 Add Bonjour/manual discovery fixture tests for refresh cancellation, duplicate records, delayed/lost mDNS, public resolution, DHCP changes, authenticated endpoint preference, manual pairing, and offline retention.": [
+      {
+        "executionId": "6bf30ab3-268b-4d1d-807d-ba383670b653",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787176107236
+      }
+    ],
+    "8.6 Add the property test for separate provisioning modes and complete artifact verification.": [
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190784061
+      }
+    ],
+    "8.7 Add the property test for verification-gated online state.": [
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190784459
+      }
+    ],
+    "8.8 Add provisioning fixture tests for authorized/unauthorized ADB, disconnects, finite-command rejection, every artifact verification dimension, first-generation installer behavior, temp-workspace cleanup, manifest recovery, retry/cancellation, bearer verification, sanitized output, and no-download behavior.": [
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787190784683
+      }
+    ],
+    "8. Implement separate Fleet Agent Enablement/Recovery and Full USB Provisioning": [
+      {
+        "executionId": "f226f5a4-3f8a-4c7f-ad05-832100e29f92",
+        "chatSessionId": "sess_64f0db54-5d22-44bb-a844-948065ab1bbb",
+        "timestamp": 1787192671828
+      }
+    ]
+  }
+}

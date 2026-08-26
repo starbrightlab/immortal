@@ -44,6 +44,12 @@ object ImmortalSettings {
   const val CLOCK_12 = "12" // force 12-hour (e.g. 1:05, 1 PM)
   const val CLOCK_24 = "24" // force 24-hour (e.g. 13:05, 13)
 
+  // Process-owned LAN room link. The canonical values are owned by [IntercomPolicy] so the
+  // settings schema and the foreground service cannot drift apart.
+  const val INTERCOM_MODE_OFF = IntercomPolicy.MODE_OFF
+  const val INTERCOM_MODE_BROADCAST = IntercomPolicy.MODE_BROADCAST
+  const val INTERCOM_MODE_RECEIVE = IntercomPolicy.MODE_RECEIVE
+
   data class Settings(
       val weatherUnit: String = UNIT_AUTO,
       val tileSize: String = SIZE_STANDARD,
@@ -78,6 +84,10 @@ object ImmortalSettings {
       // itself needs no credentials. Leave blank for a stock server with auth disabled.
       val maUsername: String = "",
       val maPassword: String = "",
+      // One-way room link over the existing raw PCM LAN protocol. Receive needs a peer address;
+      // broadcast always uses fixed port 8724.
+      val intercomMode: String = INTERCOM_MODE_OFF,
+      val intercomPeerHost: String = "",
   )
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -98,6 +108,10 @@ object ImmortalSettings {
         maPort = p.getInt("ma_port", DEFAULT_MA_PORT),
         maUsername = p.getString("ma_username", "") ?: "",
         maPassword = p.getString("ma_password", "") ?: "",
+        intercomMode =
+            IntercomPolicy.normalizeMode(p.getString("intercom_mode", INTERCOM_MODE_OFF) ?: "")
+                ?: INTERCOM_MODE_OFF,
+        intercomPeerHost = p.getString("intercom_peer_host", "")?.trim() ?: "",
     )
   }
 
@@ -153,6 +167,25 @@ object ImmortalSettings {
       prefs(c).edit().putString("ma_username", v.trim()).apply()
 
   fun setMaPassword(c: Context, v: String) = prefs(c).edit().putString("ma_password", v).apply()
+
+  fun intercomMode(c: Context): String =
+      IntercomPolicy.normalizeMode(prefs(c).getString("intercom_mode", INTERCOM_MODE_OFF) ?: "")
+          ?: INTERCOM_MODE_OFF
+
+  fun intercomPeerHost(c: Context): String =
+      prefs(c).getString("intercom_peer_host", "")?.trim() ?: ""
+
+  fun setIntercomMode(c: Context, mode: String) {
+    // The registry rejects unknown values before this runs; this normalization also protects any
+    // future non-registry caller from persisting a value the service cannot act on.
+    val canonical = IntercomPolicy.normalizeMode(mode) ?: INTERCOM_MODE_OFF
+    prefs(c).edit().putString("intercom_mode", canonical).apply()
+  }
+
+  fun setIntercomPeerHost(c: Context, host: String) {
+    val canonical = IntercomPolicy.normalizePeerHost(host) ?: ""
+    prefs(c).edit().putString("intercom_peer_host", canonical).apply()
+  }
 
   fun setWeatherUnit(c: Context, unit: String) =
       prefs(c).edit().putString("weather_unit", unit).apply()
