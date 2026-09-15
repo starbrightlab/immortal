@@ -353,6 +353,20 @@
           "author": "rudysev",
           "homepage": "https://github.com/rudysev/portal-assistant",
           "submittedBy": "rudysev"
+        },
+        {
+          "name": "PortalSnap",
+          "packageName": "net.sgransoft.portalsnap",
+          "source": "url",
+          "apkUrl": "https://github.com/sgranman/portalsnap/releases/latest/download/PortalSnap.apk",
+          "versionUrl": "https://github.com/sgranman/portalsnap/releases/latest/download/version.json",
+          "minSdk": 28,
+          "description": "A replacement for the Photo Booth app that was removed from the Portal",
+          "longDescription": "A camera app with live filters for the Portal, in place of the Photo Booth app Meta removed. Faces puts on puppy, kitty, cool, royal, googly, fancy and big-head looks; Places cuts you out and drops you somewhere else; Freefall and Bike Ride are real 3D scenes; and there are Hearts, Hamster, Disco, Pop Art and more. Takes photos and records clips with sound, all on-device with MediaPipe, with nothing sent anywhere and no Google services needed.",
+          "iconUrl": "https://raw.githubusercontent.com/sgranman/portalsnap/main/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+          "author": "Dan Sgranfetto",
+          "homepage": "https://github.com/sgranman/portalsnap",
+          "submittedBy": "sgranman"
         }
       ]
     }
