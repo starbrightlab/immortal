@@ -12,17 +12,17 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * On-device cache of screensaver media, shared by every HTTP remote source (Immich, WebDAV,
- * shared albums). Images are stored as fetched; videos are stored as screen-sized (1200x800)
- * H.264 derivatives produced by [VideoTranscoder]. Each Portal fills its own cache once, then
- * plays from local storage on every subsequent loop — cutting repeat fetches (and, for video,
- * most of the bytes) off the source server. This is the on-device answer to the video-wall
- * problem: the server is touched once per asset, not on every advance forever.
+ * On-device cache of screensaver media, shared by every HTTP remote source (Immich, WebDAV).
+ * Images are stored as fetched; videos are stored as screen-sized (1200x800) H.264 derivatives
+ * produced by [VideoTranscoder]. Which assets are resident is decided by the [CachePool] stored
+ * beside the media ([poolFile]): a random selection of the source filled up to the budget, then
+ * rotated slowly, so the source server is touched once per asset and the slideshow plays from
+ * local storage on every loop.
  *
  * Keyed by a stable hash of the item's URL, so the same asset maps to the same file across runs
- * and app restarts. Eviction is a size-budgeted LRU keyed on file last-modified, which is
- * touched on every cache hit — so the working set of a looping album stays resident and only
- * genuinely cold items are dropped.
+ * and app restarts. The budget is still enforced as a size-capped LRU ([enforceBudget]) as a
+ * backstop for a lowered storage limit; in normal operation the pool stops filling at [hasRoom]
+ * and nothing is evicted.
  *
  * All operations are best-effort: a failure returns null/false and the caller falls back to a
  * direct fetch, so the frame is never blank because of a cache problem.
@@ -55,9 +55,33 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
 
   fun videoFile(url: String): File = File(dir, "${key(url)}.mp4")
 
+  fun fileFor(url: String, isVideo: Boolean): File = if (isVideo) videoFile(url) else imageFile(url)
+
+  /** Where the [CachePool] for this cache is persisted (not a media file; never counted or evicted). */
+  fun poolFile(): File = File(dir, POOL_FILE)
+
+  /** Bytes on disk for a cached item (0 when absent). */
+  fun sizeOf(url: String, isVideo: Boolean): Long = fileFor(url, isVideo).length()
+
+  /** Remove one cached item. */
+  fun delete(url: String, isVideo: Boolean) {
+    runCatching { fileFor(url, isVideo).delete() }
+  }
+
+  /** Delete every media file whose name is not in [keepNames] (orphans no pool entry claims). */
+  fun deleteMediaExcept(keepNames: Set<String>) {
+    mediaFiles().filter { it.name !in keepNames }.forEach { runCatching { it.delete() } }
+  }
+
+  /** Resident media files: committed images and videos, never temps or the pool file. */
+  private fun mediaFiles(): List<File> =
+      dir.listFiles()?.filter {
+        it.isFile && !it.name.startsWith(".") && (it.name.endsWith(".jpg") || it.name.endsWith(".mp4"))
+      } ?: emptyList()
+
   /** The cached file for [url] if present and non-empty, touched as most-recently-used; else null. */
   fun getIfPresent(url: String, isVideo: Boolean): File? {
-    val f = if (isVideo) videoFile(url) else imageFile(url)
+    val f = fileFor(url, isVideo)
     if (f.exists() && f.length() > 0L) {
       runCatching { f.setLastModified(System.currentTimeMillis()) }
       return f
@@ -66,7 +90,7 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
   }
 
   fun isCached(url: String, isVideo: Boolean): Boolean =
-      (if (isVideo) videoFile(url) else imageFile(url)).let { it.exists() && it.length() > 0L }
+      fileFor(url, isVideo).let { it.exists() && it.length() > 0L }
 
   /** Store image bytes atomically, then enforce the budget. Returns the file, or null on failure. */
   fun putImage(url: String, bytes: ByteArray): File? =
@@ -101,12 +125,12 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
 
   /**
    * Delete least-recently-used files until the total resident size is within [budgetBytes].
-   * Hidden temp files ('.'-prefixed, in-flight writes) are ignored. Synchronized so a prefetch
+   * Hidden temp files ('.'-prefixed, in-flight writes) and the pool file are ignored. Synchronized so a prefetch
    * commit and an image put don't evict against a stale total at the same time.
    */
   @Synchronized
   fun enforceBudget() {
-    val files = dir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") } ?: return
+    val files = mediaFiles()
     var total = files.sumOf { it.length() }
     if (total <= budgetBytes) return
     for (f in files.sortedBy { it.lastModified() }) {
@@ -117,19 +141,18 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
   }
 
   /** Current resident size (excludes in-flight temp files). */
-  fun sizeBytes(): Long =
-      dir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") }?.sumOf { it.length() } ?: 0L
+  fun sizeBytes(): Long = mediaFiles().sumOf { it.length() }
 
   /**
-   * Whether the cache has meaningful room left (under ~90% of budget). The prefetch worker stops
-   * here rather than transcoding clips whose commit would just evict warmer entries — on an album
-   * bigger than the budget, filling past this line turns the cache into a treadmill (every add
-   * evicts something the slideshow still wants, so the server keeps getting re-hit forever).
+   * Whether the cache has meaningful room left (under ~90% of budget). The pool fill stops here:
+   * filling past this line would make [enforceBudget] evict resident items to admit new ones, and
+   * on an album bigger than the budget that is a treadmill that re-hits the server forever.
    */
   fun hasRoom(): Boolean = sizeBytes() < budgetBytes - budgetBytes / 10
 
   companion object {
     const val DIR = "screensaver-media-cache"
+    const val POOL_FILE = "pool.json"
 
     /** Delete the whole cache directory — used to reclaim storage when the user turns caching off. */
     fun purge(context: Context) {

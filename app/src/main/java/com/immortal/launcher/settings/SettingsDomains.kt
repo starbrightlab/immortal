@@ -279,10 +279,10 @@ object SettingsDomains {
                       get = { it.cacheEnabled },
                       set = ScreensaverConfig::setCacheEnabled,
                       help =
-                          "Downloads each photo and video from your server once, then plays it from " +
-                              "this device on every loop instead of fetching it again. Videos are " +
-                              "shrunk to fit the screen. The frame loads faster and your server does " +
-                              "far less work; it uses some of this device's storage.",
+                          "Fills this device's storage with a random selection of your photos and " +
+                              "videos, then plays them from here instead of fetching them again. Once " +
+                              "a day, about 5% are swapped for new picks from your server. Videos are " +
+                              "shrunk to fit the screen. The frame keeps playing if the server is down.",
                       visible = { _, s -> s.usesImmich || s.usesDav }),
                   IntSpec(
                       "cacheBudgetGb",
@@ -294,8 +294,9 @@ object SettingsDomains {
                       step = 1,
                       format = { "$it GB" },
                       help =
-                          "The most storage the saved copies may use. When it fills up, the items " +
-                              "shown longest ago are removed first. Also limited by free space.",
+                          "The most storage the saved copies may use. If your album is bigger than " +
+                              "this, a random part of it is kept and slowly rotated. Also limited by " +
+                              "free space.",
                       visible = { _, s -> (s.usesImmich || s.usesDav) && s.cacheEnabled }),
                   BoolSpec(
                       "batterySaver",

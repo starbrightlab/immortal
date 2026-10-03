@@ -191,18 +191,21 @@ class PhotoFrameController(
   private var remoteFetch: ((String) -> Bitmap?)? = null
   private var smbSource: SmbSource? = null
   // On-device media cache for stable-URL HTTP sources (Immich, WebDAV): images are stored as
-  // fetched, videos as 1200x800 derivatives, so each asset is pulled from the server once and
-  // then replayed from local storage on every loop. Null unless such a source is active. A
-  // background worker on [transcodeIo] warms the video cache ahead of playback. See
-  // [enableMediaCache]/[fetchRemoteImage]/[schedulePrefetch].
+  // fetched, videos as 1200x800 derivatives. Null unless such a source is active and the user
+  // turned caching on. Which assets are resident is the [pool]: a random selection of the source
+  // filled to the budget, then rotated once a day by a sync worker on [transcodeIo], and the
+  // slideshow plays only the pool. See [startPooled]/[runPoolSync]/[fetchRemoteImage].
   private var mediaCache: MediaCache? = null
   private var transcoder: VideoTranscoder? = null
   private val transcodeIo = Executors.newSingleThreadExecutor()
-  @Volatile private var prefetchRunning = false
-  // Set when a prefetch pass finds the cache out of room, so later misses don't spawn a worker
-  // (and log) just to rediscover that every ~30s. Cleared when a corrupt entry is deleted (space
-  // freed); resets with the controller each dream session.
-  @Volatile private var prefetchFull = false
+  private var pool: CachePool? = null
+  // Lists the whole source (server call); only invoked by a pool sync or a first-ever start.
+  private var poolLister: (() -> List<CachePool.Entry>?)? = null
+  private var poolShuffle = true
+  @Volatile private var poolSyncRunning = false
+  // True while the pool is still empty on a first start: the slideshow streams the server's list
+  // directly (as without a cache) until enough of the pool has been filled to switch over.
+  @Volatile private var poolLive = false
   // Web-page source: a fullscreen WebView that owns the whole frame (the page brings its own
   // clock/widgets, so the photo layer and Immortal overlay are skipped).
   private var webView: android.webkit.WebView? = null
@@ -378,6 +381,14 @@ class PhotoFrameController(
         }
       }
       is PhotoFrameSource.Immich -> {
+        val poolKey =
+            "immich|${ImmichSource.normalizeBase(source.url)}|${source.albumId.orEmpty()}|video=${source.includeVideo}"
+        val pooled =
+            startPooled(poolKey, ImmichSource.authHeaders(source.key), source.shuffle) {
+              ImmichSource.listMedia(source.url, source.key, source.albumId, source.includeVideo, cap = POOL_LIST_CAP)
+                  ?.map { CachePool.Entry(it.url, it.isVideo) }
+            }
+        if (pooled) return
         io.execute {
           val media =
               ImmichSource.listMedia(source.url, source.key, source.albumId, source.includeVideo)
@@ -391,9 +402,7 @@ class PhotoFrameController(
               remoteMode = true
               remoteIndex = -1
               remoteFailStreak = 0
-              enableMediaCache()
               advanceRemote(+1)
-              schedulePrefetch()
             } else {
               // Server unreachable / album empty → never leave the frame blank. Say so: the
               // swap to the built-in feed is otherwise invisible in a user report (issue #142).
@@ -404,6 +413,13 @@ class PhotoFrameController(
         }
       }
       is PhotoFrameSource.WebDav -> {
+        val poolKey = "dav|${source.url.trim()}|${source.user}|video=${source.includeVideo}"
+        val pooled =
+            startPooled(poolKey, DavSource.authHeaders(source.user, source.pass), source.shuffle) {
+              DavSource.listMedia(source.url, source.user, source.pass, source.includeVideo, cap = POOL_LIST_CAP)
+                  ?.map { CachePool.Entry(it.url, it.isVideo) }
+            }
+        if (pooled) return
         io.execute {
           val media =
               DavSource.listMedia(source.url, source.user, source.pass, source.includeVideo)
@@ -417,9 +433,7 @@ class PhotoFrameController(
               remoteMode = true
               remoteIndex = -1
               remoteFailStreak = 0
-              enableMediaCache()
               advanceRemote(+1)
-              schedulePrefetch()
             } else {
               startWeb()
             }
@@ -1335,14 +1349,14 @@ class PhotoFrameController(
     val url = remoteUrls[remoteIndex]
     val g = gen
     if (url in remoteVideos) {
-      // Prefer a cached screen-sized derivative (plays from disk, no network). On a miss, stream
-      // the original this once and warm the cache in the background for the next loop.
+      // Prefer a cached screen-sized derivative (plays from disk, no network). A miss (no cache,
+      // or the pool's first fill still under way) streams the original; the pool sync, not
+      // playback, decides what gets cached.
       val cached = mediaCache?.getIfPresent(url, isVideo = true)
       if (cached != null) {
         showRemoteVideo(android.net.Uri.fromFile(cached), emptyMap(), g, cachedFile = cached)
       } else {
         showRemoteVideo(android.net.Uri.parse(url), remoteHeaders, g)
-        schedulePrefetch()
       }
       return
     }
@@ -1377,8 +1391,8 @@ class PhotoFrameController(
    *
    * A playback error on a *cached* file deletes it: a truncated or codec-incompatible derivative
    * would otherwise fail every loop forever — and because the cache-hit lookup touches the file's
-   * LRU stamp, eviction would actually protect the corrupt entry. Deleting it makes the next
-   * encounter stream the original and re-transcode, so the slot self-heals like the image path.
+   * LRU stamp, eviction would actually protect the corrupt entry. Deleting it also drops it from
+   * the pool and the playlist, freeing its space for the next sync to refill.
    */
   private fun showRemoteVideo(
       uri: android.net.Uri,
@@ -1388,9 +1402,13 @@ class PhotoFrameController(
   ) {
     fun dropCorruptCache() {
       cachedFile?.let { f ->
-        Log.w(TAG, "cached video failed to play; deleting for re-fetch: ${f.name}")
+        Log.w(TAG, "cached video failed to play; deleting: ${f.name}")
         runCatching { f.delete() }
-        prefetchFull = false // space freed; let the prefetch worker re-warm this slot
+        val p = pool ?: return@let
+        p.snapshot().firstOrNull { it.isVideo && mediaCache?.videoFile(it.url)?.name == f.name }?.let {
+          p.remove(listOf(it.url))
+          poolRemoved(setOf(it.url))
+        }
       }
     }
     cancelKenBurns()
@@ -1485,10 +1503,12 @@ class PhotoFrameController(
     remoteHeaders = emptyMap()
     remoteVideos = emptySet()
     remoteFetch = null
+    poolLive = false
     smbSource?.let { s -> io.execute { runCatching { s.close() } } }
     smbSource = null
     ui.removeCallbacks(remoteTick)
     ui.removeCallbacks(remoteRefresh)
+    ui.removeCallbacks(poolSyncTick)
     stopVideo()
     rotate.run()
   }
@@ -2065,8 +2085,11 @@ class PhotoFrameController(
 
   /**
    * Fetch a remote image, going through [mediaCache] when one is active (Immich/WebDAV): a hit
-   * decodes straight from disk with no network; a miss downloads the bytes, caches them, and
-   * decodes. SMB (a custom [remoteFetch]) and the uncached sources fall back to the direct path.
+   * decodes straight from disk with no network. A miss downloads the bytes and decodes; the bytes
+   * are kept only for a pool member whose file went missing, or, during the first fill
+   * ([poolLive]), as a new pool member while there is room (saving the sync worker a second
+   * download of the same asset). SMB (a custom [remoteFetch]) and the uncached sources fall back
+   * to the direct path.
    */
   private fun fetchRemoteImage(url: String): Bitmap? {
     val cache = mediaCache
@@ -2075,7 +2098,14 @@ class PhotoFrameController(
         runCatching { decodeBoundedFile(f.path) }.getOrNull()?.let { return it }
       }
       val bytes = runCatching { downloadBytes(url, remoteHeaders) }.getOrNull() ?: return null
-      cache.putImage(url, bytes)
+      val p = pool
+      if (p != null) {
+        if (p.contains(url)) {
+          cache.putImage(url, bytes)
+        } else if (poolLive && cache.hasRoom() && cache.putImage(url, bytes) != null) {
+          p.add(CachePool.Entry(url, isVideo = false))
+        }
+      }
       return decodeBoundedBytes(bytes)
     }
     return remoteFetch?.invoke(url) ?: downloadBitmap(url, remoteHeaders)
@@ -2092,7 +2122,7 @@ class PhotoFrameController(
     return c.inputStream.use { it.readBytes() }
   }
 
-  /** Stream an authed HTTP GET straight to [dst] (for the video prefetch source). */
+  /** Stream an authed HTTP GET straight to [dst] (a video's source, before transcoding). */
   private fun downloadToFile(spec: String, headers: Map<String, String>, dst: java.io.File): Boolean =
       runCatching {
             val c = URL(spec).openConnection() as HttpURLConnection
@@ -2107,72 +2137,249 @@ class PhotoFrameController(
           .getOrDefault(false)
 
   /**
-   * Background-warm the video cache: for each not-yet-cached video, pull the source once,
-   * transcode it to a screen-sized derivative, and commit it. One clip at a time (single-thread
-   * [transcodeIo]) so a wall of Portals doesn't thrash — the first loop still streams originals;
-   * every loop after is local. Guarded by [prefetchRunning] so overlapping advances don't stack
-   * workers.
+   * Start an Immich/WebDAV source through the on-device [pool]. Returns false (caller takes the
+   * uncached streaming path) when caching is off or the disk is too full for it.
    *
-   * Warms in *playlist order from the current position* ([prefetchOrder]) so the clips about to
-   * be shown are cached first, and **stops when the cache runs out of room** ([MediaCache.hasRoom])
-   * — on an album bigger than the budget, pressing on would evict warm entries to add cold ones,
-   * turning the cache into a treadmill that re-hits the server forever.
+   * A pool that already holds media starts playing it straight from disk with no server call;
+   * the server is only listed when a sync is due ([runPoolSync]). An empty pool (first start, or
+   * the source changed) lists the server now and streams that list ([poolLive]) while the first
+   * fill runs; with no pool and no server, the frame falls back to the built-in feed as before.
    */
-  private fun schedulePrefetch() {
+  private fun startPooled(
+      key: String,
+      headers: Map<String, String>,
+      shuffle: Boolean,
+      lister: () -> List<CachePool.Entry>?,
+  ): Boolean {
+    enableMediaCache()
+    val cache = mediaCache ?: return false
+    poolLister = lister
+    poolShuffle = shuffle
+    remoteHeaders = headers
+    io.execute {
+      val p = CachePool.load(cache.poolFile(), key)
+      p.reconcile(cache) // drop missing entries; delete a previous source's files
+      val resident = p.snapshot()
+      val listed = if (resident.isEmpty()) lister() else null
+      ui.post {
+        pool = p
+        if (resident.isNotEmpty()) {
+          Log.i(TAG, "pool: playing ${resident.size} resident items (${cache.sizeBytes() / MB}MB)")
+          playPool(resident)
+        } else if (!listed.isNullOrEmpty()) {
+          Log.i(TAG, "pool: empty; streaming ${listed.size} server items while the first fill runs")
+          poolLive = true
+          remoteUrls = if (shuffle) listed.map { it.url }.shuffled() else listed.map { it.url }
+          remoteVideos = listed.filter { it.isVideo }.mapTo(HashSet()) { it.url }
+          remoteMode = true
+          remoteIndex = -1
+          remoteFailStreak = 0
+          advanceRemote(+1)
+        } else {
+          Log.w(TAG, "pool: empty and source gave no media ($key); falling back to built-in feed")
+          startWeb()
+          return@post
+        }
+        runPoolSync(prefetched = listed)
+      }
+    }
+    return true
+  }
+
+  /** Point the slideshow at the pool's resident items (from the top). */
+  private fun playPool(resident: List<CachePool.Entry>) {
+    val urls = resident.map { it.url }
+    remoteUrls = if (poolShuffle) urls.shuffled() else urls
+    remoteVideos = resident.filter { it.isVideo }.mapTo(HashSet()) { it.url }
+    remoteMode = true
+    remoteIndex = -1
+    remoteFailStreak = 0
+    poolLive = false
+    advanceRemote(+1)
+  }
+
+  private val poolSyncTick =
+      object : Runnable {
+        override fun run() {
+          runPoolSync(prefetched = null)
+        }
+      }
+
+  private fun schedulePoolSync(delayMs: Long) {
+    ui.removeCallbacks(poolSyncTick)
+    ui.postDelayed(poolSyncTick, delayMs.coerceAtLeast(60_000L))
+  }
+
+  /**
+   * Bring the pool up to date with the source, at most once per [CachePool.SYNC_INTERVAL_MS]
+   * (a wall Portal can sit in the screensaver for days, so this reschedules itself rather than
+   * only running at dream start). One pass, on the single [transcodeIo] thread:
+   *  1. list the source ([prefetched] when the caller already has the list);
+   *  2. forget resident assets the source no longer has;
+   *  3. when the cache is full and the source has assets we don't hold, rotate: drop
+   *     [CachePool.ROTATE_FRACTION] of the resident bytes at random (once per interval);
+   *  4. fill with random new picks until [MediaCache.hasRoom] says stop.
+   * An unreachable server changes nothing (the pool keeps playing) and retries in
+   * [CachePool.RETRY_MS]; so does a pass cut short by repeated download failures.
+   */
+  private fun runPoolSync(prefetched: List<CachePool.Entry>?) {
     val cache = mediaCache ?: return
-    val tc = transcoder ?: return
-    if (prefetchRunning || prefetchFull) return
-    // Snapshot playlist order + headers on the UI thread (both are mutated here only).
-    val queue = prefetchOrder(remoteUrls, remoteVideos, remoteIndex)
-    if (queue.isEmpty()) return
+    val p = pool ?: return
+    if (!remoteMode || poolSyncRunning) return
+    val now = System.currentTimeMillis()
+    if (!CachePool.isDue(p.lastSyncMs, now, CachePool.SYNC_INTERVAL_MS)) {
+      schedulePoolSync(p.lastSyncMs + CachePool.SYNC_INTERVAL_MS - now)
+      return
+    }
+    val lister = poolLister ?: return
     val headers = remoteHeaders
-    prefetchRunning = true
+    val tc = transcoder
+    poolSyncRunning = true
     // execute can only reject after stop() shut the executor down; reset the guard and move on.
     runCatching {
           transcodeIo.execute {
-            var built = 0
+            var complete = false
+            var added = 0
             var failed = 0
             try {
-              for (url in queue) {
-                if (!remoteMode || Thread.currentThread().isInterrupted) break
-                if (!cache.hasRoom()) {
-                  prefetchFull = true
-                  Log.i(TAG, "prefetch: cache full at ${cache.sizeBytes() / MB}MB; stopping (album larger than budget)")
+              val candidates = prefetched ?: lister()
+              if (candidates.isNullOrEmpty()) {
+                Log.w(TAG, "pool sync: source unreachable or empty; keeping ${p.size()} resident items")
+                return@execute
+              }
+              val listed = candidates.mapTo(HashSet()) { it.url }
+              // A list cut off at the cap can't prove an asset is gone, so only prune a full list.
+              if (candidates.size < POOL_LIST_CAP) {
+                val gone = p.snapshot().filter { it.url !in listed }
+                if (gone.isNotEmpty()) dropFromPool(cache, p, gone, "no longer in source")
+              }
+              val fresh = CachePool.pickNew(candidates, p.snapshot().mapTo(HashSet()) { it.url })
+              if (fresh.isNotEmpty() && !cache.hasRoom() &&
+                  CachePool.isDue(p.lastRotationMs, now, CachePool.SYNC_INTERVAL_MS)) {
+                val drops =
+                    CachePool.pickDrops(p.snapshot(), { cache.sizeOf(it.url, it.isVideo) }, CachePool.ROTATE_FRACTION)
+                dropFromPool(cache, p, drops, "daily rotation")
+                p.markRotated(now)
+              }
+              var streak = 0
+              var cut = false
+              for (e in fresh) {
+                if (!remoteMode || Thread.currentThread().isInterrupted) {
+                  cut = true
                   break
                 }
-                if (cache.isCached(url, isVideo = true)) continue
-                val target = cache.videoFile(url)
-                val srcTmp = cache.tempFor(java.io.File(target.path + ".src"))
-                val outTmp = cache.tempFor(target)
-                try {
-                  if (!downloadToFile(url, headers, srcTmp)) {
-                    failed++
-                    Log.w(TAG, "prefetch: download failed for $url")
-                    continue
+                if (!cache.hasRoom()) break
+                if (p.contains(e.url)) continue // the live image path got there first
+                if (fetchIntoCache(cache, tc, e, headers)) {
+                  p.add(e)
+                  added++
+                  streak = 0
+                  ui.post { poolAdded(e) }
+                } else {
+                  failed++
+                  if (++streak >= POOL_FAIL_STREAK) {
+                    Log.w(TAG, "pool sync: $streak downloads failed in a row; stopping until retry")
+                    cut = true
+                    break
                   }
-                  if (runCatching { tc.transcode(srcTmp, outTmp) }.getOrDefault(false) &&
-                      cache.commit(outTmp, target)) {
-                    built++
-                    Log.i(
-                        TAG,
-                        "prefetch: cached ${target.name} (${srcTmp.length() / MB}MB -> ${target.length() / MB}MB)")
-                  } else {
-                    failed++ // transcode already logged its own reason under ImmortalTranscode
-                  }
-                } finally {
-                  runCatching { srcTmp.delete() }
-                  runCatching { if (outTmp.exists()) outTmp.delete() }
                 }
               }
+              complete = !cut
+              if (complete) p.markSynced(now)
             } finally {
-              prefetchRunning = false
-              if (built + failed > 0) {
-                Log.i(TAG, "prefetch pass done: $built cached, $failed failed, cache=${cache.sizeBytes() / MB}MB")
+              p.flush()
+              poolSyncRunning = false
+              Log.i(
+                  TAG,
+                  "pool sync ${if (complete) "done" else "incomplete"}: +$added, $failed failed, " +
+                      "${p.size()} resident, cache=${cache.sizeBytes() / MB}MB")
+              ui.post {
+                if (!remoteMode || transcodeIo.isShutdown) return@post // source changed / stopped
+                if (poolLive) switchLiveToPool()
+                schedulePoolSync(if (complete) CachePool.SYNC_INTERVAL_MS else CachePool.RETRY_MS)
               }
             }
           }
         }
-        .onFailure { prefetchRunning = false }
+        .onFailure { poolSyncRunning = false }
+  }
+
+  /** Remove [entries] from the pool and the disk (sync thread), then from the playlist (UI). */
+  private fun dropFromPool(cache: MediaCache, p: CachePool, entries: List<CachePool.Entry>, why: String) {
+    if (entries.isEmpty()) return
+    p.remove(entries.map { it.url })
+    entries.forEach { cache.delete(it.url, it.isVideo) }
+    Log.i(TAG, "pool: dropped ${entries.size} items ($why)")
+    val urls = entries.mapTo(HashSet()) { it.url }
+    ui.post { poolRemoved(urls) }
+  }
+
+  /**
+   * Download one asset into the cache: image bytes as-is, or a video's source transcoded to a
+   * screen-sized derivative (skipped when no transcoder is available). Sync thread only.
+   */
+  private fun fetchIntoCache(
+      cache: MediaCache,
+      tc: VideoTranscoder?,
+      e: CachePool.Entry,
+      headers: Map<String, String>,
+  ): Boolean {
+    if (!e.isVideo) {
+      val bytes = runCatching { downloadBytes(e.url, headers) }.getOrNull() ?: return false
+      return cache.putImage(e.url, bytes) != null
+    }
+    tc ?: return false
+    val target = cache.videoFile(e.url)
+    val srcTmp = cache.tempFor(java.io.File(target.path + ".src"))
+    val outTmp = cache.tempFor(target)
+    try {
+      if (!downloadToFile(e.url, headers, srcTmp)) {
+        Log.w(TAG, "pool: download failed for ${e.url}")
+        return false
+      }
+      // transcode logs its own failure reason under ImmortalTranscode
+      val ok = runCatching { tc.transcode(srcTmp, outTmp) }.getOrDefault(false) && cache.commit(outTmp, target)
+      if (ok) Log.i(TAG, "pool: cached ${target.name} (${srcTmp.length() / MB}MB -> ${target.length() / MB}MB)")
+      return ok
+    } finally {
+      runCatching { srcTmp.delete() }
+      runCatching { if (outTmp.exists()) outTmp.delete() }
+    }
+  }
+
+  /** A sync added [e]: slot it among the upcoming items, or hand over from live streaming. */
+  private fun poolAdded(e: CachePool.Entry) {
+    if (!remoteMode) return
+    if (poolLive) {
+      if ((pool?.size() ?: 0) >= POOL_LIVE_SWITCH) switchLiveToPool()
+      return
+    }
+    if (e.url in remoteUrls) return
+    remoteUrls = CachePool.insertUpcoming(remoteUrls, remoteIndex, e.url, poolShuffle)
+    if (e.isVideo) remoteVideos = remoteVideos + e.url
+  }
+
+  /** A sync dropped [urls]: take them out of the playlist without losing our place. */
+  private fun poolRemoved(urls: Set<String>) {
+    if (!remoteMode || poolLive) return
+    val (kept, idx) = CachePool.removeFromPlaylist(remoteUrls, remoteIndex, urls)
+    if (kept.isEmpty()) return // keep the old list; its misses stream until the fill lands
+    remoteUrls = kept
+    remoteIndex = idx
+    remoteVideos = remoteVideos - urls
+  }
+
+  /** Stop streaming the server list and play the pool, from the next advance on. */
+  private fun switchLiveToPool() {
+    val resident = pool?.snapshot().orEmpty()
+    if (resident.isEmpty()) return
+    Log.i(TAG, "pool: switching from live streaming to ${resident.size} resident items")
+    poolLive = false
+    val urls = resident.map { it.url }
+    remoteUrls = if (poolShuffle) urls.shuffled() else urls
+    remoteVideos = resident.filter { it.isVideo }.mapTo(HashSet()) { it.url }
+    remoteIndex = -1
+    remoteFailStreak = 0
   }
 
   private val MATCH = FrameLayout.LayoutParams.MATCH_PARENT
@@ -2206,20 +2413,16 @@ class PhotoFrameController(
     // something at least as warm, so it would only add churn. See [enableMediaCache].
     const val MIN_CACHE_BUDGET_BYTES = 256L * 1024L * 1024L
 
-    /**
-     * The video URLs from [urls] in playlist order starting *after* [currentIndex] (wrapping),
-     * i.e. the order the slideshow will actually want them — so the prefetch worker warms the
-     * near future first, not a HashSet's arbitrary order. Skips the currently-playing index
-     * (it's already streaming; downloading it again in parallel would double the bandwidth).
-     * Tolerates currentIndex = -1 (nothing shown yet -> playlist order from the top). Pure.
-     */
-    internal fun prefetchOrder(urls: List<String>, videos: Set<String>, currentIndex: Int): List<String> {
-      if (urls.isEmpty() || videos.isEmpty()) return emptyList()
-      val start = if (currentIndex in urls.indices) currentIndex + 1 else 0
-      return (0 until urls.size - if (currentIndex in urls.indices) 1 else 0)
-          .map { urls[(start + it) % urls.size] }
-          .filter { it in videos }
-    }
+    // Most assets one pool sync lists from the source. The pool is a random draw from this list,
+    // so it is set well above the old 1000-item playback cap to make the draw cover the whole
+    // album; listing is paged and happens at most once a day.
+    const val POOL_LIST_CAP = 50_000
+    // Consecutive download failures that end a sync pass early (server gone mid-pass); the pass
+    // is retried after CachePool.RETRY_MS instead of burning through the whole queue.
+    const val POOL_FAIL_STREAK = 5
+    // On a first start, keep streaming the server list until the pool holds this many items, so
+    // the slideshow doesn't switch to a pool of one or two and repeat them.
+    const val POOL_LIVE_SWITCH = 30
     // Cap on the longest edge of any decoded photo. Full-res camera originals (tens of MP) decode
     // to bitmaps larger than the hardware Canvas can draw (~100MB), which crashes the launcher and
     // makes Android drop its default-home role. The largest Portal panel is 1920px; 2560 leaves

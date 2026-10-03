@@ -133,6 +133,29 @@ class MediaCacheTest {
   }
 
   @Test
+  fun poolFile_isNeverCountedOrEvicted() {
+    val c = cache(budget = 1_000L)
+    c.poolFile().writeText("x".repeat(5_000))
+    seed(c, "a", isVideo = false, size = 400, mtime = 1_000L)
+    assertEquals("pool file excluded from the resident size", 400L, c.sizeBytes())
+    c.enforceBudget()
+    assertTrue(c.poolFile().exists())
+    assertTrue(c.isCached("a", isVideo = false))
+  }
+
+  @Test
+  fun deleteMediaExcept_removesOnlyUnclaimedMedia() {
+    val c = cache(Long.MAX_VALUE)
+    seed(c, "keep", isVideo = true, size = 100, mtime = 1_000L)
+    seed(c, "orphan", isVideo = false, size = 100, mtime = 1_000L)
+    c.poolFile().writeText("{}")
+    c.deleteMediaExcept(setOf(c.videoFile("keep").name))
+    assertTrue(c.isCached("keep", isVideo = true))
+    assertFalse(c.isCached("orphan", isVideo = false))
+    assertTrue("pool file is not media", c.poolFile().exists())
+  }
+
+  @Test
   fun defaultBudget_capsAndReservesHeadroom() {
     val gb = 1024L * 1024 * 1024
     // Plenty free → capped at the ceiling (default 4 GB).
