@@ -2211,13 +2211,13 @@ class PhotoFrameController(
   }
 
   /**
-   * Bring the pool up to date with the source, at most once per [CachePool.SYNC_INTERVAL_MS]
+   * Bring the pool up to date with the source, at most once per [poolSyncIntervalMs]
    * (a wall Portal can sit in the screensaver for days, so this reschedules itself rather than
    * only running at dream start). One pass, on the single [transcodeIo] thread:
    *  1. list the source ([prefetched] when the caller already has the list);
    *  2. forget resident assets the source no longer has;
-   *  3. when the cache is full and the source has assets we don't hold, rotate: drop
-   *     [CachePool.ROTATE_FRACTION] of the resident bytes at random (once per interval);
+   *  3. when the cache is full and the source has assets we don't hold, rotate: drop the
+   *     "Swap per refresh" share of the resident bytes at random (once per interval; 0 = never);
    *  4. fill with random new picks until [MediaCache.hasRoom] says stop.
    * An unreachable server changes nothing (the pool keeps playing) and retries in
    * [CachePool.RETRY_MS]; so does a pass cut short by repeated download failures.
@@ -2227,8 +2227,8 @@ class PhotoFrameController(
     val p = pool ?: return
     if (!remoteMode || poolSyncRunning) return
     val now = System.currentTimeMillis()
-    if (!CachePool.isDue(p.lastSyncMs, now, CachePool.SYNC_INTERVAL_MS)) {
-      schedulePoolSync(p.lastSyncMs + CachePool.SYNC_INTERVAL_MS - now)
+    if (!CachePool.isDue(p.lastSyncMs, now, poolSyncIntervalMs())) {
+      schedulePoolSync(p.lastSyncMs + poolSyncIntervalMs() - now)
       return
     }
     val lister = poolLister ?: return
@@ -2254,10 +2254,11 @@ class PhotoFrameController(
                 if (gone.isNotEmpty()) dropFromPool(cache, p, gone, "no longer in source")
               }
               val fresh = CachePool.pickNew(candidates, p.snapshot().mapTo(HashSet()) { it.url })
-              if (fresh.isNotEmpty() && !cache.hasRoom() &&
-                  CachePool.isDue(p.lastRotationMs, now, CachePool.SYNC_INTERVAL_MS)) {
+              val rotateFraction = settings.cacheRotatePercent / 100.0
+              if (fresh.isNotEmpty() && rotateFraction > 0.0 && !cache.hasRoom() &&
+                  CachePool.isDue(p.lastRotationMs, now, poolSyncIntervalMs())) {
                 val drops =
-                    CachePool.pickDrops(p.snapshot(), { cache.sizeOf(it.url, it.isVideo) }, CachePool.ROTATE_FRACTION)
+                    CachePool.pickDrops(p.snapshot(), { cache.sizeOf(it.url, it.isVideo) }, rotateFraction)
                 dropFromPool(cache, p, drops, "daily rotation")
                 p.markRotated(now)
               }
@@ -2296,13 +2297,16 @@ class PhotoFrameController(
               ui.post {
                 if (!remoteMode || transcodeIo.isShutdown) return@post // source changed / stopped
                 if (poolLive) switchLiveToPool()
-                schedulePoolSync(if (complete) CachePool.SYNC_INTERVAL_MS else CachePool.RETRY_MS)
+                schedulePoolSync(if (complete) poolSyncIntervalMs() else CachePool.RETRY_MS)
               }
             }
           }
         }
         .onFailure { poolSyncRunning = false }
   }
+
+  /** The "Refresh from server every" setting, in ms. */
+  private fun poolSyncIntervalMs(): Long = settings.cacheRefreshHours * 60L * 60L * 1000L
 
   /** Remove [entries] from the pool and the disk (sync thread), then from the playlist (UI). */
   private fun dropFromPool(cache: MediaCache, p: CachePool, entries: List<CachePool.Entry>, why: String) {

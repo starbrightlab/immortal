@@ -217,6 +217,22 @@ class SettingsDomainTest {
   }
 
   @Test
+  fun cacheRotationSpecs_boundsMatchConfig() {
+    val byKey = SettingsDomains.screensaver.specs.associateBy { it.key }
+    val rotate = byKey.getValue("cacheRotatePercent") as IntSpec<*>
+    assertEquals(com.immortal.launcher.ScreensaverConfig.CACHE_ROTATE_PCT_MIN, rotate.min)
+    assertEquals(com.immortal.launcher.ScreensaverConfig.CACHE_ROTATE_PCT_MAX, rotate.max)
+    assertEquals("Off", rotate.format(0))
+    assertEquals("5%", rotate.format(5))
+    val refresh = byKey.getValue("cacheRefreshHours") as IntSpec<*>
+    assertEquals(com.immortal.launcher.ScreensaverConfig.CACHE_REFRESH_H_MIN, refresh.min)
+    assertEquals(com.immortal.launcher.ScreensaverConfig.CACHE_REFRESH_H_MAX, refresh.max)
+    assertEquals("6 hours", refresh.format(6))
+    assertEquals("1 day", refresh.format(24))
+    assertEquals("7 days", refresh.format(168))
+  }
+
+  @Test
   fun immortalRegistry_coversEveryPersistedField_orExplicitlyAccountsForIt() {
     // The on-device Immortal screen now renders its top-level controls from this domain, so a new
     // ImmortalSettings.Settings field that nobody adds a spec for would silently never appear. Every

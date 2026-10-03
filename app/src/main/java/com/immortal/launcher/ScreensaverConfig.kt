@@ -55,6 +55,15 @@ object ScreensaverConfig {
   // runtime budget is further bounded by actual free space (see MediaCache.defaultBudget).
   const val CACHE_GB_MIN = 1
   const val CACHE_GB_MAX = 32
+  // Media-cache rotation: the share of the stored media swapped for new picks from the source on
+  // each refresh (0 = keep the selection fixed), and how often that refresh runs. See CachePool.
+  const val CACHE_ROTATE_PCT_MIN = 0
+  const val CACHE_ROTATE_PCT_MAX = 50
+  const val DEFAULT_CACHE_ROTATE_PCT = 5
+  const val CACHE_REFRESH_H_MIN = 6
+  const val CACHE_REFRESH_H_MAX = 168
+  const val CACHE_REFRESH_H_STEP = 6
+  const val DEFAULT_CACHE_REFRESH_H = 24
 
   // Which edge the calendar widget hugs. Top of that edge either way.
   const val CAL_SIDE_LEFT = "left"
@@ -133,9 +142,13 @@ object ScreensaverConfig {
       // On-device media cache (Immich / WebDAV sources only): download each asset once and replay
       // it from local storage on every loop — transcoding videos to a screen-sized copy — instead
       // of re-fetching from the server. Off by default. [cacheBudgetGb] caps the disk it may use
-      // (also bounded at runtime by free space). See MediaCache / VideoTranscoder.
+      // (also bounded at runtime by free space). See MediaCache / VideoTranscoder. An album bigger
+      // than the budget is held as a random selection; every [cacheRefreshHours] the cache checks
+      // the source and swaps [cacheRotatePercent] of it for new picks. See CachePool.
       val cacheEnabled: Boolean = false,
       val cacheBudgetGb: Int = 4,
+      val cacheRotatePercent: Int = DEFAULT_CACHE_ROTATE_PCT,
+      val cacheRefreshHours: Int = DEFAULT_CACHE_REFRESH_H,
       // Calendar widget: a public iCalendar (.ics) feed link (Google "secret iCal"
       // address or an Apple iCloud public-calendar / webcal link) and how much of it
       // to show on the frame. Empty link = the widget is off.
@@ -285,6 +298,12 @@ object ScreensaverConfig {
         includeVideo = p.getBoolean("include_video", true),
         cacheEnabled = p.getBoolean("cache_enabled", false),
         cacheBudgetGb = p.getInt("cache_budget_gb", 4).coerceIn(CACHE_GB_MIN, CACHE_GB_MAX),
+        cacheRotatePercent =
+            p.getInt("cache_rotate_pct", DEFAULT_CACHE_ROTATE_PCT)
+                .coerceIn(CACHE_ROTATE_PCT_MIN, CACHE_ROTATE_PCT_MAX),
+        cacheRefreshHours =
+            p.getInt("cache_refresh_h", DEFAULT_CACHE_REFRESH_H)
+                .coerceIn(CACHE_REFRESH_H_MIN, CACHE_REFRESH_H_MAX),
         calendarUrl = p.getString("calendar_url", null),
         calendarRange = CalendarFeed.clampRange(p.getString("calendar_range", CalendarFeed.RANGE_DAY)),
         calendarEnabled = p.getBoolean("calendar_enabled", true),
@@ -453,6 +472,18 @@ object ScreensaverConfig {
 
   fun setCacheBudgetGb(c: Context, gb: Int) =
       prefs(c).edit().putInt("cache_budget_gb", gb.coerceIn(CACHE_GB_MIN, CACHE_GB_MAX)).apply()
+
+  fun setCacheRotatePercent(c: Context, pct: Int) =
+      prefs(c)
+          .edit()
+          .putInt("cache_rotate_pct", pct.coerceIn(CACHE_ROTATE_PCT_MIN, CACHE_ROTATE_PCT_MAX))
+          .apply()
+
+  fun setCacheRefreshHours(c: Context, hours: Int) =
+      prefs(c)
+          .edit()
+          .putInt("cache_refresh_h", hours.coerceIn(CACHE_REFRESH_H_MIN, CACHE_REFRESH_H_MAX))
+          .apply()
 
   fun setBatterySaver(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("battery_saver", on).apply()

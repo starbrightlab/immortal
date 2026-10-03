@@ -94,7 +94,7 @@ class CachePoolTest {
 
   @Test
   fun isDue() {
-    val day = CachePool.SYNC_INTERVAL_MS
+    val day = 24L * 60 * 60 * 1000
     assertTrue("never synced", CachePool.isDue(0L, 5_000L, day))
     assertFalse(CachePool.isDue(1_000L, 1_000L + day - 1, day))
     assertTrue(CachePool.isDue(1_000L, 1_000L + day, day))

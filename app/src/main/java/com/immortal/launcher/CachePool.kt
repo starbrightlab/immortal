@@ -19,9 +19,9 @@ import org.json.JSONObject
  * This is what stops a large album from turning the cache into a treadmill. Instead of playing
  * the whole album and letting LRU eviction swap files in and out forever, the screensaver plays
  * only the pool. The pool is filled once with a random selection of the source's assets up to the
- * storage budget, and after that it changes only on a slow cadence ([SYNC_INTERVAL_MS]): a sync
- * forgets assets that left the source, swaps out [ROTATE_FRACTION] of the cache for new random
- * picks, and tops the cache back up. Between syncs the source server is not contacted at all,
+ * storage budget, and after that it changes only on a slow, user-set cadence (the "Refresh from
+ * server every" setting, daily by default): a sync forgets assets that left the source, swaps out
+ * a user-set share of the cache (5% by default) for new random picks, and tops the cache back up. Between syncs the source server is not contacted at all,
  * and when the server is unreachable the pool simply keeps playing what it holds.
  *
  * Bound to one [sourceKey] (source type + server + album + video setting): loading the file
@@ -119,14 +119,8 @@ class CachePool private constructor(private val file: File, val sourceKey: Strin
   }
 
   companion object {
-    /** How often the pool is refreshed against the source once the cache is full. */
-    const val SYNC_INTERVAL_MS = 24L * 60 * 60 * 1000
-
     /** Retry delay after a sync that couldn't reach the server or was cut short. */
     const val RETRY_MS = 60L * 60 * 1000
-
-    /** Share of the resident bytes swapped for new random picks on each daily rotation. */
-    const val ROTATE_FRACTION = 0.05
 
     /** Fewest adds batched into one save (the batch grows to 5% of the pool). */
     const val SAVE_BATCH_MIN = 25
