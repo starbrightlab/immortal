@@ -49,6 +49,9 @@ Countdown events you add in [Tools → Countdowns](tools.md) also appear on the 
 
 A widget of up to four analogue clocks, each labelled with its city. Choose the locations under
 **Settings → Immortal → World clock locations**; the first four you pick are the ones shown.
+Prefer numbers to hands? Add the **Digital World Clock** widget instead: the same clocks and
+names, shown as digital times that follow your 12/24-hour setting and your language's time
+format.
 
 Sixteen common cities are listed for quick picking, and **Add any timezone** covers the rest.
 Search it by city or by country, and it looks past the timezone names themselves, which is what
