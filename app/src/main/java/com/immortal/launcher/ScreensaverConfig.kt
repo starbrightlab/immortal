@@ -231,6 +231,16 @@ object ScreensaverConfig {
       // Fill letterbox sidebars in fit mode with a blurred copy of the photo. On by default.
       // Turn off to show clean solid black bars (issue #199).
       val blurBackground: Boolean = true,
+      // How strongly that letterbox is blurred: a level 0..[BLUR_STRENGTH_MAX], each one twice as
+      // soft as the last. 0 is the long-standing look; the top level melts the photo into gentle
+      // colour, like Meta's own frame.
+      val blurStrength: Int = 0,
+      // Darken the blurred letterbox, 0 (as is) .. 100 (black), for people who want the bands.
+      val backgroundDim: Int = 0,
+      // Slow zoom/pan (Ken Burns) on photos in fill mode. On by default.
+      val photoMotion: Boolean = true,
+      // Show when (and where, if known) the photo was taken, on sources that know it.
+      val showPhotoDate: Boolean = true,
   ) {
     /** True when the idle screen-off timeout is active. */
     val idleSleepOn: Boolean
@@ -339,6 +349,11 @@ object ScreensaverConfig {
         dismissHaDashboard = p.getString("dismiss_ha_dashboard", null),
         cropVertical = p.getBoolean("crop_vertical", false),
         blurBackground = p.getBoolean("blur_background", true),
+        blurStrength =
+            p.getInt("blur_strength", 0).coerceIn(0, BLUR_STRENGTH_MAX),
+        backgroundDim = p.getInt("background_dim", 0).coerceIn(0, BACKGROUND_DIM_MAX),
+        photoMotion = p.getBoolean("photo_motion", true),
+        showPhotoDate = p.getBoolean("show_photo_date", true),
     )
   }
 
@@ -347,6 +362,22 @@ object ScreensaverConfig {
 
   fun setBlurBackground(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("blur_background", on).apply()
+
+  const val BLUR_STRENGTH_MAX = 4
+  val BLUR_STRENGTH_LABELS = listOf("Classic", "Soft", "Strong", "Extra strong", "Maximum")
+  const val BACKGROUND_DIM_MAX = 100
+
+  fun setBlurStrength(c: Context, v: Int) =
+      prefs(c).edit().putInt("blur_strength", v.coerceIn(0, BLUR_STRENGTH_MAX)).apply()
+
+  fun setBackgroundDim(c: Context, v: Int) =
+      prefs(c).edit().putInt("background_dim", v.coerceIn(0, BACKGROUND_DIM_MAX)).apply()
+
+  fun setPhotoMotion(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("photo_motion", on).apply()
+
+  fun setShowPhotoDate(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("show_photo_date", on).apply()
 
   fun setSoundscape(c: Context, s: String) = prefs(c).edit().putString("soundscape", s).apply()
 

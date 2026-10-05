@@ -46,6 +46,20 @@ you don't type URLs and credentials on the Portal:
 | Web page | Pull images from any web page. |
 | Built-in feed | Keyless. Pick between Lorem Picsum (stock photography), the Met Museum and Art Institute of Chicago collections, Wikimedia featured landscapes, or NASA's Astronomy Picture of the Day. Unsplash-ready with a key. |
 
+## Photo look
+
+Under **Settings → Screensaver**, also on the phone remote:
+
+- **Fit / Fill**: show the whole photo, or crop it to fill the screen.
+- **Blur photo background** (fit): fill the sidebars beside a photo with a blurred copy of it,
+  or turn it off for plain black bars. **Background blur strength** goes from *Classic* to
+  *Maximum*, where the photo melts into soft colour. **Darken background** dims the sidebars,
+  and at 100% they're black.
+- **Photo motion** (fill): a slow zoom and pan across each photo. Turn it off for still photos.
+- **Show when photos were taken**: the capture date in the corner, plus the place for your own
+  photos. This works for your own folder and SMB, which read the photo's EXIF, and for Google
+  Photos shared albums, which list each photo's capture date.
+
 ## Presence-aware behaviour
 
 The screensaver cooperates with the Portal's camera-based presence detection so it can run as a
