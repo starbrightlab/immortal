@@ -62,11 +62,17 @@ object ImmortalSettings {
           KEY_ACTION_BACK,
       )
 
+  // App language selection.
+  const val LANG_AUTO = "auto" // follow device locale (default)
+  const val LANG_ES = "es" // force Spanish
+  const val LANG_EN = "en" // force English
+
   data class Settings(
       val weatherUnit: String = UNIT_AUTO,
       val tileSize: String = SIZE_STANDARD,
       val weatherWidget: String = WIDGET_OFF,
       val clockFormat: String = CLOCK_AUTO,
+      val language: String = LANG_AUTO,
       // Mini-player in the home header (cover art + controls), shown only while
       // something is actually playing. Defaults on — useful to everyone, unobtrusive.
       val showMiniPlayer: Boolean = true,
@@ -119,6 +125,7 @@ object ImmortalSettings {
         tileSize = p.getString("tile_size", SIZE_STANDARD) ?: SIZE_STANDARD,
         weatherWidget = p.getString("weather_widget", WIDGET_OFF) ?: WIDGET_OFF,
         clockFormat = p.getString("clock_format", CLOCK_AUTO) ?: CLOCK_AUTO,
+        language = p.getString("language", LANG_AUTO) ?: LANG_AUTO,
         showMiniPlayer = p.getBoolean("show_mini_player", true),
         portalPresence = p.getBoolean("portal_presence", true),
         hideStatusBar = p.getBoolean("hide_status_bar", true),
@@ -164,6 +171,9 @@ object ImmortalSettings {
 
   fun setPortalPresence(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("portal_presence", on).apply()
+
+  fun setLanguage(c: Context, lang: String) =
+      prefs(c).edit().putString("language", lang).apply()
 
   fun multiRoomEnabled(c: Context): Boolean = prefs(c).getBoolean("multiroom_enabled", false)
 

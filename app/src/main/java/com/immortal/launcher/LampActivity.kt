@@ -61,6 +61,7 @@ class LampActivity : ComponentActivity() {
 @Composable
 private fun LampScreen(onBrightness: (Float) -> Unit) {
   val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var brightness by remember { mutableFloatStateOf(0.9f) }
   var warmth by remember { mutableFloatStateOf(0.6f) } // 0 = white, 1 = candle
   var showControls by remember { mutableStateOf(true) }
@@ -85,12 +86,12 @@ private fun LampScreen(onBrightness: (Float) -> Unit) {
       Surface(color = Color(0x66000000), shape = RoundedCornerShape(20.dp),
           modifier = Modifier.widthIn(max = 520.dp).padding(24.dp)) {
         Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text("💡 Lamp", color = Color.White, fontSize = 20.sp, textAlign = TextAlign.Center,
+          Text(com.immortal.launcher.i18n.I18n.translate("💡 Lamp", userLang), color = Color.White, fontSize = 20.sp, textAlign = TextAlign.Center,
               modifier = Modifier.fillMaxWidth())
-          Text("Brightness", color = Color.White, fontSize = 15.sp)
+          Text(com.immortal.launcher.i18n.I18n.translate("Brightness", userLang), color = Color.White, fontSize = 15.sp)
           Slider(value = brightness, onValueChange = { brightness = it }, valueRange = 0.05f..1f)
           if (!red) {
-            Text("Warmth", color = Color.White, fontSize = 15.sp)
+            Text(com.immortal.launcher.i18n.I18n.translate("Warmth", userLang), color = Color.White, fontSize = 15.sp)
             Slider(value = warmth, onValueChange = { warmth = it }, valueRange = 0f..1f)
           }
           // Night-light toggle: switch the whole panel to deep red for night use,
@@ -98,12 +99,13 @@ private fun LampScreen(onBrightness: (Float) -> Unit) {
           Surface(
               color = if (red) Color(0x55FF3B30) else Color(0x33FFFFFF),
               shape = RoundedCornerShape(16.dp),
-              modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                  .clickable { red = !red },
+              modifier = Modifier.fillMaxWidth().clickable { red = !red },
           ) {
-            Text(if (red) "🔴  Night light · on" else "🔴  Night light",
-                color = Color.White, fontSize = 17.sp, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp))
+            Text(
+                if (red) com.immortal.launcher.i18n.I18n.translate("🔴 Red night-light", userLang) else com.immortal.launcher.i18n.I18n.translate("White light", userLang),
+                color = Color.White, fontSize = 15.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(),
+            )
           }
           // Sleep button: genuinely turns the screen off via device-admin lockNow(),
           // exactly like the home screen's moon sleep button (ScreenControl.sleep).
@@ -113,7 +115,7 @@ private fun LampScreen(onBrightness: (Float) -> Unit) {
               modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                   .clickable { ScreenControl.sleep(context) },
           ) {
-            Text("🌙  Sleep", color = Color.White, fontSize = 17.sp,
+            Text(com.immortal.launcher.i18n.I18n.translate("🌙 Sleep", userLang), color = Color.White, fontSize = 17.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp))
           }

@@ -68,6 +68,7 @@ private fun CalendarUrlEntryScreen(
     onCancel: () -> Unit,
 ) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val existing = remember { ScreensaverConfig.load(context).calendarUrl.orEmpty() }
   var url by remember { mutableStateOf(existing) }
   val (_, initialFocus) = rememberInitialFocus()
@@ -87,14 +88,13 @@ private fun CalendarUrlEntryScreen(
   ) {
     Column(modifier = Modifier.widthIn(max = 1100.dp)) {
       Text(
-          "Calendar link",
+          com.immortal.launcher.i18n.I18n.translate("Calendar link", userLang),
           color = Color.White,
           fontSize = 34.sp,
           fontWeight = FontWeight.SemiBold,
       )
       Text(
-          "Paste a private iCalendar (.ics) link from Google Calendar or Apple iCloud. " +
-              "Immortal reads it directly — it can't sign in to your account.",
+          com.immortal.launcher.i18n.I18n.translate("Paste a private iCalendar (.ics) link from Google Calendar or Apple iCloud. Immortal reads it directly — it can't sign in to your account.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -115,9 +115,9 @@ private fun CalendarUrlEntryScreen(
 
       Text(
           when {
-            trimmed.isEmpty() -> "Examples: Google \"secret address in iCal format\", Apple iCloud public calendar."
-            supported -> "Looks like a $provider link."
-            else -> "That doesn't look like a calendar (.ics) link yet."
+            trimmed.isEmpty() -> com.immortal.launcher.i18n.I18n.translate("Examples: Google \"secret address in iCal format\", Apple iCloud public calendar.", userLang)
+            supported -> com.immortal.launcher.i18n.I18n.tr("Looks like a $provider link.", "Parece un enlace de $provider.", userLang)
+            else -> com.immortal.launcher.i18n.I18n.translate("That doesn't look like a calendar (.ics) link yet.", userLang)
           },
           color = if (supported || trimmed.isEmpty()) Color(0xFF9A9A9A) else Color(0xFFE89090),
           fontSize = 13.sp,
@@ -135,7 +135,7 @@ private fun CalendarUrlEntryScreen(
               },
       ) {
         Text(
-            "Use this calendar",
+            com.immortal.launcher.i18n.I18n.translate("Use this calendar", userLang),
             color = if (supported) Color.White else Color(0xFF777777),
             fontSize = 18.sp,
             fontWeight = FontWeight.SemiBold,
@@ -156,7 +156,7 @@ private fun CalendarUrlEntryScreen(
                 },
         ) {
           Text(
-              "Remove calendar",
+              com.immortal.launcher.i18n.I18n.translate("Remove calendar", userLang),
               color = Color(0xFFE89090),
               fontSize = 16.sp,
               textAlign = TextAlign.Center,
@@ -175,7 +175,7 @@ private fun CalendarUrlEntryScreen(
               },
       ) {
         Text(
-            "Cancel",
+            com.immortal.launcher.i18n.I18n.translate("Cancel", userLang),
             color = Color(0xFFDDDDDD),
             fontSize = 16.sp,
             textAlign = TextAlign.Center,
@@ -186,18 +186,18 @@ private fun CalendarUrlEntryScreen(
       Spacer(Modifier.heightIn(min = 26.dp))
 
       Text(
-          "How to get a link:",
+          com.immortal.launcher.i18n.I18n.translate("How to get a link:", userLang),
           color = Color(0xFFBBBBBB),
           fontSize = 14.sp,
           fontWeight = FontWeight.SemiBold,
           modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
       )
       Text(
-          "• Google Calendar (on a computer) → Settings → your calendar → " +
-              "\"Integrate calendar\" → copy the \"Secret address in iCal format\". " +
-              "Keep it private — anyone with it can read the calendar.\n" +
-              "• Apple iCloud → Calendar app → tap a calendar → turn on \"Public Calendar\" " +
-              "→ Copy Link (a webcal:// link works too).",
+          com.immortal.launcher.i18n.I18n.tr(
+              "• Google Calendar (on a computer) → Settings → your calendar → \"Integrate calendar\" → copy the \"Secret address in iCal format\". Keep it private — anyone with it can read the calendar.\n• Apple iCloud → Calendar app → tap a calendar → turn on \"Public Calendar\" → Copy Link (a webcal:// link works too).",
+              "• Google Calendar (en ordenador) → Ajustes → tu calendario → \"Integrar calendario\" → copia la \"Dirección secreta en formato iCal\".\n• Apple iCloud → App Calendario → tocar calendario → activar \"Calendario público\" → Copiar enlace.",
+              userLang
+          ),
           color = Color(0xFF8A8A8A),
           fontSize = 13.sp,
           modifier = Modifier.padding(start = 4.dp),

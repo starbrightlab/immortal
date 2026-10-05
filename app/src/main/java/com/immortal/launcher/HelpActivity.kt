@@ -99,8 +99,86 @@ private data class HelpPage(
     val linkLabel: String? = null,
     val linkUrl: String? = null,
 )
-
-private val helpPages =
+private fun buildHelpPages(userLang: String?): List<HelpPage> {
+  val isEs = com.immortal.launcher.i18n.I18n.isSpanish(userLang)
+  return if (isEs) {
+    listOf(
+        HelpPage(
+            glyph = ICON_HEART,
+            accent = Color(0xFFE0567A),
+            title = "Bienvenido a Immortal",
+            body =
+                "Tu Portal tiene una segunda vida. Immortal es una pantalla de inicio, marco de fotos " +
+                    "y tienda de apps gratuita creada por la comunidad para mantener tu dispositivo útil. " +
+                    "Aquí tienes una guía rápida: solo te llevará un minuto.",
+        ),
+        HelpPage(
+            glyph = ICON_GRID,
+            accent = Color(0xFF4F8DF0),
+            title = "Cómo navegar por la app",
+            body =
+                "Toca cualquier icono para abrirlo. Los iconos que parecen un pequeño grupo (como " +
+                    "Ajustes) son carpetas, toca para ver su contenido. Desde cualquier app, " +
+                    "toca el botón de inicio redondo o el icono de Immortal para volver aquí.",
+        ),
+        HelpPage(
+            glyph = ICON_CALL,
+            accent = Color(0xFF1FA463),
+            title = "Hacer videollamadas",
+            body =
+                "¡Las llamadas siguen funcionando! Toca el icono Llamadas y elige una persona en la " +
+                    "pantalla original del Portal. Al finalizar la llamada, toca el botón de inicio " +
+                    "o el icono de Immortal para regresar.",
+        ),
+        HelpPage(
+            glyph = ICON_IMAGE,
+            accent = Color(0xFF8E5BD0),
+            title = "Tu marco de fotos personal",
+            body =
+                "Cuando no lo estás usando, tu Portal se convierte en un marco de fotos. Para " +
+                    "mostrar tus fotos, abre Ajustes, elige Salvapantallas y selecciona tu carpeta. " +
+                    "En el Portal Go, puede suspenderse cuando no haya nadie cerca para ahorrar batería.",
+        ),
+        HelpPage(
+            glyph = ICON_DOWNLOAD,
+            accent = Color(0xFF2D6CDF),
+            title = "Añadir más aplicaciones",
+            body =
+                "Toca App Store para añadir aplicaciones seleccionadas: reproductores, navegador, " +
+                    "paneles de domótica y más. ¿Buscas algo específico? Instala Aurora Store desde allí " +
+                    "para acceder a la mayoría de apps de Android sin cuenta de Google.",
+        ),
+        HelpPage(
+            glyph = ICON_REFRESH,
+            accent = Color(0xFFD98C12),
+            title = "Instalar apps tras reiniciar",
+            body =
+                "Instalar apps usa un asistente que se ejecuta hasta que el Portal se apaga o reinicia. " +
+                    "Todo lo instalado sigue funcionando, pero para instalar algo NUEVO tras reiniciar, " +
+                    "vuelve a conectar tu Portal al ordenador y ejecuta el instalador de Immortal. Es rápido y seguro.",
+        ),
+        HelpPage(
+            glyph = ICON_INFO,
+            accent = Color(0xFF5A6470),
+            title = "Algunas limitaciones",
+            body =
+                "Immortal hace mucho, pero no todo. Algunas apps que dependen de los servicios de Google " +
+                    "pueden no funcionar completamente y no podemos modificar el sistema integrado del Portal. " +
+                    "Nos enfocamos en lo que funciona de manera estable.",
+        ),
+        HelpPage(
+            glyph = ICON_PEOPLE,
+            accent = Color(0xFF2E9E8F),
+            title = "Creado por y para fans",
+            body =
+                "Immortal está hecho por voluntarios que no querían que estos estupendos dispositivos terminaran " +
+                    "en un cajón. Añadimos nuevas apps y funciones conforme la comunidad las crea. " +
+                    "¿Quieres ayudar o sugerir una app? Visítanos en GitHub.",
+            linkLabel = "Abrir nuestra página de GitHub",
+            linkUrl = "https://github.com/starbrightlab/immortal",
+        ),
+    )
+  } else {
     listOf(
         HelpPage(
             glyph = ICON_HEART,
@@ -183,10 +261,14 @@ private val helpPages =
             linkUrl = "https://github.com/starbrightlab/immortal",
         ),
     )
+  }
+}
 
 @Composable
 private fun HelpTour() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
+  val helpPages = remember(userLang) { buildHelpPages(userLang) }
   val activity = context as? Activity
   var page by remember { mutableIntStateOf(0) }
   val last = helpPages.lastIndex
@@ -255,15 +337,15 @@ private fun HelpTour() {
           verticalAlignment = Alignment.CenterVertically,
       ) {
         if (page > 0) {
-          PillButton(label = "Back", filled = false) { go(-1) }
+          PillButton(label = com.immortal.launcher.i18n.I18n.translate("Back", userLang), filled = false) { go(-1) }
         } else {
-          PillButton(label = "Skip", filled = false) { activity?.finish() }
+          PillButton(label = com.immortal.launcher.i18n.I18n.translate("Skip", userLang), filled = false) { activity?.finish() }
         }
         Spacer(Modifier.weight(1f))
         if (page < last) {
-          PillButton(label = "Next", filled = true, focusRequester = nextFocus) { go(1) }
+          PillButton(label = com.immortal.launcher.i18n.I18n.translate("Next", userLang), filled = true, focusRequester = nextFocus) { go(1) }
         } else {
-          PillButton(label = "Done", filled = true, focusRequester = nextFocus) {
+          PillButton(label = com.immortal.launcher.i18n.I18n.translate("Done", userLang), filled = true, focusRequester = nextFocus) {
             activity?.finish()
           }
         }

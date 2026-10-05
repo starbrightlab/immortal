@@ -52,15 +52,16 @@ fun <S> SettingsList(
     onApply: (key: String, value: Any) -> Unit,
 ) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val visible = domain.specs.filter { it.key !in exclude && it.visibleWhen(context, snapshot) }
   val groups = LinkedHashMap<String?, MutableList<SettingSpec<S>>>()
   visible.forEach { groups.getOrPut(domain.sections[it.key]) { mutableListOf() }.add(it) }
   groups.forEach { (section, specs) ->
-    if (section != null) SectionLabel(section)
+    if (section != null) SectionLabel(com.immortal.launcher.i18n.I18n.translate(section, userLang))
     Card {
       specs.forEachIndexed { i, spec ->
         if (i > 0) Divider()
-        SettingControl(spec, snapshot, onApply)
+        SettingControl(spec, snapshot, userLang, onApply)
       }
     }
     Spacer(Modifier.size(22.dp))
@@ -68,15 +69,15 @@ fun <S> SettingsList(
 }
 
 @Composable
-private fun <S> SettingControl(spec: SettingSpec<S>, snapshot: S, onApply: (String, Any) -> Unit) {
+private fun <S> SettingControl(spec: SettingSpec<S>, snapshot: S, userLang: String, onApply: (String, Any) -> Unit) {
   val context = LocalContext.current
   @Suppress("UNCHECKED_CAST")
   when (spec) {
     is BoolSpec<*> -> {
       val s = spec as BoolSpec<S>
       Column {
-        ToggleRow(s.title, s.get(snapshot)) { onApply(s.key, it) }
-        HelpText(s.help)
+        ToggleRow(com.immortal.launcher.i18n.I18n.translate(s.title, userLang), s.get(snapshot)) { onApply(s.key, it) }
+        HelpText(com.immortal.launcher.i18n.I18n.translateHelp(s.help, userLang))
       }
     }
     is EnumSpec<*> -> {
@@ -86,11 +87,11 @@ private fun <S> SettingControl(spec: SettingSpec<S>, snapshot: S, onApply: (Stri
             modifier = Modifier.fillMaxWidth().padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-          Text(s.title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+          Text(com.immortal.launcher.i18n.I18n.translate(s.title, userLang), color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
           // EnumSpec.options is value→label; Segmented wants label→value.
-          Segmented(s.options.map { (v, l) -> l to v }, s.get(snapshot)) { onApply(s.key, it) }
+          Segmented(s.options.map { (v, l) -> com.immortal.launcher.i18n.I18n.translate(l, userLang) to v }, s.get(snapshot)) { onApply(s.key, it) }
         }
-        HelpText(s.help)
+        HelpText(com.immortal.launcher.i18n.I18n.translateHelp(s.help, userLang))
       }
     }
     is IntSpec<*> -> {
@@ -98,13 +99,13 @@ private fun <S> SettingControl(spec: SettingSpec<S>, snapshot: S, onApply: (Stri
       val v = s.get(snapshot)
       Column {
         Stepper(
-            label = s.title,
+            label = com.immortal.launcher.i18n.I18n.translate(s.title, userLang),
             valueText = s.format(v),
             widthMin = 72.dp,
             onMinus = { onApply(s.key, v - s.step) },
             onPlus = { onApply(s.key, v + s.step) },
         )
-        HelpText(s.help)
+        HelpText(com.immortal.launcher.i18n.I18n.translateHelp(s.help, userLang))
       }
     }
     is StringSpec<*> -> {
@@ -112,25 +113,23 @@ private fun <S> SettingControl(spec: SettingSpec<S>, snapshot: S, onApply: (Stri
       val entry = s.entry
       if (entry is Entry.Nav) {
         Column {
-          NavRow(s.title, s.get(snapshot).ifBlank { "Not set" }) {
+          NavRow(com.immortal.launcher.i18n.I18n.translate(s.title, userLang), s.get(snapshot).ifBlank { "Not set" }) {
             context.startActivity(Intent(context, entry.activity))
           }
-          HelpText(s.help)
+          HelpText(com.immortal.launcher.i18n.I18n.translateHelp(s.help, userLang))
         }
       }
-      // An inline string on a D-pad screen is rare; the on-device screens that need free text use a
-      // dedicated entry Activity (Entry.Nav). An Inline string here renders nothing for now.
     }
     is NavSpec<*> -> {
       val s = spec as NavSpec<S>
       Column {
-        NavRow(s.title, s.value(context, snapshot)) {
+        NavRow(com.immortal.launcher.i18n.I18n.translate(s.title, userLang), s.value(context, snapshot)) {
           context.startActivity(Intent(context, s.activity))
         }
-        HelpText(s.help)
+        HelpText(com.immortal.launcher.i18n.I18n.translateHelp(s.help, userLang))
       }
     }
-    is DerivedSpec<*> -> {} // read-only/flat-only — not rendered on-device
+    is DerivedSpec<*> -> {}
   }
 }
 

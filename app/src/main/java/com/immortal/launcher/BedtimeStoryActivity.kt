@@ -61,6 +61,8 @@ class BedtimeStoryActivity : ComponentActivity() {
 @Composable
 private fun BedtimeScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
+  val stories = remember(userLang) { Stories.forLanguage(userLang) }
   var selected by remember { mutableStateOf<Stories.Story?>(null) }
   var speaking by remember { mutableStateOf(false) }
 
@@ -98,8 +100,8 @@ private fun BedtimeScreen() {
               .verticalScroll(rememberScrollState()),
           verticalArrangement = Arrangement.spacedBy(14.dp),
       ) {
-        Text("🌙 Bedtime stories", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-        Stories.ALL.forEach { s ->
+        Text(com.immortal.launcher.i18n.I18n.translate("🌙 Bedtime stories", userLang), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        stories.forEach { s ->
           Surface(color = Color(0x18FFFFFF), shape = RoundedCornerShape(16.dp),
               modifier = Modifier.fillMaxWidth()
                   .tvFocusableRow { selected = s; readAloud(s) }) {
@@ -128,7 +130,7 @@ private fun BedtimeScreen() {
           Text(p, color = Color(0xFFEDEDED), fontSize = 23.sp, lineHeight = 34.sp)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-          StoryButton(if (speaking) "Stop" else "Read aloud", Color(0xFF512DA8), Modifier.fillMaxWidth()) {
+          StoryButton(if (speaking) com.immortal.launcher.i18n.I18n.translate("Stop", userLang) else com.immortal.launcher.i18n.I18n.translate("Read aloud", userLang), Color(0xFF512DA8), Modifier.fillMaxWidth()) {
             if (speaking) { runCatching { tts?.stop() }; speaking = false } else readAloud(story)
           }
         }

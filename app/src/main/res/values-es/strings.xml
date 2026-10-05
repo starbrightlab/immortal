@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2026 Starbright Lab.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<resources>
+    <string name="app_name">Immortal</string>
+    <string name="install_confirm_desc">Permite a Immortal confirmar automáticamente los diálogos de instalación de aplicaciones, para que las apps desplegadas por WiFi desde el gestor de flotas se instalen sin necesidad de tocar este Portal.</string>
+    <string name="bar_watch_desc">Permite a Immortal mostrar sus botones rápidos (como el selector de aplicaciones) en sincronía con la barra superior del Portal al detectarla. No lee el contenido de la pantalla.</string>
+    <string name="back_gesture_service_label">Atrás en Immortal</string>
+    <string name="back_gesture_service_description">Desliza desde el borde derecho de la pantalla para volver atrás en cualquier aplicación. Immortal debe estar activado en los ajustes de Accesibilidad para que funcione.</string>
+</resources>

@@ -66,6 +66,7 @@ class FacePickerActivity : ComponentActivity() {
 @Composable
 private fun FacePickerScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   var facesOn by remember { mutableStateOf(ScreensaverConfig.load(context).facesEnabled) }
   var faceId by remember { mutableStateOf(ScreensaverConfig.load(context).faceId) }
   var sizeIndex by remember { mutableStateOf(ScreensaverConfig.load(context).faceSizeIndex) }
@@ -85,9 +86,14 @@ private fun FacePickerScreen() {
               .padding(horizontal = 28.dp, vertical = 32.dp),
   ) {
     Column(modifier = Modifier.widthIn(max = 1100.dp)) {
-      Text("Clock face", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Choose how the time looks on your screensaver.",
+          com.immortal.launcher.i18n.I18n.translate("Clock face", userLang),
+          color = Color.White,
+          fontSize = 34.sp,
+          fontWeight = FontWeight.SemiBold,
+      )
+      Text(
+          com.immortal.launcher.i18n.I18n.translate("Choose how the time looks on your screensaver.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
@@ -95,7 +101,7 @@ private fun FacePickerScreen() {
       Spacer(Modifier.size(26.dp))
 
       // Master switch — off shows photos only (no clock). On by default.
-      Card { ToggleRow("Show a clock face", facesOn) { v ->
+      Card { ToggleRow(com.immortal.launcher.i18n.I18n.translate("Show a clock face", userLang), facesOn) { v ->
         ScreensaverConfig.setFacesEnabled(context, v)
         facesOn = v
       } }
@@ -106,8 +112,8 @@ private fun FacePickerScreen() {
           FaceCatalog.entries.forEachIndexed { i, entry ->
             if (i > 0) Divider()
             SelectableRow(
-                title = entry.name,
-                subtitle = entry.tagline,
+                title = com.immortal.launcher.i18n.I18n.translate(entry.name, userLang),
+                subtitle = com.immortal.launcher.i18n.I18n.translate(entry.tagline, userLang),
                 selected = faceId == entry.id,
                 onClick = {
                   ScreensaverConfig.setFaceId(context, entry.id)
@@ -122,7 +128,7 @@ private fun FacePickerScreen() {
         if (selected.sizes.isNotEmpty()) {
           Spacer(Modifier.size(18.dp))
           Card {
-            SizeStepper(sizeIndex.coerceIn(0, selected.sizes.lastIndex)) { v ->
+            SizeStepper(sizeIndex.coerceIn(0, selected.sizes.lastIndex), userLang) { v ->
               ScreensaverConfig.setFaceSizeIndex(context, v)
               sizeIndex = v
             }
@@ -130,8 +136,7 @@ private fun FacePickerScreen() {
         }
       } else {
         Text(
-            "Photos only — no clock or widgets on the screensaver. The now-playing card still " +
-                "follows its own switch in screensaver settings.",
+            com.immortal.launcher.i18n.I18n.translate("Photos only — no clock or widgets on the screensaver. The now-playing card still follows its own switch in screensaver settings.", userLang),
             color = Color(0xFF9A9A9A),
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 14.dp, start = 4.dp, end = 4.dp),
@@ -139,14 +144,13 @@ private fun FacePickerScreen() {
       }
 
       Spacer(Modifier.size(22.dp))
-      PreviewButton {
+      PreviewButton(userLang) {
         runCatching {
           context.startActivity(Intent(context, PhotoFramePreviewActivity::class.java))
         }
       }
       Text(
-          "More faces — and premium layouts — are coming. Your photos keep showing behind the " +
-              "clock; the flip clock takes over the whole screen on its own.",
+          com.immortal.launcher.i18n.I18n.translate("More faces — and premium layouts — are coming. Your photos keep showing behind the clock; the flip clock takes over the whole screen on its own.", userLang),
           color = Color(0xFF7C7C7C),
           fontSize = 13.sp,
           modifier = Modifier.padding(top = 14.dp, start = 4.dp, end = 4.dp),
@@ -157,7 +161,7 @@ private fun FacePickerScreen() {
 
 /** Small ◀ Small/Medium/Large ▶ stepper for the clock size (D-pad and touch). */
 @Composable
-private fun SizeStepper(index: Int, onChange: (Int) -> Unit) {
+private fun SizeStepper(index: Int, userLang: String, onChange: (Int) -> Unit) {
   val src = remember { MutableInteractionSource() }
   val focused by src.collectIsFocusedAsState()
   val last = FaceCatalog.SIZE_LABELS.lastIndex
@@ -184,10 +188,10 @@ private fun SizeStepper(index: Int, onChange: (Int) -> Unit) {
               .padding(start = 18.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text("Size", color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+    Text(com.immortal.launcher.i18n.I18n.translate("Size", userLang), color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
     ArrowButton("◀", focused) { if (index > 0) onChange(index - 1) }
     Text(
-        FaceCatalog.SIZE_LABELS[index.coerceIn(0, last)],
+        com.immortal.launcher.i18n.I18n.translate(FaceCatalog.SIZE_LABELS[index.coerceIn(0, last)], userLang),
         color = if (focused) Color.White else Color(0xFFDDDDDD),
         fontSize = 17.sp,
         fontWeight = FontWeight.SemiBold,
@@ -199,10 +203,10 @@ private fun SizeStepper(index: Int, onChange: (Int) -> Unit) {
 }
 
 @Composable
-private fun PreviewButton(onClick: () -> Unit) {
+private fun PreviewButton(userLang: String, onClick: () -> Unit) {
   Surface(color = Color(0xFF2E6BE6), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
     Text(
-        "Preview",
+        com.immortal.launcher.i18n.I18n.translate("Preview", userLang),
         color = Color.White,
         fontSize = 17.sp,
         fontWeight = FontWeight.SemiBold,

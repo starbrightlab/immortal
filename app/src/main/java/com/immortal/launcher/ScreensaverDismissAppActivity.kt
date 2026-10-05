@@ -202,6 +202,7 @@ class ScreensaverDismissAppActivity : ComponentActivity() {
 @Composable
 private fun DismissAppScreen(onDone: () -> Unit) {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val haPkg = remember { ScreensaverDismiss.installedHaPackage(context) }
   val initial = remember { ScreensaverConfig.load(context) }
 
@@ -244,14 +245,14 @@ private fun DismissAppScreen(onDone: () -> Unit) {
         }
         Spacer(Modifier.size(14.dp))
         Text(
-            "Open when dismissed",
+            com.immortal.launcher.i18n.I18n.translate("Open when dismissed", userLang),
             color = Color.White,
             fontSize = 30.sp,
             fontWeight = FontWeight.SemiBold,
         )
       }
       Text(
-          "Choose what opens when you tap the screensaver to wake the Portal.",
+          com.immortal.launcher.i18n.I18n.translate("Choose what opens when you tap the screensaver to wake the Portal.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp, start = 58.dp),
@@ -265,7 +266,7 @@ private fun DismissAppScreen(onDone: () -> Unit) {
           DismissRow(
               icon = haIcon,
               title = "Home Assistant",
-              subtitle = "Open your Home Assistant dashboard on tap.",
+              subtitle = com.immortal.launcher.i18n.I18n.translate("Open your Home Assistant dashboard on tap.", userLang),
               selected = haMode,
           ) {
             haMode = true
@@ -275,7 +276,7 @@ private fun DismissAppScreen(onDone: () -> Unit) {
           if (haMode) {
             Divider()
             Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 16.dp)) {
-              Text("Dashboard", color = Color.White, fontSize = 15.sp)
+              Text(com.immortal.launcher.i18n.I18n.translate("Dashboard", userLang), color = Color.White, fontSize = 15.sp)
               OutlinedTextField(
                   value = haPath,
                   onValueChange = {
@@ -290,8 +291,7 @@ private fun DismissAppScreen(onDone: () -> Unit) {
                   modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(top = 8.dp),
               )
               Text(
-                  "The path after your Home Assistant address (e.g. lovelace/0). " +
-                      "Leave blank to open your default dashboard.",
+                  com.immortal.launcher.i18n.I18n.translate("The path after your Home Assistant address (e.g. lovelace/0). Leave blank to open your default dashboard.", userLang),
                   color = Color(0xFF8A8A8A),
                   fontSize = 13.sp,
                   modifier = Modifier.padding(top = 8.dp),
@@ -303,12 +303,12 @@ private fun DismissAppScreen(onDone: () -> Unit) {
       }
 
       // --- Launcher + installed apps -------------------------------------------------
-      SectionLabel(if (haPkg != null) "Or an app" else "Open")
+      SectionLabel(com.immortal.launcher.i18n.I18n.translate(if (haPkg != null) "Or an app" else "Open", userLang))
       Card {
         DismissRow(
             icon = null,
-            title = "Immortal launcher",
-            subtitle = "Return to your home screen (default).",
+            title = com.immortal.launcher.i18n.I18n.translate("Immortal launcher", userLang),
+            subtitle = com.immortal.launcher.i18n.I18n.translate("Return to your home screen (default).", userLang),
             selected = !haMode && selectedComponent == null,
         ) {
           ScreensaverConfig.setDismissLauncher(context)
@@ -319,7 +319,7 @@ private fun DismissAppScreen(onDone: () -> Unit) {
         if (list == null) {
           Divider()
           Text(
-              "Finding your apps…",
+              com.immortal.launcher.i18n.I18n.translate("Finding your apps…", userLang),
               color = Color(0xFF9A9A9A),
               fontSize = 15.sp,
               modifier = Modifier.padding(18.dp),

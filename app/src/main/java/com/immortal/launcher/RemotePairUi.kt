@@ -58,10 +58,13 @@ fun enableRemoteAndMintPin(context: Context): Pair<String?, String?> {
  */
 @Composable
 fun RemotePairCard(url: String?, pin: String?, modifier: Modifier = Modifier) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
+
   Surface(color = Color(0xFF1C1C1E), shape = RoundedCornerShape(18.dp), modifier = modifier.fillMaxWidth()) {
     if (url == null) {
       Text(
-          "Connect your Portal to Wi-Fi to use the remote.",
+          com.immortal.launcher.i18n.I18n.translate("Connect your Portal to Wi-Fi to use the remote.", userLang),
           color = Color(0xFFE0A0A0),
           fontSize = 17.sp,
           modifier = Modifier.padding(20.dp),
@@ -73,7 +76,7 @@ fun RemotePairCard(url: String?, pin: String?, modifier: Modifier = Modifier) {
           modifier = Modifier.fillMaxWidth().padding(24.dp),
           horizontalAlignment = Alignment.CenterHorizontally,
       ) {
-        Text("Scan with your phone camera", color = Color(0xFF9A9A9A), fontSize = 15.sp)
+        Text(com.immortal.launcher.i18n.I18n.translate("Scan with your phone camera", userLang), color = Color(0xFF9A9A9A), fontSize = 15.sp)
         if (qr != null) {
           Surface(color = Color.White, shape = RoundedCornerShape(12.dp), modifier = Modifier.padding(top = 14.dp)) {
             Image(
@@ -83,7 +86,7 @@ fun RemotePairCard(url: String?, pin: String?, modifier: Modifier = Modifier) {
             )
           }
         }
-        Text("or open $url and enter the code", color = Color(0xFF9A9A9A), fontSize = 14.sp, modifier = Modifier.padding(top = 18.dp))
+        Text(com.immortal.launcher.i18n.I18n.tr("or open $url and enter the code", "o abre $url e introduce el código", userLang), color = Color(0xFF9A9A9A), fontSize = 14.sp, modifier = Modifier.padding(top = 18.dp))
         Text(
             pin ?: "------",
             color = Color.White,
@@ -92,7 +95,7 @@ fun RemotePairCard(url: String?, pin: String?, modifier: Modifier = Modifier) {
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.padding(top = 8.dp),
         )
-        Text("Code expires in a few minutes", color = Color(0xFF7C7C7C), fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+        Text(com.immortal.launcher.i18n.I18n.translate("Code expires in a few minutes", userLang), color = Color(0xFF7C7C7C), fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
       }
     }
   }

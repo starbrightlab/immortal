@@ -61,6 +61,7 @@ private val EMOJI_PALETTE =
 @Composable
 private fun CountdownSettingsScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val activity = context as? Activity
   var events by remember { mutableStateOf(CountdownConfig.loadSorted(context)) }
 
@@ -83,9 +84,9 @@ private fun CountdownSettingsScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      Text("Countdowns", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+      Text(com.immortal.launcher.i18n.I18n.translate("Countdowns", userLang), color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
       Text(
-          "Pin a chip on the home screen counting down to a birthday, trip, or holiday.",
+          com.immortal.launcher.i18n.I18n.translate("Pin a chip on the home screen counting down to a birthday, trip, or holiday.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 15.sp,
           textAlign = TextAlign.Center,

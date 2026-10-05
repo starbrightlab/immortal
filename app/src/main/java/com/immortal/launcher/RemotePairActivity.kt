@@ -61,6 +61,7 @@ class RemotePairActivity : ComponentActivity() {
 @Composable
 private fun RemotePairScreen() {
   val context = LocalContext.current
+  val userLang = ImmortalSettings.load(context).language
   val activity = context as? Activity
   var pin by remember { mutableStateOf<String?>(null) }
   var url by remember { mutableStateOf<String?>(null) }
@@ -91,10 +92,9 @@ private fun RemotePairScreen() {
               .padding(horizontal = 28.dp, vertical = 40.dp),
   ) {
     Column(modifier = Modifier.widthIn(max = 900.dp)) {
-      Text("Control from your phone", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+      Text(com.immortal.launcher.i18n.I18n.translate("Control from your phone", userLang), color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
       Text(
-          "Use a phone or tablet on the same Wi-Fi as a remote for this Portal — nav buttons and " +
-              "an app launcher, no extra app to install.",
+          com.immortal.launcher.i18n.I18n.translate("Use a phone or tablet on the same Wi-Fi as a remote for this Portal — nav buttons and an app launcher, no extra app to install.", userLang),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp),
