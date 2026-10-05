@@ -214,6 +214,33 @@ class PhotoFrameController(
   private val history = ArrayList<Bitmap>()
   private var index = -1
 
+  // In-memory cache of decoded photos (current + prev/next preloads) so a swipe has its neighbour
+  // ready. Sized in bytes: 1/8 of the heap, capped at 32MB, with no floor, so a small heap gets a
+  // small (or effectively empty) cache rather than a forced one. Decodes can reach [MAX_EDGE]
+  // (~17MB at 2560px), so a cache too small for an entry just stays empty and swipes fall back to
+  // the async load in [setupAdjacentDragBitmap].
+  private val preloadedBitmaps = run {
+    val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+    val cacheSizeKb = (maxMemoryKb / 8).coerceAtMost(32 * 1024)
+    object : android.util.LruCache<String, Bitmap>(cacheSizeKb) {
+      override fun sizeOf(key: String, value: Bitmap): Int {
+        return (value.byteCount / 1024).coerceAtLeast(1)
+      }
+    }
+  }
+
+  // Blurred letterboxes, keyed by the source bitmap they were made from, so a photo's blur is
+  // computed once (on [io] when it is preloaded) and reused by the drag preview and by [show].
+  // Weak keys: an entry goes when its photo leaves the cache and is collected.
+  private val blurCache =
+      java.util.Collections.synchronizedMap(java.util.WeakHashMap<Bitmap, Bitmap>())
+
+  /** Put a decoded photo in [preloadedBitmaps], and pre-blur it while still off the main thread. */
+  private fun cachePreloaded(key: String, bmp: Bitmap) {
+    preloadedBitmaps.put(key, bmp)
+    if (blurLetterbox) blurredBackground(bmp)
+  }
+
   // Default-feed source-chain state (see [fetchWebPhoto]).
   // Wikimedia Commons featured-landscape image list: fetched once per session, then cycled.
   private var wikimediaUrls: List<String> = emptyList()
@@ -244,28 +271,224 @@ class PhotoFrameController(
   // that omits MOVE events): clear horizontal swipe = prev/next, clear tap = exit.
   private var downX = 0f
   private var downY = 0f
+  private var isDragging = false
+  private var dragPreparedDirection = 0
+  private var pendingTransitionDirection: Int = 0
+  private var velocityTracker: android.view.VelocityTracker? = null
+
+  private fun setupAdjacentDragBitmap(dir: Int, screenW: Float, currentDx: Float) {
+    val key = when {
+      localMode && playlist.isNotEmpty() -> {
+        val targetIdx = if (dir > 0) (localIndex + 1) % playlist.size else (localIndex - 1 + playlist.size) % playlist.size
+        playlist[targetIdx].path
+      }
+      remoteMode && remoteUrls.isNotEmpty() -> {
+        val targetIdx = if (dir > 0) (remoteIndex + 1) % remoteUrls.size else (remoteIndex - 1 + remoteUrls.size) % remoteUrls.size
+        remoteUrls[targetIdx]
+      }
+      else -> null
+    } ?: return
+
+    val cached = preloadedBitmaps.get(key)
+    if (cached != null) {
+      applyIncomingDragBitmap(cached, dir, screenW, currentDx)
+    } else {
+      incomingLayer.photo.setImageDrawable(null)
+      incomingLayer.frameContainer.visibility = View.GONE
+      incomingLayer.blurPhoto.visibility = View.GONE
+
+      io.execute {
+        val bmp = when {
+          localMode -> runCatching { decodeCorrected(key) }.getOrNull()
+          remoteMode -> runCatching { fetchRemoteImage(key) }.getOrNull()
+          else -> null
+        }
+        if (bmp != null) {
+          cachePreloaded(key, bmp)
+          ui.post {
+            if (isDragging && dragPreparedDirection == dir) {
+              applyIncomingDragBitmap(bmp, dir, screenW, currentDx)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Show [bmp] on the incoming layer as the neighbour being dragged in. It is laid out exactly as
+   * [show] will lay it out (crop, fit/fill sizing, blur setting), so releasing the drag doesn't make
+   * the photo jump. The blur never runs here on the main thread: it is used if a preload already
+   * made it, otherwise made on [io] and added when ready.
+   */
+  private fun applyIncomingDragBitmap(bmp: Bitmap, dir: Int, screenW: Float, currentDx: Float) {
+    val layer = incomingLayer
+    layoutLayer(layer, displayBitmap(bmp))
+    layer.frameContainer.visibility = View.VISIBLE
+    layer.frameContainer.alpha = 1f
+    val blurred = if (blurLetterbox) blurCache[bmp] else null
+    if (blurred != null) {
+      showDragBlur(layer, blurred)
+    } else {
+      layer.blurPhoto.visibility = View.GONE
+      if (blurLetterbox) {
+        io.execute {
+          val made = blurredBackground(bmp) ?: return@execute
+          ui.post { if (isDragging && dragPreparedDirection == dir) showDragBlur(layer, made) }
+        }
+      }
+    }
+    val incomingX = if (dir > 0) screenW + currentDx else -screenW + currentDx
+    layer.frameContainer.translationX = incomingX
+    layer.blurPhoto.translationX = incomingX
+    layer.blurPhoto.bringToFront()
+    layer.frameContainer.bringToFront()
+    keepOverlaysOnTop()
+  }
+
+  private fun showDragBlur(layer: PhotoLayer, blurred: Bitmap) {
+    layer.blurPhoto.setImageBitmap(blurred)
+    layer.blurPhoto.translationX = layer.frameContainer.translationX
+    layer.blurPhoto.alpha = 1f
+    layer.blurPhoto.visibility = View.VISIBLE
+  }
+
+  private fun snapBackDragLayers(screenW: Float, dx: Float) {
+    val interpolator = android.view.animation.DecelerateInterpolator(1.8f)
+    currentLayer.frameContainer.animate()
+        .translationX(0f)
+        .setDuration(250L)
+        .setInterpolator(interpolator)
+        .start()
+    currentLayer.blurPhoto.animate()
+        .translationX(0f)
+        .setDuration(250L)
+        .setInterpolator(interpolator)
+        .start()
+
+    val cancelTargetX = if (dx < 0) screenW else -screenW
+    incomingLayer.frameContainer.animate()
+        .translationX(cancelTargetX)
+        .setDuration(250L)
+        .setInterpolator(interpolator)
+        .withEndAction {
+          incomingLayer.frameContainer.visibility = View.GONE
+          incomingLayer.frameContainer.translationX = 0f
+        }
+        .start()
+    incomingLayer.blurPhoto.animate()
+        .translationX(cancelTargetX)
+        .setDuration(250L)
+        .setInterpolator(interpolator)
+        .withEndAction {
+          incomingLayer.blurPhoto.visibility = View.GONE
+          incomingLayer.blurPhoto.translationX = 0f
+        }
+        .start()
+  }
+
+  private fun suspendAutoTick() {
+    ui.removeCallbacks(localTick)
+    ui.removeCallbacks(remoteTick)
+  }
+
+  private fun rescheduleAutoTick() {
+    if (localMode) {
+      ui.removeCallbacks(localTick)
+      ui.postDelayed(localTick, intervalMs())
+    } else if (remoteMode) {
+      ui.removeCallbacks(remoteTick)
+      ui.postDelayed(remoteTick, intervalMs())
+    }
+  }
 
   /** Hosts forward their touch events here. */
   fun onTouch(ev: MotionEvent) {
     // While the timer alarm is showing, the slide-to-stop owns the touch stream.
     if (faceRenderer.handleAlarmTouch(ev)) return
+    val screenW = context.resources.displayMetrics.widthPixels.toFloat()
+
     when (ev.actionMasked) {
       MotionEvent.ACTION_DOWN -> {
         downX = ev.x
         downY = ev.y
+        isDragging = false
+        dragPreparedDirection = 0
+        velocityTracker?.recycle()
+        velocityTracker = android.view.VelocityTracker.obtain()
+        velocityTracker?.addMovement(ev)
+        suspendAutoTick()
       }
-      MotionEvent.ACTION_UP -> {
+      MotionEvent.ACTION_MOVE -> {
+        velocityTracker?.addMovement(ev)
         val dx = ev.x - downX
         val dy = ev.y - downY
+        if (!isDragging && abs(dx) > 30 && abs(dx) > abs(dy) * 1.5f) {
+          isDragging = true
+          suspendAutoTick()
+        }
+        if (isDragging) {
+          currentLayer.frameContainer.translationX = dx
+          currentLayer.blurPhoto.translationX = dx
+
+          val targetDir = if (dx < 0) +1 else -1
+          if (dragPreparedDirection != targetDir) {
+            dragPreparedDirection = targetDir
+            setupAdjacentDragBitmap(targetDir, screenW, dx)
+          }
+
+          val incomingX = if (targetDir > 0) screenW + dx else -screenW + dx
+          incomingLayer.frameContainer.translationX = incomingX
+          incomingLayer.blurPhoto.translationX = incomingX
+        }
+      }
+      MotionEvent.ACTION_CANCEL -> {
+        velocityTracker?.addMovement(ev)
+        velocityTracker?.recycle()
+        velocityTracker = null
+        val dx = ev.x - downX
+        if (isDragging) {
+          isDragging = false
+          snapBackDragLayers(screenW, dx)
+        }
+        dragPreparedDirection = 0
+        rescheduleAutoTick()
+      }
+      MotionEvent.ACTION_UP -> {
+        velocityTracker?.addMovement(ev)
+        velocityTracker?.computeCurrentVelocity(1000)
+        val velocityX = velocityTracker?.xVelocity ?: 0f
+        velocityTracker?.recycle()
+        velocityTracker = null
+
+        val dx = ev.x - downX
+        val dy = ev.y - downY
+        if (isDragging) {
+          isDragging = false
+          val threshold = screenW * 0.18f
+          val isFlickNext = dx < -threshold || (dx < -25f && velocityX < -500f)
+          val isFlickPrev = dx > threshold || (dx > 25f && velocityX > 500f)
+
+          if (isFlickNext) {
+            pendingTransitionDirection = +1
+            next()
+          } else if (isFlickPrev) {
+            pendingTransitionDirection = -1
+            prev()
+          } else {
+            snapBackDragLayers(screenW, dx)
+            rescheduleAutoTick()
+          }
+          dragPreparedDirection = 0
+          return
+        }
         // A tap while the welcome overlay is showing dismisses it early
         // rather than exiting the screensaver.
         if (welcomeVisible && abs(dx) < 48 && abs(dy) < 48) {
           dismissWelcome()
           return
         }
-        if (abs(dx) > 120 && abs(dx) > abs(dy) * 1.5f) {
-          if (dx < 0) next() else prev()
-        } else if (abs(dx) < 48 && abs(dy) < 48) {
+        if (abs(dx) < 48 && abs(dy) < 48) {
           onExit?.invoke()
         }
       }
@@ -1154,8 +1377,19 @@ class PhotoFrameController(
 
   private fun showLocalImage(path: String, g: Int) {
     stopVideo()
+    val cached = preloadedBitmaps.get(path)
+    if (cached != null) {
+      photo.visibility = View.VISIBLE
+      show(cached)
+      loadCaptionForLocal(path, g)
+      preloadAdjacentLocal(localIndex)
+      ui.postDelayed(localTick, intervalMs())
+      return
+    }
     io.execute {
-      val bmp = runCatching { decodeCorrected(path) }.getOrNull()
+      val bmp = runCatching { decodeCorrected(path) }
+          .getOrNull()
+          ?.also { cachePreloaded(path, it) }
       ui.post {
         if (g != gen) return@post // superseded by a newer advance
         if (bmp == null) {
@@ -1165,7 +1399,28 @@ class PhotoFrameController(
         photo.visibility = View.VISIBLE
         show(bmp)
         loadCaptionForLocal(path, g)
+        preloadAdjacentLocal(localIndex)
         ui.postDelayed(localTick, intervalMs())
+      }
+    }
+  }
+
+  private fun preloadAdjacentLocal(currIdx: Int) {
+    if (playlist.isEmpty()) return
+    val nextIdx = (currIdx + 1) % playlist.size
+    val prevIdx = (currIdx - 1 + playlist.size) % playlist.size
+    io.execute {
+      val nextItem = playlist[nextIdx]
+      if (!nextItem.isVideo && preloadedBitmaps.get(nextItem.path) == null) {
+        runCatching { decodeCorrected(nextItem.path) }.getOrNull()?.let {
+          cachePreloaded(nextItem.path, it)
+        }
+      }
+      val prevItem = playlist[prevIdx]
+      if (!prevItem.isVideo && preloadedBitmaps.get(prevItem.path) == null) {
+        runCatching { decodeCorrected(prevItem.path) }.getOrNull()?.let {
+          cachePreloaded(prevItem.path, it)
+        }
       }
     }
   }
@@ -1360,9 +1615,26 @@ class PhotoFrameController(
       }
       return
     }
+    showRemoteImage(url, g)
+  }
+
+  private fun showRemoteImage(url: String, g: Int) {
     stopVideo()
+    val cached = preloadedBitmaps.get(url)
+    if (cached != null) {
+      remoteFailStreak = 0
+      remoteReresolveStreak = 0
+      photo.visibility = View.VISIBLE
+      show(cached)
+      if (smbSource != null) loadCaptionForSmb(url, g) else faceRenderer.setCaption(null, null)
+      preloadAdjacentRemote(remoteIndex)
+      ui.postDelayed(remoteTick, intervalMs())
+      return
+    }
     io.execute {
-      val bmp = runCatching { fetchRemoteImage(url) }.getOrNull()
+      val bmp = runCatching { fetchRemoteImage(url) }
+          .getOrNull()
+          ?.also { cachePreloaded(url, it) }
       ui.post {
         if (g != gen) return@post // superseded by a newer advance
         if (!remoteMode) return@post // raced with startWeb() flipping us off
@@ -1375,10 +1647,29 @@ class PhotoFrameController(
         remoteReresolveStreak = 0
         photo.visibility = View.VISIBLE
         show(bmp)
-        // EXIF caption only for SMB here — it reads the user's own files. The HTTP remote sources
-        // (iCloud/Google/Immich/DAV) serve EXIF-stripped images, so they carry no caption.
         if (smbSource != null) loadCaptionForSmb(url, g) else faceRenderer.setCaption(null, null)
+        preloadAdjacentRemote(remoteIndex)
         ui.postDelayed(remoteTick, intervalMs())
+      }
+    }
+  }
+
+  private fun preloadAdjacentRemote(currIdx: Int) {
+    if (remoteUrls.isEmpty()) return
+    val nextIdx = (currIdx + 1) % remoteUrls.size
+    val prevIdx = (currIdx - 1 + remoteUrls.size) % remoteUrls.size
+    io.execute {
+      val nextUrl = remoteUrls[nextIdx]
+      if (nextUrl !in remoteVideos && preloadedBitmaps.get(nextUrl) == null) {
+        runCatching { fetchRemoteImage(nextUrl) }.getOrNull()?.let {
+          cachePreloaded(nextUrl, it)
+        }
+      }
+      val prevUrl = remoteUrls[prevIdx]
+      if (prevUrl !in remoteVideos && preloadedBitmaps.get(prevUrl) == null) {
+        runCatching { fetchRemoteImage(prevUrl) }.getOrNull()?.let {
+          cachePreloaded(prevUrl, it)
+        }
       }
     }
   }
@@ -1602,36 +1893,13 @@ class PhotoFrameController(
     return null
   }
 
-  private fun show(bmp: Bitmap) {
-    faceRenderer.setCaption(null, null)
-
-    val targetLayer = incomingLayer
-    val outgoingLayer = currentLayer
-
-    val isRawPortrait = bmp.height > bmp.width
-
-    // Optionally crop vertical (portrait) photos by ~20% (10% top, 10% bottom) if setting is enabled
-    val displayBmp = if (isRawPortrait && settings.cropVertical) {
-      runCatching {
-        val cropPct = 0.20f
-        val cropPixels = (bmp.height * cropPct / 2f).toInt()
-        val croppedH = maxOf(1, bmp.height - cropPixels * 2)
-        Bitmap.createBitmap(bmp, 0, cropPixels, bmp.width, croppedH)
-      }.getOrDefault(bmp)
-    } else {
-      bmp
-    }
-
-    val isPortrait = displayBmp.height > displayBmp.width
-    // The user's fit/fill choice applies to EVERY photo (issue #188). 1.65 forced portraits
-    // into the blurred letterbox even on "fill", which read as a regression on landscape
-    // panels (portraits stopped cropping to full-screen) and doubly so on portrait-mounted
-    // panels (where a portrait photo fills natively). The blurred letterbox belongs to fit
-    // mode only; the aspect math below is orientation-generic, so a portrait panel needs no
-    // special case.
+  /**
+   * Size [layer]'s frame for [displayBmp] under the fit/fill setting and put the photo in it. Shared
+   * by [show] and the drag preview, so a photo looks the same while dragged in as once it lands.
+   */
+  private fun layoutLayer(layer: PhotoLayer, displayBmp: Bitmap) {
     val isFitMode = settings.fit == ScreensaverConfig.FIT_FIT
-
-    val containerLp = targetLayer.frameContainer.layoutParams as FrameLayout.LayoutParams
+    val containerLp = layer.frameContainer.layoutParams as FrameLayout.LayoutParams
     val displayMetrics = context.resources.displayMetrics
     val screenW = displayMetrics.widthPixels
     val screenH = displayMetrics.heightPixels
@@ -1652,24 +1920,76 @@ class PhotoFrameController(
         containerLp.height = maxOf(2, evenH)
       }
       containerLp.gravity = Gravity.CENTER
-      targetLayer.frameContainer.layoutParams = containerLp
-
-      if (settings.blurBackground) {
-        runCatching {
-          val blurred = createBlurredBackground(displayBmp)
-          targetLayer.blurPhoto.setImageBitmap(blurred)
-        }
-      } else {
-        targetLayer.blurPhoto.setImageDrawable(null)
-      }
+      layer.frameContainer.layoutParams = containerLp
     } else {
       containerLp.width = MATCH
       containerLp.height = MATCH
       containerLp.gravity = Gravity.CENTER
-      targetLayer.frameContainer.layoutParams = containerLp
+      layer.frameContainer.layoutParams = containerLp
     }
 
-    targetLayer.photo.setImageBitmap(displayBmp)
+    layer.photo.setImageBitmap(displayBmp)
+  }
+
+  /** Crop ~20% (10% top, 10% bottom) off portrait photos when the crop-vertical setting is on. */
+  private fun displayBitmap(bmp: Bitmap): Bitmap =
+      if (bmp.height > bmp.width && settings.cropVertical) {
+        runCatching {
+          val cropPixels = (bmp.height * 0.20f / 2f).toInt()
+          val croppedH = maxOf(1, bmp.height - cropPixels * 2)
+          Bitmap.createBitmap(bmp, 0, cropPixels, bmp.width, croppedH)
+        }.getOrDefault(bmp)
+      } else {
+        bmp
+      }
+
+  /** Photos get the blurred letterbox behind them only in fit mode with the blur setting on. */
+  private val blurLetterbox: Boolean
+    get() = settings.fit == ScreensaverConfig.FIT_FIT && settings.blurBackground
+
+  /** [bmp]'s blurred letterbox, made once and reused from [blurCache]. Callable from any thread. */
+  private fun blurredBackground(bmp: Bitmap): Bitmap? =
+      blurCache[bmp]
+          ?: runCatching { createBlurredBackground(displayBitmap(bmp)) }
+              .getOrNull()
+              ?.also { blurCache[bmp] = it }
+
+  /** Keep the clock face, calendar, dashboard and welcome overlays above the photo layers. */
+  private fun keepOverlaysOnTop() {
+    if (this::videoView.isInitialized) videoView.bringToFront()
+    faceRenderer.view.bringToFront()
+    // The calendar panel is a sibling of the photo layers, so the incoming
+    // layer's bringToFront() would otherwise bury it for the rest of the
+    // slide — visible only while the new photo is still fading in.
+    if (this::calendarPanel.isInitialized) calendarPanel.bringToFront()
+    dashboardPanel?.bringToFront()
+    welcomeOverlay?.bringToFront()
+  }
+
+  private fun show(bmp: Bitmap) {
+    faceRenderer.setCaption(null, null)
+
+    val targetLayer = incomingLayer
+    val outgoingLayer = currentLayer
+
+    val displayBmp = displayBitmap(bmp)
+
+    val isPortrait = displayBmp.height > displayBmp.width
+    // The user's fit/fill choice applies to EVERY photo (issue #188). 1.65 forced portraits
+    // into the blurred letterbox even on "fill", which read as a regression on landscape
+    // panels (portraits stopped cropping to full-screen) and doubly so on portrait-mounted
+    // panels (where a portrait photo fills natively). The blurred letterbox belongs to fit
+    // mode only; the aspect math in [layoutLayer] is orientation-generic, so a portrait panel needs no
+    // special case.
+    val isFitMode = settings.fit == ScreensaverConfig.FIT_FIT
+    val screenW = context.resources.displayMetrics.widthPixels
+
+    layoutLayer(targetLayer, displayBmp)
+    if (isFitMode && settings.blurBackground) {
+      blurredBackground(bmp)?.let { targetLayer.blurPhoto.setImageBitmap(it) }
+    } else {
+      targetLayer.blurPhoto.setImageDrawable(null)
+    }
 
     // Prepare incoming layer at 0 alpha and bring to front
     targetLayer.blurPhoto.alpha = 0f
@@ -1682,51 +2002,108 @@ class PhotoFrameController(
     targetLayer.frameContainer.bringToFront()
 
     // Keep UI components above photo layers
-    if (this::videoView.isInitialized) videoView.bringToFront()
-    faceRenderer.view.bringToFront()
-    // The calendar panel is a sibling of the photo layers, so the incoming
-    // layer's bringToFront() above would otherwise bury it for the rest of the
-    // slide — visible only while the new photo is still fading in.
-    if (this::calendarPanel.isInitialized) calendarPanel.bringToFront()
-    dashboardPanel?.bringToFront()
-    welcomeOverlay?.bringToFront()
+    keepOverlaysOnTop()
 
     // Start Ken Burns motion on incoming photo
     startKenBurns(targetLayer.photo, isPortrait)
 
-    val fadeDuration = 900L
+    val slideDir = pendingTransitionDirection
+    pendingTransitionDirection = 0
 
-    targetLayer.frameContainer.animate()
-        .alpha(1f)
-        .setDuration(fadeDuration)
-        .setInterpolator(AccelerateDecelerateInterpolator())
-        .start()
+    if (slideDir != 0) {
+      val endX = if (slideDir > 0) -screenW.toFloat() else screenW.toFloat()
+      val currentTargetX = targetLayer.frameContainer.translationX
+      val remainingDistance = if (currentTargetX != 0f) abs(currentTargetX) else screenW.toFloat()
+      val fractionRemaining = (remainingDistance / screenW.toFloat()).coerceIn(0.1f, 1.0f)
+      val slideDuration = (350L * fractionRemaining).toLong().coerceIn(120L, 350L)
+      val interpolator = android.view.animation.DecelerateInterpolator(1.8f)
 
-    if (isFitMode) {
-      targetLayer.blurPhoto.animate()
+      if (currentTargetX == 0f) {
+        val startX = if (slideDir > 0) screenW.toFloat() else -screenW.toFloat()
+        targetLayer.frameContainer.translationX = startX
+        targetLayer.blurPhoto.translationX = startX
+      }
+
+      targetLayer.frameContainer.alpha = 1f
+      targetLayer.blurPhoto.alpha = 1f
+
+      targetLayer.frameContainer.animate()
+          .translationX(0f)
+          .alpha(1f)
+          .setDuration(slideDuration)
+          .setInterpolator(interpolator)
+          .start()
+
+      if (isFitMode) {
+        targetLayer.blurPhoto.animate()
+            .translationX(0f)
+            .alpha(1f)
+            .setDuration(slideDuration)
+            .setInterpolator(interpolator)
+            .start()
+      }
+
+      outgoingLayer.frameContainer.animate()
+          .translationX(endX)
+          .alpha(0f)
+          .setDuration(slideDuration)
+          .setInterpolator(interpolator)
+          .withEndAction {
+            outgoingLayer.frameContainer.visibility = View.GONE
+            outgoingLayer.frameContainer.translationX = 0f
+          }
+          .start()
+
+      outgoingLayer.blurPhoto.animate()
+          .translationX(endX)
+          .alpha(0f)
+          .setDuration(slideDuration)
+          .setInterpolator(interpolator)
+          .withEndAction {
+            outgoingLayer.blurPhoto.visibility = View.GONE
+            outgoingLayer.blurPhoto.translationX = 0f
+          }
+          .start()
+    } else {
+      val fadeDuration = 900L
+
+      targetLayer.frameContainer.translationX = 0f
+      targetLayer.blurPhoto.translationX = 0f
+      outgoingLayer.frameContainer.translationX = 0f
+      outgoingLayer.blurPhoto.translationX = 0f
+
+      targetLayer.frameContainer.animate()
           .alpha(1f)
           .setDuration(fadeDuration)
           .setInterpolator(AccelerateDecelerateInterpolator())
           .start()
+
+      if (isFitMode) {
+        targetLayer.blurPhoto.animate()
+            .alpha(1f)
+            .setDuration(fadeDuration)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .start()
+      }
+
+      outgoingLayer.frameContainer.animate()
+          .alpha(0f)
+          .setDuration(fadeDuration)
+          .setInterpolator(AccelerateDecelerateInterpolator())
+          .withEndAction {
+            outgoingLayer.frameContainer.visibility = View.GONE
+          }
+          .start()
+
+      outgoingLayer.blurPhoto.animate()
+          .alpha(0f)
+          .setDuration(fadeDuration)
+          .setInterpolator(AccelerateDecelerateInterpolator())
+          .withEndAction {
+            outgoingLayer.blurPhoto.visibility = View.GONE
+          }
+          .start()
     }
-
-    outgoingLayer.frameContainer.animate()
-        .alpha(0f)
-        .setDuration(fadeDuration)
-        .setInterpolator(AccelerateDecelerateInterpolator())
-        .withEndAction {
-          outgoingLayer.frameContainer.visibility = View.GONE
-        }
-        .start()
-
-    outgoingLayer.blurPhoto.animate()
-        .alpha(0f)
-        .setDuration(fadeDuration)
-        .setInterpolator(AccelerateDecelerateInterpolator())
-        .withEndAction {
-          outgoingLayer.blurPhoto.visibility = View.GONE
-        }
-        .start()
 
     activeLayerIndex = if (activeLayerIndex == 0) 1 else 0
   }
