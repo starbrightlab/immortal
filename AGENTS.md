@@ -36,7 +36,11 @@ release.
 ## Repository layout
 
 ```
-app/                         The Android app (single module)
+app/                         The Android app
+airplay/                     AirPlay 2 receiver library module — VENDORED, read airplay/UPSTREAM.md
+  src/main/cpp/              native stack (UxPlay + OpenSSL + libplist + FFmpeg), 4 git submodules
+  src/main/kotlin/io/github/jqssun/airplay/   upstream's code — do NOT rename this package
+  src/main/kotlin/com/immortal/airplay/       the host-facing facade; the only part that's ours
   src/main/java/com/immortal/launcher/   ~99 Kotlin files, flat package, grouped by name prefix
   src/main/assets/           bundled catalog.json fallback, clock faces, fonts, fallback photos
   src/main/res/              Compose theme lives in .../launcher/ui/theme/
@@ -106,7 +110,7 @@ definition drives three consumers automatically:
 3. **Phone remote** — the `/remote/settings` schema + the generic PWA renderer in `RemoteHtml`.
 
 The domains live in `SettingsDomains.kt` (`SettingsDomains.all`): `screensaver`, `calendar`,
-`immortal`, `mqtt`, `quickbar`, `fleet`, `chime`, `digitalclock`, `welcome`, `sunrise`.
+`immortal`, `mqtt`, `quickbar`, `fleet`, `chime`, `digitalclock`, `welcome`, `sunrise`, `airplay`.
 
 ### Adding or changing a setting — the rules
 

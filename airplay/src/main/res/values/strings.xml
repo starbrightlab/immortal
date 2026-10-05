@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The only strings the :airplay module itself resolves through R: the foreground-service
+  notification (service/AirPlayService.kt) and the video-download toasts
+  (download/VideoDownloader.kt). Values are upstream's verbatim.
+
+  Everything else in upstream's strings.xml belongs to the UI shell and stays in :app.
+  Keeping this file minimal is what lets the vendored sources compile inside the module with
+  no source edits at all — see airplay/UPSTREAM.md.
+-->
+<resources>
+    <!-- Notification -->
+    <string name="notification_channel">AirPlay Service</string>
+    <string name="notification_title">AirPlay Server Running</string>
+    <string name="notification_text">Accepting AirPlay connections</string>
+    <string name="notification_pin_title">AirPlay PIN Required</string>
+    <string name="notification_pin_text">PIN: %1$s</string>
+
+    <!-- Video download -->
+    <string name="download_saved">Saved to %1$s</string>
+    <string name="download_failed">Download failed</string>
+</resources>

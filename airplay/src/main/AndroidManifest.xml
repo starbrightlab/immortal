@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2026 Starbright Lab.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<!--
+  Everything the AirPlay receiver needs to run, declared by the module itself so any host app
+  (portal-receiver here, Immortal next) gets it through manifest merging without restating it.
+
+  Deliberately NOT declared here, because they are host policy rather than module requirements:
+    - SYSTEM_ALERT_WINDOW           the host decides whether to raise a surface over other apps
+    - RECEIVE_BOOT_COMPLETED        the host owns its own boot receiver
+    - android:usesCleartextTraffic  an <application> attribute; AirPlay video streams HLS over
+                                    plain http from the native httpd, so a host that wants the
+                                    video path must set it (portal-receiver and Immortal both do)
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- mDNS/NSD does not receive on Android 9/10 without a held multicast lock. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <service
+            android:name="io.github.jqssun.airplay.service.AirPlayService"
+            android:foregroundServiceType="connectedDevice|mediaPlayback"
+            android:exported="false" />
+    </application>
+
+</manifest>

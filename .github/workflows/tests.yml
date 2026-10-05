@@ -28,6 +28,14 @@ jobs:
       - name: Install compile SDK
         run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null || true
 
+      # The :airplay module declares an externalNativeBuild, and AGP resolves the NDK while
+      # CONFIGURING it — before any task runs — so a missing NDK fails the build with "NDK is not
+      # installed" even for a pure-JVM test task. Nothing native is actually compiled here: no
+      # CMake task appears in :app:testDebugUnitTest's graph (verified), which is why CMake itself
+      # isn't installed. Keep the version in step with ndkVersion in airplay/build.gradle.kts.
+      - name: Install NDK (:airplay configures against it)
+        run: yes | sdkmanager "ndk;27.0.12077973" >/dev/null || true
+
       - name: Run unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon
 

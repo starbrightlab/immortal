@@ -12,6 +12,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import com.immortal.airplay.AirPlayHost
 
 /**
  * Process-wide hooks. As the home app our process is effectively persistent, so a
@@ -84,5 +85,11 @@ class ImmortalApp : Application() {
     // Publish this Portal to Home Assistant over MQTT if the user configured a broker
     // (no-op otherwise). Off by default.
     MqttService.sync(this)
+
+    // AirPlay receiver: tell the module which Activity hosts a cast, then bring it up if the
+    // user turned it on (no-op otherwise). The host Activity has to be registered before the
+    // service can start — it's also the target of the receiver's notification tap.
+    AirPlayHost.surfaceActivity = AirPlayActivity::class.java
+    AirPlayControl.ensureRunning(this)
   }
 }

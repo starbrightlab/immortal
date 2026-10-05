@@ -189,6 +189,8 @@ private fun ImmortalSettingsScreen() {
 
       RemoteNavRow()
 
+      AirPlayNavRow()
+
       FeatureSettingsNavRow(
           "Sounds", "Chimes & spoken time",
           "Hourly chime, spoken time, golden-hour tone, quiet hours") {
@@ -692,6 +694,41 @@ private fun RemoteNavRow() {
         Text("Control from your phone", color = Color.White, fontSize = 17.sp)
         Text(
             if (RemotePairing.isEnabled(context)) "On — pair a phone as a remote" else "Off",
+            color = Color(0xFF9A9A9A),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+      }
+      Text("›", color = Color(0xFF7C7C7C), fontSize = 26.sp)
+    }
+  }
+}
+
+/**
+ * Opens the AirPlay screen ([AirPlayPairActivity]); shows on/off at a glance. Sits in the same
+ * "Remote" section as [RemoteNavRow] — both are "use your phone with this Portal". Hidden outright
+ * on a device with no native library (arm64-only build, so emulators).
+ */
+@Composable
+private fun AirPlayNavRow() {
+  val context = LocalContext.current
+  if (!AirPlayControl.isProbablySupported()) return
+  Card {
+    Row(
+        modifier =
+            Modifier.fillMaxWidth()
+                .tvFocusableRow {
+                  runCatching {
+                    context.startActivity(Intent(context, AirPlayPairActivity::class.java))
+                  }
+                }
+                .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text("Stream from your iPhone", color = Color.White, fontSize = 17.sp)
+        Text(
+            if (AirPlayConfig.isEnabled(context)) "On — AirPlay audio and screen mirroring" else "Off",
             color = Color(0xFF9A9A9A),
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 2.dp),

@@ -189,6 +189,31 @@
             android:exported="false"
             android:theme="@style/Theme.SampleApp" />
 
+        <!-- "Stream from your iPhone": AirPlay on/off + how to connect. The AirPlay service
+             and its permissions come from the :airplay module by manifest merging; only
+             these two host Activities are declared here. -->
+        <activity
+            android:name=".AirPlayPairActivity"
+            android:exported="false"
+            android:label="AirPlay"
+            android:theme="@style/Theme.SampleApp" />
+
+        <!-- Where a cast renders: a full-screen SurfaceView, raised by AirPlayControl once
+             mirroring or AirPlay video is live (never for audio-only). Excluded from recents —
+             it's a stream, not a task. singleTask + configChanges so the mirroring -> AirPlay
+             video handover can't recreate the Activity and tear its surface down mid-session.
+             showWhenLocked/turnScreenOn let a cast land on a sleeping Portal; the background
+             start itself rides the SYSTEM_ALERT_WINDOW grant this app already holds. -->
+        <activity
+            android:name=".AirPlayActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.SampleApp" />
+
         <!-- Immortal-settings sub-screens (reached via a NavSpec from the registry-driven screen). -->
         <activity android:name=".MultiRoomActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />
         <activity android:name=".MqttActivity" android:exported="false" android:theme="@style/Theme.SampleApp" />

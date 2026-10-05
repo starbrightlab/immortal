@@ -74,6 +74,7 @@ nav:
       - Smart home (Home Assistant / MQTT): features/smart-home.md
       - Fleet management: features/fleet.md
       - Phone remote: features/remote.md
+      - AirPlay: features/airplay.md
       - Portal TV: features/portal-tv.md
   - How-to guides:
       - Installing apps & app stores: guides/installing-apps.md
