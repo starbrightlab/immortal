@@ -39,7 +39,9 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import org.json.JSONArray
 import org.json.JSONObject
@@ -78,10 +80,10 @@ class PhotoFrameController(
     private val weatherRefreshMs: Long = 30 * 60_000L,
     private val calendarRefreshMs: Long = 30 * 60_000L,
 ) {
-  private val io = Executors.newSingleThreadExecutor()
+  private val io = stoppableExecutor()
   // A separate single-thread executor for caption work (EXIF read + the reverse-geocode
   // network call), so an 8s geocode lookup can never stall the image-decode pipeline on [io].
-  private val metaIo = Executors.newSingleThreadExecutor()
+  private val metaIo = stoppableExecutor()
   private val ui = Handler(Looper.getMainLooper())
 
   private class PhotoLayer(
@@ -197,7 +199,7 @@ class PhotoFrameController(
   // slideshow plays only the pool. See [startPooled]/[runPoolSync]/[fetchRemoteImage].
   private var mediaCache: MediaCache? = null
   private var transcoder: VideoTranscoder? = null
-  private val transcodeIo = Executors.newSingleThreadExecutor()
+  private val transcodeIo = stoppableExecutor()
   private var pool: CachePool? = null
   // Lists the whole source (server call); only invoked by a pool sync or a first-ever start.
   private var poolLister: (() -> List<CachePool.Entry>?)? = null
@@ -501,6 +503,10 @@ class PhotoFrameController(
   }
 
   fun stop() {
+    // Supersede any load still in flight. Its io task can outlive the shutdownNow() below (the
+    // interrupt just fails the fetch) and post its result after the queue was cleared; bumping
+    // [gen] makes that late post drop itself instead of advancing a frame that is gone.
+    gen++
     ui.removeCallbacks(dashboardCycle)
     ui.removeCallbacksAndMessages(null)
     runCatching { gestureCamera?.stop() }
@@ -2408,6 +2414,18 @@ class PhotoFrameController(
   private fun dp(v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
 
   internal companion object {
+    /**
+     * A single-thread executor for the frame's background work that, once shut down by [stop],
+     * silently drops further tasks instead of throwing. A late callback that tries to queue more
+     * work (e.g. advancing to the next photo after a failed fetch) must not crash the launcher
+     * with a RejectedExecutionException on the main thread. The idle thread times out, so a frame
+     * that is never stopped doesn't pin one.
+     */
+    internal fun stoppableExecutor(): ThreadPoolExecutor =
+        ThreadPoolExecutor(
+                1, 1, 30L, TimeUnit.SECONDS, LinkedBlockingQueue(), ThreadPoolExecutor.DiscardPolicy())
+            .apply { allowCoreThreadTimeOut(true) }
+
     /**
      * The view size (w × h) that makes a [videoW]×[videoH] clip cover a [screenW]×[screenH]
      * screen with its aspect preserved — the geometry behind [applyVideoFit]'s fill mode. Null

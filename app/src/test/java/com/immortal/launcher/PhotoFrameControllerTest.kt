@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Pure geometry behind the screensaver's video fill mode (no Context). */
 class PhotoFrameControllerTest {
@@ -38,5 +40,30 @@ class PhotoFrameControllerTest {
     assertNull(PhotoFrameController.videoCoverSize(0, 0, 1920, 1080))
     assertNull(PhotoFrameController.videoCoverSize(1920, 1080, 0, 0))
     assertNull(PhotoFrameController.videoCoverSize(-1, 1080, 1920, 1080))
+  }
+
+  @Test
+  fun stoppableExecutor_runsTasksInOrderWhileRunning() {
+    val io = PhotoFrameController.stoppableExecutor()
+    val seen = mutableListOf<Int>()
+    val done = CountDownLatch(1)
+    io.execute { seen += 1 }
+    io.execute { seen += 2 }
+    io.execute { done.countDown() }
+    assertTrue(done.await(5, TimeUnit.SECONDS))
+    assertEquals(listOf(1, 2), seen)
+    io.shutdownNow()
+  }
+
+  @Test
+  fun stoppableExecutor_dropsWorkAfterShutdownInsteadOfThrowing() {
+    // The screensaver's stop() shuts its executors down while a fetch may still be running; that
+    // fetch's callback then queues the next photo. That must be a no-op, not a launcher crash.
+    val io = PhotoFrameController.stoppableExecutor()
+    io.shutdownNow()
+    var ran = false
+    io.execute { ran = true }
+    assertTrue(io.isShutdown)
+    assertTrue(!ran)
   }
 }
