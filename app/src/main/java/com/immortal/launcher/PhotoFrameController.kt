@@ -1728,15 +1728,19 @@ class PhotoFrameController(
   }
 
   /**
-   * Apply a subtle tvOS-style zoom/pan to the frontal photo over the dwell time.
+   * Apply a subtle tvOS-style zoom/pan to the frontal photo over the dwell time. Only in fill
+   * mode: in fit mode the user asked to see the whole frame, so zooming into it would crop
+   * exactly what they chose to keep (issue #225).
    */
   private fun startKenBurns(targetPhoto: ImageView = currentLayer.photo, isPortrait: Boolean = false) {
     kenBurns?.cancel()
-    val minScale = 1.006f
+    kenBurns = null
+    val minScale = restScale()
     targetPhoto.scaleX = minScale
     targetPhoto.scaleY = minScale
     targetPhoto.translationX = 0f
     targetPhoto.translationY = 0f
+    if (settings.fit != ScreensaverConfig.FIT_FILL) return
 
     val zoomScale = if (isPortrait) 1.15f else 1.08f
     val w = (if (targetPhoto.width > 0) targetPhoto.width else context.resources.displayMetrics.widthPixels)
@@ -1769,10 +1773,13 @@ class PhotoFrameController(
     kenBurns = set
   }
 
+  /** Resting scale: a hair of overscan hides edge seams when cropping; fit shows the whole frame. */
+  private fun restScale() = if (settings.fit == ScreensaverConfig.FIT_FILL) 1.006f else 1f
+
   private fun cancelKenBurns() {
     kenBurns?.cancel()
     kenBurns = null
-    val minScale = 1.006f
+    val minScale = restScale()
     if (this::layerA.isInitialized) {
       layerA.photo.scaleX = minScale
       layerA.photo.scaleY = minScale

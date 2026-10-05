@@ -22,6 +22,7 @@ import android.util.Log
 import android.widget.Toast
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.util.concurrent.Executors
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -50,6 +51,19 @@ class MqttPublisher(private val appContext: Context) {
   @Volatile private var hasBattery = false
   private val main = Handler(Looper.getMainLooper())
 
+  /**
+   * Where event-driven publishes go. Sensor callbacks, broadcast receivers and the hub listeners
+   * all fire on the main thread, and a socket write there throws NetworkOnMainThreadException —
+   * which the runCatching wrappers swallowed, so those updates silently never reached HA. One
+   * thread keeps them in order.
+   */
+  private val out =
+      Executors.newSingleThreadExecutor { r -> Thread(r, "mqtt-out").apply { isDaemon = true } }
+
+  private fun send(block: () -> Unit) {
+    runCatching { out.execute { runCatching(block).onFailure { Log.w(TAG, "publish failed", it) } } }
+  }
+
   private val id = MqttConfig.deviceId(appContext)
   private val base = "immortal/$id"
   private val audio by lazy { appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
@@ -62,12 +76,12 @@ class MqttPublisher(private val appContext: Context) {
    */
   private val ambient by lazy {
     AmbientSensors(appContext) { kind, value ->
-      client?.publish("$base/${kind.key}/state", value, retain = true)
+      send { client?.publish("$base/${kind.key}/state", value, retain = true) }
     }
   }
 
-  private val presenceListener = PresenceHub.Listener { st -> runCatching { publishPresence(st) } }
-  private val nowPlayingListener = NowPlayingHub.Listener { st -> runCatching { publishMedia(st) } }
+  private val presenceListener = PresenceHub.Listener { st -> send { publishPresence(st) } }
+  private val nowPlayingListener = NowPlayingHub.Listener { st -> send { publishMedia(st) } }
   private var batteryReceiver: BroadcastReceiver? = null
   private var screenReceiver: BroadcastReceiver? = null
   private var micMuteReceiver: BroadcastReceiver? = null
@@ -253,7 +267,7 @@ class MqttPublisher(private val appContext: Context) {
     NowPlayingHub.addListener(nowPlayingListener)
     val r =
         object : BroadcastReceiver() {
-          override fun onReceive(c: Context, i: Intent) = runCatching { publishBattery(i) }.let {}
+          override fun onReceive(c: Context, i: Intent) = send { publishBattery(i) }
         }
     batteryReceiver = r
     // Registering for a sticky broadcast returns the current battery intent — publish it now.
@@ -263,7 +277,7 @@ class MqttPublisher(private val appContext: Context) {
     // screen field can lag; the system broadcast is immediate).
     val sr =
         object : BroadcastReceiver() {
-          override fun onReceive(c: Context, i: Intent) = runCatching { publishScreen() }.let {}
+          override fun onReceive(c: Context, i: Intent) = send { publishScreen() }
         }
     screenReceiver = sr
     appContext.registerReceiver(
@@ -278,7 +292,7 @@ class MqttPublisher(private val appContext: Context) {
     // asking each caller to remember to republish.
     val mr =
         object : BroadcastReceiver() {
-          override fun onReceive(c: Context, i: Intent) = runCatching { publishMicMute() }.let {}
+          override fun onReceive(c: Context, i: Intent) = send { publishMicMute() }
         }
     micMuteReceiver = mr
     // The literal avoids gating on AudioManager.ACTION_MICROPHONE_MUTE_CHANGED (API 28) when
@@ -291,7 +305,7 @@ class MqttPublisher(private val appContext: Context) {
     if (MqttConfig.ambientSensors(appContext)) ambient.start()
     // The service knows when it actually came up; publishing straight after sync() reported the
     // state from BEFORE the start, which read as the switch refusing to stay on.
-    CameraStreamService.onStateChanged = { runCatching { publishStreamState() }.let {} }
+    CameraStreamService.onStateChanged = { send { publishStreamState() } }
   }
 
   private fun detach() {
