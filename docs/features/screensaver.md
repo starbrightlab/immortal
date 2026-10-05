@@ -55,7 +55,9 @@ Under **Settings → Screensaver**, also on the phone remote:
   or turn it off for plain black bars. **Background blur strength** goes from *Classic* to
   *Maximum*, where the photo melts into soft colour. **Darken background** dims the sidebars,
   and at 100% they're black.
-- **Photo motion** (fill): a slow zoom and pan across each photo. Turn it off for still photos.
+- **Photo motion**: a slow zoom and pan across each photo. By default it runs in fill mode only,
+  because zooming a fit photo trims the edges you chose to see. Pick *Always* to have it in fit
+  mode too, or *Off* for still photos.
 - **Show when photos were taken**: the capture date in the corner, plus the place for your own
   photos. This works for your own folder and SMB, which read the photo's EXIF, and for Google
   Photos shared albums, which list each photo's capture date.

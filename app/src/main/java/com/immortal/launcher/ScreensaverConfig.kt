@@ -237,8 +237,9 @@ object ScreensaverConfig {
       val blurStrength: Int = 0,
       // Darken the blurred letterbox, 0 (as is) .. 100 (black), for people who want the bands.
       val backgroundDim: Int = 0,
-      // Slow zoom/pan (Ken Burns) on photos in fill mode. On by default.
-      val photoMotion: Boolean = true,
+      // Slow zoom/pan (Ken Burns): [MOTION_FILL] (default — fill mode only, since zooming a fit
+      // photo crops what the user chose to see whole, issue #225), [MOTION_ALWAYS], or [MOTION_OFF].
+      val photoMotion: String = MOTION_FILL,
       // Show when (and where, if known) the photo was taken, on sources that know it.
       val showPhotoDate: Boolean = true,
   ) {
@@ -352,7 +353,7 @@ object ScreensaverConfig {
         blurStrength =
             p.getInt("blur_strength", 0).coerceIn(0, BLUR_STRENGTH_MAX),
         backgroundDim = p.getInt("background_dim", 0).coerceIn(0, BACKGROUND_DIM_MAX),
-        photoMotion = p.getBoolean("photo_motion", true),
+        photoMotion = coercePhotoMotion(p.getString("photo_motion", null)) ?: MOTION_FILL,
         showPhotoDate = p.getBoolean("show_photo_date", true),
     )
   }
@@ -373,8 +374,18 @@ object ScreensaverConfig {
   fun setBackgroundDim(c: Context, v: Int) =
       prefs(c).edit().putInt("background_dim", v.coerceIn(0, BACKGROUND_DIM_MAX)).apply()
 
-  fun setPhotoMotion(c: Context, on: Boolean) =
-      prefs(c).edit().putBoolean("photo_motion", on).apply()
+  const val MOTION_FILL = "fill"
+  const val MOTION_ALWAYS = "always"
+  const val MOTION_OFF = "off"
+
+  /** [v] if it is a known photo-motion mode, else null (so a typo leaves the setting alone). */
+  fun coercePhotoMotion(v: String?): String? =
+      v?.takeIf { it == MOTION_FILL || it == MOTION_ALWAYS || it == MOTION_OFF }
+
+  fun setPhotoMotion(c: Context, mode: String) {
+    val m = coercePhotoMotion(mode) ?: return
+    prefs(c).edit().putString("photo_motion", m).apply()
+  }
 
   fun setShowPhotoDate(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("show_photo_date", on).apply()

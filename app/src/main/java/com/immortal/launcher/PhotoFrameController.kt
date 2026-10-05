@@ -1794,7 +1794,7 @@ class PhotoFrameController(
     targetPhoto.scaleY = minScale
     targetPhoto.translationX = 0f
     targetPhoto.translationY = 0f
-    if (settings.fit != ScreensaverConfig.FIT_FILL || !settings.photoMotion) return
+    if (!photoMotionOn()) return
 
     val zoomScale = if (isPortrait) 1.15f else 1.08f
     val w = (if (targetPhoto.width > 0) targetPhoto.width else context.resources.displayMetrics.widthPixels)
@@ -1826,6 +1826,14 @@ class PhotoFrameController(
     set.start()
     kenBurns = set
   }
+
+  /** Whether photos get the Ken Burns zoom/pan, per the photo-motion setting and fit/fill. */
+  private fun photoMotionOn(): Boolean =
+      when (settings.photoMotion) {
+        ScreensaverConfig.MOTION_ALWAYS -> true
+        ScreensaverConfig.MOTION_OFF -> false
+        else -> settings.fit == ScreensaverConfig.FIT_FILL
+      }
 
   /** Resting scale: a hair of overscan hides edge seams when cropping; fit shows the whole frame. */
   private fun restScale() = if (settings.fit == ScreensaverConfig.FIT_FILL) 1.006f else 1f

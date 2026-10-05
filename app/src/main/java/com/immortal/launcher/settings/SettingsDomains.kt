@@ -320,13 +320,18 @@ object SettingsDomains {
                       format = { "$it%" },
                       help = "Dims the blurred sidebars so the photo stands out. 100% turns them black.",
                       visible = { _, s -> s.fit == ScreensaverConfig.FIT_FIT && s.blurBackground }),
-                  BoolSpec(
+                  EnumSpec(
                       "photoMotion",
                       "Photo motion",
                       get = { it.photoMotion },
                       set = ScreensaverConfig::setPhotoMotion,
-                      help = "A slow zoom and pan across each photo. Turn off for still photos.",
-                      visible = { _, s -> s.fit == ScreensaverConfig.FIT_FILL }),
+                      options =
+                          listOf(
+                              ScreensaverConfig.MOTION_FILL to "In fill mode",
+                              ScreensaverConfig.MOTION_ALWAYS to "Always",
+                              ScreensaverConfig.MOTION_OFF to "Off"),
+                      coerce = { ScreensaverConfig.coercePhotoMotion(it) },
+                      help = "A slow zoom and pan across each photo. In fit mode it trims the edges as it zooms, so it's off there unless you choose Always."),
                   BoolSpec(
                       "showPhotoDate",
                       "Show when photos were taken",
