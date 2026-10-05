@@ -208,6 +208,24 @@ class RemoteAlbumTest {
   }
 
   @Test
+  fun extractGoogleTakenAt_readsEachPhotosCaptureTimeInItsOwnZone() {
+    // Shape of a share page's data blob: [id,[url,w,h,…nested…],taken,id,utcOffset,uploaded,…].
+    // An <img> tag for the first photo comes first and carries no date.
+    val page =
+        "<img src=\"https://lh3.googleusercontent.com/pw/PhotoA=w400\">" +
+            "[\"idA\",[\"https://lh3.googleusercontent.com/pw/PhotoA\",3000,4000,null,[null,null,1]," +
+            "[1234567],2,[[null,1,null,1]]],1700000000000,\"keyA\",3600000,1720000000000]," +
+            "[\"idB\",[\"https://lh3.googleusercontent.com/pw/PhotoB\",1200,1600,null,[7654321]]," +
+            "1710000000000,\"keyB\",-18000000,1720000000000]," +
+            "[\"idC\",[\"https://lh3.googleusercontent.com/pw/PhotoC\",800,600,null]]"
+    val taken = RemoteAlbum.extractGoogleTakenAt(page)
+    assertEquals(1700000000000L + 3600000L, taken["https://lh3.googleusercontent.com/pw/PhotoA"])
+    assertEquals(1710000000000L - 18000000L, taken["https://lh3.googleusercontent.com/pw/PhotoB"])
+    // PhotoC has no date of its own and must not borrow a neighbour's.
+    assertNull(taken["https://lh3.googleusercontent.com/pw/PhotoC"])
+  }
+
+  @Test
   fun pickBestDerivative_skipsEntriesMissingChecksum() {
     val derivs =
         JSONObject(

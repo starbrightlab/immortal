@@ -26,6 +26,9 @@ object RemoteAlbum {
       val title: String?,
       val photoUrls: List<String>,
       val headers: Map<String, String> = emptyMap(),
+      // Capture time per entry of [photoUrls], as wall-clock-where-taken in UTC millis. Only
+      // filled where the listing carries it (Google Photos shares); absent entries have no date.
+      val takenAt: Map<String, Long> = emptyMap(),
   )
 
   fun isSupported(url: String): Boolean {
@@ -397,6 +400,7 @@ object RemoteAlbum {
     val maxDim = maxOf(screenW, screenH)
     val sizeSuffix = "=w${maxDim}-h${maxDim}-no"
     val seen = LinkedHashSet<String>()
+    val takenByBase = HashMap<String, Long>(extractGoogleTakenAt(html))
     raw.forEach { u ->
       if (isGoogleAvatarUrl(u)) return@forEach
       val stripped = u.substringBefore('=')
@@ -413,6 +417,7 @@ object RemoteAlbum {
       // Contained per page: a failed continuation fetch keeps the photos already found
       // rather than propagating out of the crawl (issue #175 hardening).
       val rpcBody = runCatching { fetchGoogleBatchRpc(albumKey, token!!) }.getOrNull() ?: break
+      takenByBase.putAll(extractGoogleTakenAt(rpcBody))
       val prevSize = seen.size
       LH3_REGEX.findAll(rpcBody).forEach { m ->
         val u = m.value
@@ -429,8 +434,37 @@ object RemoteAlbum {
       page++
     }
 
-    return Album(extractGoogleTitle(html), seen.toList())
+    val photos = seen.toList()
+    val takenAt =
+        photos.mapNotNull { u -> takenByBase[u.substringBefore('=')]?.let { u to it } }.toMap()
+    return Album(extractGoogleTitle(html), photos, takenAt = takenAt)
   }
+
+  /**
+   * Capture dates from a Google Photos share page (or continuation page), keyed by the photo's
+   * base URL (before any `=size` suffix). The page's data blob lists each item as
+   * `["<id>",["<lh3 url>",w,h,…],<taken ms>,"<id>",<utc offset ms>,<uploaded ms>,…]`, so the first
+   * `],<13 digits>,"…",<offset>,<13 digits>` after a photo URL, and before the next one, is that
+   * photo's capture time. Returned as wall clock where taken (taken + offset) in UTC millis.
+   * Best-effort: anything that doesn't match that shape simply has no date.
+   */
+  internal fun extractGoogleTakenAt(text: String): Map<String, Long> {
+    val out = HashMap<String, Long>()
+    val starts = GOOGLE_PHOTO_URL.findAll(text).toList()
+    starts.forEachIndexed { i, m ->
+      val end = if (i + 1 < starts.size) starts[i + 1].range.first else text.length
+      val window = text.substring(m.range.last + 1, minOf(end, m.range.last + 1 + 2000))
+      val t = GOOGLE_TAKEN_AT.find(window) ?: return@forEachIndexed
+      val taken = t.groupValues[1].toLongOrNull() ?: return@forEachIndexed
+      val offset = t.groupValues[2].toLongOrNull() ?: 0L
+      out.putIfAbsent(m.groupValues[1].substringBefore('='), taken + offset)
+    }
+    return out
+  }
+
+  private val GOOGLE_PHOTO_URL =
+      Regex("""\["(https://lh3\.googleusercontent\.com/pw/[A-Za-z0-9_\-/]+(?:=[A-Za-z0-9\-_]+)?)",\d+,\d+""")
+  private val GOOGLE_TAKEN_AT = Regex("""\],(\d{13}),"[^"]*",(-?\d+),\d{13}""")
 
   internal fun extractGoogleAlbumKey(url: String, html: String): String? {
     val mUrl = Regex("""photos\.google\.com/share/([A-Za-z0-9_\-]+)""", RegexOption.IGNORE_CASE).find(url)

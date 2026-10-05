@@ -298,6 +298,46 @@ object SettingsDomains {
                       get = { it.blurBackground },
                       set = ScreensaverConfig::setBlurBackground,
                       help = "Fills letterbox sidebars in fit mode with a blurred copy of the photo instead of solid black."),
+                  IntSpec(
+                      "blurStrength",
+                      "Background blur strength",
+                      get = { it.blurStrength },
+                      set = ScreensaverConfig::setBlurStrength,
+                      min = 0,
+                      max = ScreensaverConfig.BLUR_STRENGTH_MAX,
+                      step = 1,
+                      format = { ScreensaverConfig.BLUR_STRENGTH_LABELS.getOrElse(it) { _ -> it.toString() } },
+                      help = "How soft the blurred sidebars are. Maximum melts them into gentle colour.",
+                      visible = { _, s -> s.fit == ScreensaverConfig.FIT_FIT && s.blurBackground }),
+                  IntSpec(
+                      "backgroundDim",
+                      "Darken background",
+                      get = { it.backgroundDim },
+                      set = ScreensaverConfig::setBackgroundDim,
+                      min = 0,
+                      max = ScreensaverConfig.BACKGROUND_DIM_MAX,
+                      step = 10,
+                      format = { "$it%" },
+                      help = "Dims the blurred sidebars so the photo stands out. 100% turns them black.",
+                      visible = { _, s -> s.fit == ScreensaverConfig.FIT_FIT && s.blurBackground }),
+                  EnumSpec(
+                      "photoMotion",
+                      "Photo motion",
+                      get = { it.photoMotion },
+                      set = ScreensaverConfig::setPhotoMotion,
+                      options =
+                          listOf(
+                              ScreensaverConfig.MOTION_FILL to "In fill mode",
+                              ScreensaverConfig.MOTION_ALWAYS to "Always",
+                              ScreensaverConfig.MOTION_OFF to "Off"),
+                      coerce = { ScreensaverConfig.coercePhotoMotion(it) },
+                      help = "A slow zoom and pan across each photo. In fit mode it trims the edges as it zooms, so it's off there unless you choose Always."),
+                  BoolSpec(
+                      "showPhotoDate",
+                      "Show when photos were taken",
+                      get = { it.showPhotoDate },
+                      set = ScreensaverConfig::setShowPhotoDate,
+                      help = "Shows the date (and place, when known) a photo was taken, on sources that provide it."),
                   // On-device cache: only meaningful for a network source that re-fetches the same
                   // assets every loop (Immich / WebDAV). Hidden for a local folder or the built-in
                   // feed, where there's nothing to save a round-trip on.

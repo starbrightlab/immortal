@@ -39,6 +39,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.Executors
 import kotlin.math.abs
 import org.json.JSONArray
@@ -183,6 +184,9 @@ class PhotoFrameController(
   // public shares, the x-api-key for Immich. Applied in [advanceRemote]/[downloadBitmap]/
   // [showRemoteVideo].
   private var remoteHeaders: Map<String, String> = emptyMap()
+  // Capture time (wall clock where taken, as UTC millis) per photo URL, for albums whose listing
+  // carries it (Google Photos shares). Empty for every other source.
+  private var remoteTakenAt: Map<String, Long> = emptyMap()
   // The subset of [remoteUrls] that are videos (Immich with "Play videos" on); these stream
   // through the VideoView instead of the bitmap download. See [showRemoteVideo].
   private var remoteVideos: Set<String> = emptySet()
@@ -368,6 +372,7 @@ class PhotoFrameController(
             if (urls.isNotEmpty()) {
               remoteUrls = if (source.shuffle) urls.shuffled() else urls
               remoteHeaders = album?.headers.orEmpty()
+              remoteTakenAt = album?.takenAt.orEmpty()
               remoteMode = true
               remoteIndex = -1
               remoteFailStreak = 0
@@ -594,6 +599,10 @@ class PhotoFrameController(
   /** Read EXIF date/GPS for a local file off [metaIo], reverse-geocode the place, then publish
    *  the caption — guarded by [gen] so a slow lookup for a superseded photo is dropped. */
   private fun loadCaptionForLocal(path: String, g: Int) {
+    if (!settings.showPhotoDate) {
+      faceRenderer.setCaption(null, null)
+      return
+    }
     metaIo.execute {
       val meta = runCatching { PhotoCaption.read(ExifInterface(path)) }.getOrNull()
       publishCaption(meta, g)
@@ -603,12 +612,26 @@ class PhotoFrameController(
   /** Same as [loadCaptionForLocal] but for an SMB file: a fresh read stream feeds EXIF. */
   private fun loadCaptionForSmb(path: String, g: Int) {
     val src = smbSource ?: return
+    if (!settings.showPhotoDate) {
+      faceRenderer.setCaption(null, null)
+      return
+    }
     metaIo.execute {
       val meta =
           runCatching { src.openStream(path)?.use { PhotoCaption.read(ExifInterface(it)) } }
               .getOrNull()
       publishCaption(meta, g)
     }
+  }
+
+  /**
+   * Caption a network-album photo with its capture date, when the album listing carried one
+   * (a Google Photos share does; see [RemoteAlbum.extractGoogleTakenAt]). The date is the
+   * wall-clock date where it was taken, so it's formatted in UTC rather than the device zone.
+   */
+  private fun showRemoteTakenAt(url: String) {
+    val taken = if (settings.showPhotoDate) remoteTakenAt[url] else null
+    faceRenderer.setCaption(null, taken?.let { PhotoCaption.formatDate(it, TimeZone.getTimeZone("UTC")) })
   }
 
   private fun publishCaption(meta: PhotoCaption.Meta?, g: Int) {
@@ -784,6 +807,19 @@ class PhotoFrameController(
       }
     }
     blurPhoto.visibility = if (isFit && settings.blurBackground) View.VISIBLE else View.GONE
+    applyBackgroundDim()
+  }
+
+  /** Darken every blurred-letterbox view by the "Darken background" setting. */
+  private fun applyBackgroundDim() {
+    val overlay = dimOverlayColor(settings.backgroundDim)
+    val views =
+        if (this::layerA.isInitialized) listOf(blurPhoto, layerA.blurPhoto, layerB.blurPhoto)
+        else listOf(blurPhoto)
+    views.forEach { v ->
+      if (overlay == 0) v.clearColorFilter()
+      else v.setColorFilter(overlay, android.graphics.PorterDuff.Mode.SRC_ATOP)
+    }
   }
 
   /**
@@ -1317,6 +1353,7 @@ class PhotoFrameController(
               if (remoteMode && urls.isNotEmpty()) {
                 remoteUrls = urls
                 remoteHeaders = fresh?.headers.orEmpty()
+                remoteTakenAt = fresh?.takenAt.orEmpty()
                 if (remoteIndex >= remoteUrls.size) remoteIndex = -1
                 remoteFailStreak = 0
               }
@@ -1377,7 +1414,7 @@ class PhotoFrameController(
         show(bmp)
         // EXIF caption only for SMB here — it reads the user's own files. The HTTP remote sources
         // (iCloud/Google/Immich/DAV) serve EXIF-stripped images, so they carry no caption.
-        if (smbSource != null) loadCaptionForSmb(url, g) else faceRenderer.setCaption(null, null)
+        if (smbSource != null) loadCaptionForSmb(url, g) else showRemoteTakenAt(url)
         ui.postDelayed(remoteTick, intervalMs())
       }
     }
@@ -1485,6 +1522,7 @@ class PhotoFrameController(
         if (urls.isNotEmpty()) {
           remoteUrls = if (settings.shuffle) urls.shuffled() else urls
           remoteHeaders = fresh?.headers.orEmpty()
+          remoteTakenAt = fresh?.takenAt.orEmpty()
           remoteIndex = -1
           remoteFailStreak = 0
           advanceRemote(+1)
@@ -1744,7 +1782,7 @@ class PhotoFrameController(
     targetPhoto.scaleY = minScale
     targetPhoto.translationX = 0f
     targetPhoto.translationY = 0f
-    if (settings.fit != ScreensaverConfig.FIT_FILL) return
+    if (!photoMotionOn()) return
 
     val zoomScale = if (isPortrait) 1.15f else 1.08f
     val w = (if (targetPhoto.width > 0) targetPhoto.width else context.resources.displayMetrics.widthPixels)
@@ -1777,6 +1815,14 @@ class PhotoFrameController(
     kenBurns = set
   }
 
+  /** Whether photos get the Ken Burns zoom/pan, per the photo-motion setting and fit/fill. */
+  private fun photoMotionOn(): Boolean =
+      when (settings.photoMotion) {
+        ScreensaverConfig.MOTION_ALWAYS -> true
+        ScreensaverConfig.MOTION_OFF -> false
+        else -> settings.fit == ScreensaverConfig.FIT_FILL
+      }
+
   /** Resting scale: a hair of overscan hides edge seams when cropping; fit shows the whole frame. */
   private fun restScale() = if (settings.fit == ScreensaverConfig.FIT_FILL) 1.006f else 1f
 
@@ -1803,7 +1849,7 @@ class PhotoFrameController(
    * preserving aspect ratio without distortion or pixelation.
    */
   private fun createBlurredBackground(src: Bitmap): Bitmap {
-    val maxDim = maxOf(64, maxOf(src.width, src.height) / 2)
+    val maxDim = blurEdge(maxOf(src.width, src.height), settings.blurStrength)
     val (tw, th) = if (src.width >= src.height) {
       maxDim to maxOf(1, (maxDim * src.height) / src.width)
     } else {
@@ -2408,6 +2454,18 @@ class PhotoFrameController(
   private fun dp(v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
 
   internal companion object {
+    /**
+     * Long edge, in pixels, that a photo is shrunk to before its letterbox is box-blurred. Each
+     * strength level halves it (0 = half size, the classic look), so the same blur radius covers
+     * twice as much of the picture; the view scales it back up, smoothly. Never below 16px.
+     */
+    internal fun blurEdge(longEdge: Int, strength: Int): Int =
+        maxOf(16, longEdge / (2 shl strength.coerceIn(0, ScreensaverConfig.BLUR_STRENGTH_MAX)))
+
+    /** Black overlay (ARGB) that darkens the letterbox by [dimPercent]; 0 means none. */
+    internal fun dimOverlayColor(dimPercent: Int): Int =
+        (dimPercent.coerceIn(0, 100) * 255 / 100) shl 24
+
     /**
      * The view size (w × h) that makes a [videoW]×[videoH] clip cover a [screenW]×[screenH]
      * screen with its aspect preserved — the geometry behind [applyVideoFit]'s fill mode. Null

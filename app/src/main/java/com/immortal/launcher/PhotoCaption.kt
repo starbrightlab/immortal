@@ -7,12 +7,14 @@
 
 package com.immortal.launcher
 
+import android.text.format.DateFormat
 import androidx.exifinterface.media.ExifInterface
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.ConcurrentHashMap
 import org.json.JSONObject
 
@@ -55,9 +57,17 @@ object PhotoCaption {
   // so callers (which run on a background thread) synchronize on it.
   private val EXIF_DATE = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US)
 
-  /** Friendly capture date, e.g. "June 22, 2026" in the device locale. Null when absent. */
-  fun formatDate(millis: Long?): String? =
-      millis?.let { SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(Date(it)) }
+  /**
+   * Friendly capture date in the device locale's own order, e.g. "June 22, 2026" or
+   * "22 de junio de 2026", in [zone]. Null when absent.
+   */
+  fun formatDate(millis: Long?, zone: TimeZone = TimeZone.getDefault()): String? =
+      millis?.let {
+        val locale = Locale.getDefault()
+        SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, "yMMMMd"), locale)
+            .apply { timeZone = zone }
+            .format(Date(it))
+      }
 
   // --- reverse geocoding (keyless) -------------------------------------------
   // BigDataCloud's reverse-geocode-client endpoint needs no key — the same keyless-web-service

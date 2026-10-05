@@ -39,4 +39,23 @@ class PhotoFrameControllerTest {
     assertNull(PhotoFrameController.videoCoverSize(1920, 1080, 0, 0))
     assertNull(PhotoFrameController.videoCoverSize(-1, 1080, 1920, 1080))
   }
+
+  @Test
+  fun blurEdge_halvesPerLevelFromTheClassicHalfSize() {
+    assertEquals(1280, PhotoFrameController.blurEdge(2560, 0)) // classic: half size
+    assertEquals(640, PhotoFrameController.blurEdge(2560, 1))
+    assertEquals(80, PhotoFrameController.blurEdge(2560, 4)) // maximum
+    // Out-of-range levels clamp; tiny photos never shrink below 16px.
+    assertEquals(80, PhotoFrameController.blurEdge(2560, 99))
+    assertEquals(1280, PhotoFrameController.blurEdge(2560, -3))
+    assertEquals(16, PhotoFrameController.blurEdge(100, 4))
+  }
+
+  @Test
+  fun dimOverlayColor_isBlackWithTheRequestedAlpha() {
+    assertEquals(0, PhotoFrameController.dimOverlayColor(0))
+    assertEquals(0xFF000000.toInt(), PhotoFrameController.dimOverlayColor(100))
+    assertEquals(127 shl 24, PhotoFrameController.dimOverlayColor(50))
+    assertEquals(0xFF000000.toInt(), PhotoFrameController.dimOverlayColor(150))
+  }
 }
