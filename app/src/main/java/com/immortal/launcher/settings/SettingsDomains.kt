@@ -39,6 +39,8 @@ import com.immortal.launcher.Weather
 import com.immortal.launcher.WeatherLocationActivity
 import com.immortal.launcher.ScreensaverConfig
 import com.immortal.launcher.SettingsGuard
+import com.immortal.launcher.VoiceConfig
+import com.immortal.launcher.VoiceSatelliteService
 import org.json.JSONArray
 
 /**
@@ -1387,6 +1389,43 @@ object SettingsDomains {
           defaults = { WelcomeConfig.Settings() },
       )
 
+  /** The Home Assistant voice satellite ([VoiceSatelliteService]). */
+  val voice: SettingsDomain<VoiceConfig.Settings> =
+      SettingsDomain(
+          id = "voice",
+          title = "Voice assistant",
+          load = VoiceConfig::load,
+          specs =
+              listOf(
+                  BoolSpec(
+                      "enabled",
+                      "Home Assistant voice satellite",
+                      get = { it.enabled },
+                      set = VoiceConfig::setEnabled,
+                      help =
+                          "Talk to Home Assistant's Assist through this Portal, like a Voice PE. " +
+                              "Keeps the microphone listening for the wake word while on."),
+                  BoolSpec(
+                      "wakeSound",
+                      "Wake sound",
+                      get = { it.wakeSound },
+                      set = VoiceConfig::setWakeSound,
+                      help = "A short tone when the wake word is heard.",
+                      visible = { _, s -> s.enabled }),
+                  BoolSpec(
+                      "showTranscript",
+                      "Show the conversation",
+                      get = { it.showTranscript },
+                      set = VoiceConfig::setShowTranscript,
+                      help = "Shows what you said and Home Assistant's answer on screen.",
+                      visible = { _, s -> s.enabled }),
+              ),
+          defaults = { VoiceConfig.Settings() },
+          onApplied = { c, _ -> VoiceSatelliteService.sync(c) },
+      )
+
   val all: List<SettingsDomain<*>> =
-      listOf(screensaver, calendar, immortal, mqtt, quickbar, fleet, chime, digitalclock, welcome, sunrise)
+      listOf(
+          screensaver, calendar, immortal, mqtt, quickbar, fleet, chime, digitalclock, welcome, sunrise,
+          voice)
 }

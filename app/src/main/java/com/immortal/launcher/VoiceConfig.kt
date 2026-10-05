@@ -1,0 +1,47 @@
+/*
+ * Copyright (c) 2026 Starbright Lab.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+package com.immortal.launcher
+
+import android.content.Context
+
+/**
+ * Settings for the Home Assistant voice satellite ([VoiceSatelliteService]): the Portal offers
+ * itself to Home Assistant's Assist as a Wyoming satellite, like a Voice PE. Off by default — it
+ * keeps the microphone open while on.
+ */
+object VoiceConfig {
+  private const val PREFS = "immortal_voice"
+
+  const val DEFAULT_PORT = 10700
+
+  data class Settings(
+      val enabled: Boolean = false,
+      // Play a short tone when the wake word is heard, so you know it's listening.
+      val wakeSound: Boolean = true,
+      // Show what you said and Home Assistant's answer on screen.
+      val showTranscript: Boolean = true,
+  )
+
+  private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+  fun load(c: Context): Settings {
+    val p = prefs(c)
+    return Settings(
+        enabled = p.getBoolean("enabled", false),
+        wakeSound = p.getBoolean("wake_sound", true),
+        showTranscript = p.getBoolean("show_transcript", true),
+    )
+  }
+
+  fun setEnabled(c: Context, on: Boolean) = prefs(c).edit().putBoolean("enabled", on).apply()
+
+  fun setWakeSound(c: Context, on: Boolean) = prefs(c).edit().putBoolean("wake_sound", on).apply()
+
+  fun setShowTranscript(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("show_transcript", on).apply()
+}
