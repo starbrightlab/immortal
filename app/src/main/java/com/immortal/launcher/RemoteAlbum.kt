@@ -397,11 +397,7 @@ object RemoteAlbum {
     val maxDim = maxOf(screenW, screenH)
     val sizeSuffix = "=w${maxDim}-h${maxDim}-no"
     val seen = LinkedHashSet<String>()
-    raw.forEach { u ->
-      if (isGoogleAvatarUrl(u)) return@forEach
-      val stripped = u.substringBefore('=')
-      seen.add(stripped + sizeSuffix)
-    }
+    googleAlbumPhotoUrls(raw).forEach { u -> seen.add(u.substringBefore('=') + sizeSuffix) }
 
     // Crawl pagination tokens if the Google Photos album contains more photos than page 1.
     val albumKey = extractGoogleAlbumKey(finalUrl, html)
@@ -414,12 +410,8 @@ object RemoteAlbum {
       // rather than propagating out of the crawl (issue #175 hardening).
       val rpcBody = runCatching { fetchGoogleBatchRpc(albumKey, token!!) }.getOrNull() ?: break
       val prevSize = seen.size
-      LH3_REGEX.findAll(rpcBody).forEach { m ->
-        val u = m.value
-        if (!isGoogleAvatarUrl(u)) {
-          val stripped = u.substringBefore('=')
-          seen.add(stripped + sizeSuffix)
-        }
+      googleAlbumPhotoUrls(LH3_REGEX.findAll(rpcBody).map { it.value }.toList()).forEach { u ->
+        seen.add(u.substringBefore('=') + sizeSuffix)
       }
       val nextToken = extractGoogleContinuationToken(rpcBody)
       if (nextToken == token || seen.size == prevSize) {
@@ -465,10 +457,25 @@ object RemoteAlbum {
     }.getOrNull()
   }
 
-  internal fun isGoogleAvatarUrl(url: String): Boolean {
-    val path = url.removePrefix("https://lh3.googleusercontent.com")
-    return path.startsWith("/a/") || path.startsWith("/a-/")
+  /**
+   * The album's photos among the lh3 URLs scraped from a share page (or a continuation page).
+   * Album media is served under `/pw/`; everything else on the page is UI chrome, such as the
+   * owner's avatar (`/a/`) or the account widget's avatar (`/ogw/`), which for an account with no
+   * profile photo is Google's default silhouette (issue #233). So keep only `/pw/` URLs. If a page
+   * has none at all (an older or changed page format), fall back to dropping known avatars rather
+   * than returning nothing.
+   */
+  internal fun googleAlbumPhotoUrls(urls: List<String>): List<String> {
+    val photos = urls.filter { lh3Path(it).startsWith("/pw/") }
+    return photos.ifEmpty { urls.filterNot(::isGoogleAvatarUrl) }
   }
+
+  internal fun isGoogleAvatarUrl(url: String): Boolean {
+    val path = lh3Path(url)
+    return path.startsWith("/a/") || path.startsWith("/a-/") || path.startsWith("/ogw/")
+  }
+
+  private fun lh3Path(url: String): String = url.removePrefix("https://lh3.googleusercontent.com")
 
   private fun extractGoogleTitle(html: String): String? {
     val m = Regex("""<title>([^<]+)</title>""", RegexOption.IGNORE_CASE).find(html) ?: return null
