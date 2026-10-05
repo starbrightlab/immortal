@@ -1,0 +1,39 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Native macOS project bootstrap" : {
+      "comment" : "Initial detail text for the native macOS application shell.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Native macOS project bootstrap"
+          }
+        }
+      }
+    },
+    "Portal Manager" : {
+      "comment" : "Application and navigation title.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portal Manager"
+          }
+        }
+      }
+    },
+    "Portals" : {
+      "comment" : "Sidebar section title.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portals"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

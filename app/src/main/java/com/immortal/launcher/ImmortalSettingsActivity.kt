@@ -153,7 +153,14 @@ private fun ImmortalSettingsScreen() {
       SettingsList(
           SettingsDomains.immortal,
           settings,
-          exclude = setOf("multiRoomEnabled", "snapcastHost", "maPort", "maUsername", "maPassword"),
+          exclude = setOf(
+              "multiRoomEnabled",
+              "snapcastHost",
+              "maPort",
+              "maUsername",
+              "maPassword",
+              "intercomMode",
+              "intercomPeerHost"),
       ) { k, v ->
         apply(k, v)
       }

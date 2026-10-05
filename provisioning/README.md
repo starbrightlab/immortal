@@ -167,7 +167,12 @@ test build. Dev mode + the local-install path handle both:
 
 ```bash
 ./fleetctl dev on  --device "Living Room"      # pause the official self-updater
-./fleetctl dev update ./app/build/outputs/apk/release/app-release.apk --device "Living Room"
+APK_SHA256=$(shasum -a 256 ./app/build/outputs/apk/release/app-release.apk | awk '{print $1}')
+# Set VERSION_CODE, VERSION_NAME, and CERT_SHA256 from the signed release evidence.
+../scripts/verify-android-release.sh ./app/build/outputs/apk/release/app-release.apk \
+  "$VERSION_CODE" "$VERSION_NAME" "$CERT_SHA256" "$APK_SHA256"
+./fleetctl dev update ./app/build/outputs/apk/release/app-release.apk \
+  --sha256 "$APK_SHA256" --device "Living Room"
 ./fleetctl dev status --device "Living Room"
 ./fleetctl dev off --device "Living Room"       # resume official updates
 ```
@@ -176,6 +181,11 @@ test build. Dev mode + the local-install path handle both:
 device, and installs it over Immortal via the same silent path the store uses — no
 cable, no `version.json`, no catalog/versionCode gate. `--package`/`--path` override
 the defaults (`com.immortal.launcher` and a temp path in the app's files dir).
+Before any push, `--sha256 DIGEST` compares the local APK with the expected
+digest; a mismatch exits before device targeting and cannot modify a Portal.
+`scripts/verify-android-release.sh` adds the release preflight: it checks the
+recorded version identity, signer certificate, v2 signature scheme, and exact
+APK digest before any deployment command runs.
 
 **Sign with the same key.** An in-place update is signature-checked by Android, so
 your local build must be signed with the **same key** as the installed Immortal (the
@@ -211,7 +221,9 @@ target devices by name:
 ./fleetctl update --check                # dry-run: what has updates
 ./fleetctl update --all --device all
 ./fleetctl dev on --device "Living Room"            # pause official self-update
-./fleetctl dev update ./app/build/outputs/apk/release/app-release.apk --device "Living Room"
+./fleetctl dev update ./app/build/outputs/apk/release/app-release.apk \
+  --sha256 "$(shasum -a 256 ./app/build/outputs/apk/release/app-release.apk | awk '{print $1}')" \
+  --device "Living Room"
 ./fleetctl dev off --device "Living Room"           # resume official self-update
 ./fleetctl calendar set --url 'https://…/basic.ics' --range week --device all
 ./fleetctl calendar off --device "Living Room"

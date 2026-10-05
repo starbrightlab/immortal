@@ -59,6 +59,8 @@ android {
   buildTypes {
     release {
       isMinifyEnabled = false
+      // Do not bake mutable local HEAD metadata into the distributed APK.
+      vcsInfo.include = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       if (keystorePropsFile.exists()) {
         signingConfig = signingConfigs.getByName("release")

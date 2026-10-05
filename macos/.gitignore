@@ -1,0 +1,41 @@
+# Xcode-generated products and archives
+DerivedData/
+build/
+target/
+*.xcarchive
+*.xcarchive/
+*.dSYM
+*.dSYM.zip
+
+# Local Portal Manager state and credential exports
+**/Registries/
+**/Registry/*.json
+**/Registry/*.plist
+**/Registry/*.db
+**/*Registry*.json
+**/*registry*.json
+**/*keychain*
+!PortalManager/Infrastructure/Credentials/KeychainCredentialStore.swift
+**/*.keychain
+**/*.keychain-db
+**/*credentials*.json
+**/*tokens*.json
+
+# Local ADB/platform-tools and provisioning artifacts
+**/adb
+**/adb.exe
+**/fastboot
+**/fastboot.exe
+**/platform-tools/
+**/provisioning-artifacts/
+**/provisioning-artifact*/
+**/provisioning-output/
+**/*.apk
+**/*.aab
+
+# Fixture secrets must never enter source control or app resources
+PortalManagerTests/Fixtures/**/secrets/
+PortalManagerTests/Fixtures/**/*secret*
+PortalManagerTests/Fixtures/**/*credential*
+PortalManagerTests/Fixtures/**/*token*
+PortalManagerTests/Fixtures/**/*.env

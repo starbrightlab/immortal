@@ -1,0 +1,1068 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E10000000000000000000001 /* PortalManagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* PortalManagerApp.swift */; };
+		E10000000000000000000002 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* RootView.swift */; };
+		E10000000000000000000003 /* PortalManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* PortalManagerTests.swift */; };
+		E70000000000000000000001 /* SettingsPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000000000000000000001 /* SettingsPolicyTests.swift */; };
+		E40000000000000000000001 /* DeterministicFakes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000001 /* DeterministicFakes.swift */; };
+		E10000000000000000000004 /* PortalManagerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* PortalManagerUITests.swift */; };
+		E30000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000001 /* AppDelegate.swift */; };
+		E30000000000000000000002 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000002 /* AppCommands.swift */; };
+		E30000000000000000000003 /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000003 /* DependencyContainer.swift */; };
+		E30000000000000000000004 /* SceneNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000004 /* SceneNavigation.swift */; };
+		E30000000000000000000005 /* DependencyPorts.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000005 /* DependencyPorts.swift */; };
+		E30000000000000000000006 /* PortalManagerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000006 /* PortalManagerStore.swift */; };
+		E30000000000000000000007 /* ConnectionAdmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000007 /* ConnectionAdmission.swift */; };
+		E30000000000000000000008 /* JSONRegistryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000008 /* JSONRegistryStore.swift */; };
+		E30000000000000000000019 /* PortalRegistryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000019 /* PortalRegistryCoordinator.swift */; };
+		E3000000000000000000000B /* SourceSecretCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000B /* SourceSecretCoordinator.swift */; };
+		E20000000000000000000007 /* PortalRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* PortalRegistry.swift */; };
+		E20000000000000000000008 /* SourceMutation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* SourceMutation.swift */; };
+		E30000000000000000000009 /* KeychainCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000009 /* KeychainCredentialStore.swift */; };
+		E3000000000000000000000A /* Redactor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000A /* Redactor.swift */; };
+		E10000000000000000000011 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000001 /* Foundation.framework */; };
+		E10000000000000000000012 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* SwiftUI.framework */; };
+		E10000000000000000000013 /* AppKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000003 /* AppKit.framework */; };
+		E10000000000000000000014 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000004 /* Network.framework */; };
+		E10000000000000000000015 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000005 /* Security.framework */; };
+		E10000000000000000000016 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000006 /* XCTest.framework */; };
+		E10000000000000000000017 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000006 /* XCTest.framework */; };
+		E10000000000000000000018 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* Localizable.xcstrings */; };
+		E10000000000000000000021 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* AppIcon.icns */; };
+		E10000000000000000000022 /* CastingTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000F /* CastingTarget.swift */; };
+		E90000000000000000000011 /* CastingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000014 /* CastingCoordinator.swift */; };
+		E10000000000000000000023 /* FleetCredentialSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000010 /* FleetCredentialSync.swift */; };
+		E90000000000000000000012 /* FleetCredentialSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000015 /* FleetCredentialSyncCoordinator.swift */; };
+		E90000000000000000000013 /* CredentialSyncView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000016 /* CredentialSyncView.swift */; };
+		E90000000000000000000014 /* BackgroundServiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000017 /* BackgroundServiceView.swift */; };
+		E90000000000000000000016 /* BackgroundServiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000018 /* BackgroundServiceController.swift */; };
+		E3000000000000000000001D /* FleetCredentialSyncTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000001D /* FleetCredentialSyncTransport.swift */; };
+		E90000000000000000000017 /* CastingAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000019 /* CastingAdapters.swift */; };
+		E90000000000000000000018 /* CastingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000020 /* CastingView.swift */; };
+		E90000000000000000000019 /* MultiRoomSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000021 /* MultiRoomSetupView.swift */; };
+		E90000000000000000000020 /* MultiRoomSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000011 /* MultiRoomSetup.swift */; };
+		E20000000000000000000012 /* NativeRoom.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000012 /* NativeRoom.swift */; };
+		E90000000000000000000021 /* NativeRoomCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000022 /* NativeRoomCoordinator.swift */; };
+		E90000000000000000000022 /* NativeRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000023 /* NativeRoomView.swift */; };
+		E40000000000000000000005 /* FleetCredentialSyncTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000008 /* FleetCredentialSyncTransportTests.swift */; };
+		E40000000000000000000006 /* BackgroundServiceControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000009 /* BackgroundServiceControllerTests.swift */; };
+		E40000000000000000000007 /* CastingAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000010 /* CastingAdapterTests.swift */; };
+		E40000000000000000000008 /* MultiRoomSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000011 /* MultiRoomSetupTests.swift */; };
+		E40000000000000000000009 /* NativeRoomCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000012 /* NativeRoomCoordinatorTests.swift */; };
+		E20000000000000000000001 /* Portal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* Portal.swift */; };
+		E20000000000000000000002 /* PortalCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* PortalCapabilities.swift */; };
+		E20000000000000000000003 /* ConnectionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* ConnectionState.swift */; };
+		E20000000000000000000004 /* ManagerError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* ManagerError.swift */; };
+		E20000000000000000000005 /* PortalInfoClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* PortalInfoClassifier.swift */; };
+		E20000000000000000000006 /* LANPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000006 /* LANPolicy.swift */; };
+		E20000000000000000000009 /* FleetRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* FleetRoute.swift */; };
+		E3000000000000000000000C /* OperationPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000C /* OperationPlanner.swift */; };
+		E30000000000000000000010 /* PortalSessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000010 /* PortalSessionCoordinator.swift */; };
+		E3000000000000000000000D /* HTTPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000D /* HTTPTransport.swift */; };
+		E3000000000000000000000E /* FleetHTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000E /* FleetHTTPClient.swift */; };
+		E3000000000000000000000F /* FleetResponseClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000000F /* FleetResponseClassifier.swift */; };
+		E50000000000000000000001 /* BonjourBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000000000000000000001 /* BonjourBrowser.swift */; };
+		E3000000000000000000001A /* DiscoveryCandidateAdmission.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000001A /* DiscoveryCandidateAdmission.swift */; };
+		E3000000000000000000001B /* DiscoveryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000001B /* DiscoveryCoordinator.swift */; };
+		E3000000000000000000001C /* ManualPortalCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3000000000000000000001C /* ManualPortalCoordinator.swift */; };
+		E2000000000000000000000A /* Provisioning.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000A /* Provisioning.swift */; };
+		E60000000000000000000001 /* ADBRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000001 /* ADBRunner.swift */; };
+		E2000000000000000000000B /* ArtifactVerification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* ArtifactVerification.swift */; };
+		E2000000000000000000000C /* ArtifactVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000C /* ArtifactVerifier.swift */; };
+		E2000000000000000000000D /* SettingsSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000D /* SettingsSchema.swift */; };
+		E2000000000000000000000E /* SettingsPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000E /* SettingsPolicy.swift */; };
+		E60000000000000000000002 /* TempWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000002 /* TempWorkspace.swift */; };
+		E60000000000000000000003 /* ProvisioningCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000000000000000000003 /* ProvisioningCoordinator.swift */; };
+		E80000000000000000000001 /* SettingsCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000001 /* SettingsCoordinator.swift */; };
+		E10000000000000000000007 /* ProvisioningContractsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* ProvisioningContractsTests.swift */; };
+		E80000000000000000000002 /* SettingsCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B80000000000000000000002 /* SettingsCoordinatorTests.swift */; };
+		E10000000000000000000008 /* LocalArtifactVerifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* LocalArtifactVerifierTests.swift */; };
+		E10000000000000000000009 /* TempWorkspaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* TempWorkspaceTests.swift */; };
+		E90000000000000000000010 /* EngineLayerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000010 /* EngineLayerTests.swift */; };
+		E40000000000000000000002 /* ProvisioningCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000002 /* ProvisioningCoordinatorTests.swift */; };
+		E40000000000000000000003 /* CastingCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000006 /* CastingCoordinatorTests.swift */; };
+		E40000000000000000000004 /* FleetCredentialSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000000000000000000007 /* FleetCredentialSyncTests.swift */; };
+		E10000000000000000000020 /* libcompression.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = C10000000000000000000007 /* libcompression.tbd */; };
+		E90000000000000000000001 /* BulkOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000001 /* BulkOperation.swift */; };
+		E90000000000000000000002 /* MusicTopology.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000002 /* MusicTopology.swift */; };
+		E90000000000000000000003 /* ReleaseEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000003 /* ReleaseEvidence.swift */; };
+		E90000000000000000000004 /* BulkOperationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000004 /* BulkOperationEngine.swift */; };
+		E90000000000000000000005 /* MusicServiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000005 /* MusicServiceCoordinator.swift */; };
+		E90000000000000000000006 /* ReleaseEvidenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000006 /* ReleaseEvidenceCoordinator.swift */; };
+		EA0000000000000000000023 /* ReleasePackaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000023 /* ReleasePackaging.swift */; };
+		E90000000000000000000007 /* ReadOnlyServiceAdapters.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000007 /* ReadOnlyServiceAdapters.swift */; };
+		E90000000000000000000008 /* SystemServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000008 /* SystemServices.swift */; };
+		E90000000000000000000009 /* PortalTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90000000000000000000009 /* PortalTheme.swift */; };
+		E9000000000000000000000A /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000000000000000000000A /* HomeView.swift */; };
+		E9000000000000000000000B /* PortalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000000000000000000000B /* PortalsView.swift */; };
+		E9000000000000000000000C /* MusicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000000000000000000000C /* MusicView.swift */; };
+		E9000000000000000000000D /* BulkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000000000000000000000D /* BulkView.swift */; };
+		E9000000000000000000000E /* ProvisioningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000000000000000000000E /* ProvisioningView.swift */; };
+		E9000000000000000000000F /* ReleaseEvidenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9000000000000000000000F /* ReleaseEvidenceView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		Q10000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T10000000000000000000001;
+			remoteInfo = PortalManager;
+		};
+		Q10000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T10000000000000000000001;
+			remoteInfo = PortalManager;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B10000000000000000000001 /* PortalManagerApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalManagerApp.swift; sourceTree = "<group>"; };
+		B10000000000000000000002 /* RootView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		B10000000000000000000003 /* PortalManagerTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalManagerTests.swift; sourceTree = "<group>"; };
+		B70000000000000000000001 /* SettingsPolicyTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsPolicyTests.swift; sourceTree = "<group>"; };
+		B40000000000000000000001 /* DeterministicFakes.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DeterministicFakes.swift; sourceTree = "<group>"; };
+		B10000000000000000000004 /* PortalManagerUITests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalManagerUITests.swift; sourceTree = "<group>"; };
+		B30000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		B30000000000000000000002 /* AppCommands.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
+		B30000000000000000000003 /* DependencyContainer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DependencyContainer.swift; sourceTree = "<group>"; };
+		B30000000000000000000004 /* SceneNavigation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SceneNavigation.swift; sourceTree = "<group>"; };
+		B30000000000000000000005 /* DependencyPorts.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DependencyPorts.swift; sourceTree = "<group>"; };
+		B30000000000000000000006 /* PortalManagerStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalManagerStore.swift; sourceTree = "<group>"; };
+		B30000000000000000000007 /* ConnectionAdmission.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ConnectionAdmission.swift; sourceTree = "<group>"; };
+		B30000000000000000000008 /* JSONRegistryStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = JSONRegistryStore.swift; sourceTree = "<group>"; };
+		B30000000000000000000019 /* PortalRegistryCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalRegistryCoordinator.swift; sourceTree = "<group>"; };
+		B3000000000000000000000B /* SourceSecretCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SourceSecretCoordinator.swift; sourceTree = "<group>"; };
+		B30000000000000000000009 /* KeychainCredentialStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KeychainCredentialStore.swift; sourceTree = "<group>"; };
+		B3000000000000000000000A /* Redactor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Redactor.swift; sourceTree = "<group>"; };
+		B10000000000000000000005 /* Localizable.xcstrings */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		B10000000000000000000021 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = com.apple.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		B10000000000000000000006 /* PortalManager.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = PortalManager.entitlements; sourceTree = "<group>"; };
+		B20000000000000000000001 /* Portal.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Portal.swift; sourceTree = "<group>"; };
+		B20000000000000000000002 /* PortalCapabilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalCapabilities.swift; sourceTree = "<group>"; };
+		B20000000000000000000003 /* ConnectionState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ConnectionState.swift; sourceTree = "<group>"; };
+		B20000000000000000000004 /* ManagerError.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ManagerError.swift; sourceTree = "<group>"; };
+		B20000000000000000000005 /* PortalInfoClassifier.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalInfoClassifier.swift; sourceTree = "<group>"; };
+		B20000000000000000000006 /* LANPolicy.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LANPolicy.swift; sourceTree = "<group>"; };
+		B20000000000000000000007 /* PortalRegistry.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalRegistry.swift; sourceTree = "<group>"; };
+		B20000000000000000000008 /* SourceMutation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SourceMutation.swift; sourceTree = "<group>"; };
+		B20000000000000000000009 /* FleetRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FleetRoute.swift; sourceTree = "<group>"; };
+		B3000000000000000000000C /* OperationPlanner.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OperationPlanner.swift; sourceTree = "<group>"; };
+		B30000000000000000000010 /* PortalSessionCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalSessionCoordinator.swift; sourceTree = "<group>"; };
+		B3000000000000000000000D /* HTTPTransport.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HTTPTransport.swift; sourceTree = "<group>"; };
+		B3000000000000000000000E /* FleetHTTPClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FleetHTTPClient.swift; sourceTree = "<group>"; };
+		B3000000000000000000000F /* FleetResponseClassifier.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FleetResponseClassifier.swift; sourceTree = "<group>"; };
+		B50000000000000000000001 /* BonjourBrowser.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BonjourBrowser.swift; sourceTree = "<group>"; };
+		B3000000000000000000001A /* DiscoveryCandidateAdmission.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DiscoveryCandidateAdmission.swift; sourceTree = "<group>"; };
+		B3000000000000000000001B /* DiscoveryCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DiscoveryCoordinator.swift; sourceTree = "<group>"; };
+		B3000000000000000000001C /* ManualPortalCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ManualPortalCoordinator.swift; sourceTree = "<group>"; };
+		B2000000000000000000000A /* Provisioning.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Provisioning.swift; sourceTree = "<group>"; };
+		B60000000000000000000001 /* ADBRunner.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ADBRunner.swift; sourceTree = "<group>"; };
+		B2000000000000000000000B /* ArtifactVerification.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ArtifactVerification.swift; sourceTree = "<group>"; };
+		B2000000000000000000000C /* ArtifactVerifier.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ArtifactVerifier.swift; sourceTree = "<group>"; };
+		B2000000000000000000000D /* SettingsSchema.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsSchema.swift; sourceTree = "<group>"; };
+		B2000000000000000000000E /* SettingsPolicy.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsPolicy.swift; sourceTree = "<group>"; };
+		B2000000000000000000000F /* CastingTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingTarget.swift; sourceTree = "<group>"; };
+		B20000000000000000000010 /* FleetCredentialSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetCredentialSync.swift; sourceTree = "<group>"; };
+		B60000000000000000000002 /* TempWorkspace.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TempWorkspace.swift; sourceTree = "<group>"; };
+		B60000000000000000000003 /* ProvisioningCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProvisioningCoordinator.swift; sourceTree = "<group>"; };
+		B80000000000000000000001 /* SettingsCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsCoordinator.swift; sourceTree = "<group>"; };
+		B10000000000000000000007 /* ProvisioningContractsTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProvisioningContractsTests.swift; sourceTree = "<group>"; };
+		B80000000000000000000002 /* SettingsCoordinatorTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsCoordinatorTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000008 /* LocalArtifactVerifierTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LocalArtifactVerifierTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000009 /* TempWorkspaceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TempWorkspaceTests.swift; sourceTree = "<group>"; };
+		B90000000000000000000010 /* EngineLayerTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EngineLayerTests.swift; sourceTree = "<group>"; };
+		B40000000000000000000002 /* ProvisioningCoordinatorTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProvisioningCoordinatorTests.swift; sourceTree = "<group>"; };
+		B40000000000000000000006 /* CastingCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingCoordinatorTests.swift; sourceTree = "<group>"; };
+		B40000000000000000000007 /* FleetCredentialSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetCredentialSyncTests.swift; sourceTree = "<group>"; };
+		C10000000000000000000001 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		C10000000000000000000002 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		C10000000000000000000003 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
+		C10000000000000000000004 /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
+		C10000000000000000000005 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		C10000000000000000000006 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		C10000000000000000000007 /* libcompression.tbd */ = {isa = PBXFileReference; lastKnownFileType = archive.tbd; name = libcompression.tbd; path = usr/lib/libcompression.tbd; sourceTree = SDKROOT; };
+		B90000000000000000000001 /* BulkOperation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BulkOperation.swift; sourceTree = "<group>"; };
+		B90000000000000000000002 /* MusicTopology.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MusicTopology.swift; sourceTree = "<group>"; };
+		B90000000000000000000003 /* ReleaseEvidence.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReleaseEvidence.swift; sourceTree = "<group>"; };
+		B90000000000000000000004 /* BulkOperationEngine.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BulkOperationEngine.swift; sourceTree = "<group>"; };
+		B90000000000000000000005 /* MusicServiceCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MusicServiceCoordinator.swift; sourceTree = "<group>"; };
+		B90000000000000000000006 /* ReleaseEvidenceCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReleaseEvidenceCoordinator.swift; sourceTree = "<group>"; };
+		B90000000000000000000014 /* CastingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingCoordinator.swift; sourceTree = "<group>"; };
+		B90000000000000000000015 /* FleetCredentialSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetCredentialSyncCoordinator.swift; sourceTree = "<group>"; };
+		B90000000000000000000016 /* CredentialSyncView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialSyncView.swift; sourceTree = "<group>"; };
+		B90000000000000000000017 /* BackgroundServiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundServiceView.swift; sourceTree = "<group>"; };
+		B90000000000000000000018 /* BackgroundServiceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundServiceController.swift; sourceTree = "<group>"; };
+		B3000000000000000000001D /* FleetCredentialSyncTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetCredentialSyncTransport.swift; sourceTree = "<group>"; };
+		B40000000000000000000008 /* FleetCredentialSyncTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetCredentialSyncTransportTests.swift; sourceTree = "<group>"; };
+		B40000000000000000000009 /* BackgroundServiceControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundServiceControllerTests.swift; sourceTree = "<group>"; };
+		B90000000000000000000019 /* CastingAdapters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingAdapters.swift; sourceTree = "<group>"; };
+		B90000000000000000000020 /* CastingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingView.swift; sourceTree = "<group>"; };
+		B90000000000000000000021 /* MultiRoomSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiRoomSetupView.swift; sourceTree = "<group>"; };
+		B20000000000000000000011 /* MultiRoomSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiRoomSetup.swift; sourceTree = "<group>"; };
+		B40000000000000000000010 /* CastingAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CastingAdapterTests.swift; sourceTree = "<group>"; };
+		B40000000000000000000011 /* MultiRoomSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiRoomSetupTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000012 /* NativeRoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRoom.swift; sourceTree = "<group>"; };
+		B90000000000000000000022 /* NativeRoomCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRoomCoordinator.swift; sourceTree = "<group>"; };
+		BA0000000000000000000023 /* ReleasePackaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleasePackaging.swift; sourceTree = "<group>"; };
+		B90000000000000000000023 /* NativeRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRoomView.swift; sourceTree = "<group>"; };
+		B40000000000000000000012 /* NativeRoomCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRoomCoordinatorTests.swift; sourceTree = "<group>"; };
+		B90000000000000000000007 /* ReadOnlyServiceAdapters.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReadOnlyServiceAdapters.swift; sourceTree = "<group>"; };
+		B90000000000000000000008 /* SystemServices.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SystemServices.swift; sourceTree = "<group>"; };
+		B90000000000000000000009 /* PortalTheme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalTheme.swift; sourceTree = "<group>"; };
+		B9000000000000000000000A /* HomeView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		B9000000000000000000000B /* PortalsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PortalsView.swift; sourceTree = "<group>"; };
+		B9000000000000000000000C /* MusicView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MusicView.swift; sourceTree = "<group>"; };
+		B9000000000000000000000D /* BulkView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BulkView.swift; sourceTree = "<group>"; };
+		B9000000000000000000000E /* ProvisioningView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProvisioningView.swift; sourceTree = "<group>"; };
+		B9000000000000000000000F /* ReleaseEvidenceView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReleaseEvidenceView.swift; sourceTree = "<group>"; };
+		D10000000000000000000001 /* PortalManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PortalManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D10000000000000000000002 /* PortalManagerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PortalManagerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D10000000000000000000003 /* PortalManagerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PortalManagerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F10000000000000000000002 /* PortalManager Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E10000000000000000000011 /* Foundation.framework in Frameworks */,
+				E10000000000000000000012 /* SwiftUI.framework in Frameworks */,
+				E10000000000000000000013 /* AppKit.framework in Frameworks */,
+				E10000000000000000000014 /* Network.framework in Frameworks */,
+				E10000000000000000000015 /* Security.framework in Frameworks */,
+				E10000000000000000000020 /* libcompression.tbd in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F10000000000000000000005 /* PortalManagerTests Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E10000000000000000000016 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F10000000000000000000008 /* PortalManagerUITests Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E10000000000000000000017 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A10000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000005 /* PortalManager */,
+				A1000000000000000000000C /* PortalManagerTests */,
+				A10000000000000000000016 /* PortalManagerUITests */,
+				A10000000000000000000003 /* Products */,
+				A10000000000000000000004 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		A10000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000001 /* PortalManager.app */,
+				D10000000000000000000002 /* PortalManagerTests.xctest */,
+				D10000000000000000000003 /* PortalManagerUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000004 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C10000000000000000000001 /* Foundation.framework */,
+				C10000000000000000000002 /* SwiftUI.framework */,
+				C10000000000000000000003 /* AppKit.framework */,
+				C10000000000000000000004 /* Network.framework */,
+				C10000000000000000000005 /* Security.framework */,
+				C10000000000000000000006 /* XCTest.framework */,
+				C10000000000000000000007 /* libcompression.tbd */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000005 /* PortalManager */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000006 /* App */,
+				A10000000000000000000007 /* Domain */,
+				A10000000000000000000008 /* Application */,
+				A10000000000000000000009 /* Infrastructure */,
+				A1000000000000000000000A /* UI */,
+				A1000000000000000000000B /* Resources */,
+				B10000000000000000000006 /* PortalManager.entitlements */,
+			);
+			path = PortalManager;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000006 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000001 /* PortalManagerApp.swift */,
+				B30000000000000000000001 /* AppDelegate.swift */,
+				B30000000000000000000002 /* AppCommands.swift */,
+				B30000000000000000000003 /* DependencyContainer.swift */,
+				B30000000000000000000004 /* SceneNavigation.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000007 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000001 /* Portal.swift */,
+				B20000000000000000000002 /* PortalCapabilities.swift */,
+				B20000000000000000000003 /* ConnectionState.swift */,
+				B20000000000000000000004 /* ManagerError.swift */,
+				B20000000000000000000005 /* PortalInfoClassifier.swift */,
+				B20000000000000000000006 /* LANPolicy.swift */,
+				B20000000000000000000007 /* PortalRegistry.swift */,
+				B20000000000000000000008 /* SourceMutation.swift */,
+				B20000000000000000000009 /* FleetRoute.swift */,
+				B2000000000000000000000A /* Provisioning.swift */,
+				B2000000000000000000000B /* ArtifactVerification.swift */,
+				B2000000000000000000000D /* SettingsSchema.swift */,
+				B2000000000000000000000E /* SettingsPolicy.swift */,
+				B90000000000000000000001 /* BulkOperation.swift */,
+				B90000000000000000000002 /* MusicTopology.swift */,
+				B90000000000000000000003 /* ReleaseEvidence.swift */,
+				B20000000000000000000011 /* MultiRoomSetup.swift */,
+				B20000000000000000000012 /* NativeRoom.swift */,
+				B2000000000000000000000F /* CastingTarget.swift */,
+				B20000000000000000000010 /* FleetCredentialSync.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000008 /* Application */ = {
+			isa = PBXGroup;
+			children = (
+				B30000000000000000000005 /* DependencyPorts.swift */,
+				B30000000000000000000006 /* PortalManagerStore.swift */,
+				B30000000000000000000007 /* ConnectionAdmission.swift */,
+				B3000000000000000000001A /* DiscoveryCandidateAdmission.swift */,
+				B3000000000000000000001B /* DiscoveryCoordinator.swift */,
+				B3000000000000000000001C /* ManualPortalCoordinator.swift */,
+				B30000000000000000000019 /* PortalRegistryCoordinator.swift */,
+				B30000000000000000000010 /* PortalSessionCoordinator.swift */,
+				B3000000000000000000000B /* SourceSecretCoordinator.swift */,
+				B80000000000000000000001 /* SettingsCoordinator.swift */,
+				B3000000000000000000000C /* OperationPlanner.swift */,
+				B60000000000000000000003 /* ProvisioningCoordinator.swift */,
+				B90000000000000000000004 /* BulkOperationEngine.swift */,
+				B90000000000000000000005 /* MusicServiceCoordinator.swift */,
+				B90000000000000000000006 /* ReleaseEvidenceCoordinator.swift */,
+				BA0000000000000000000023 /* ReleasePackaging.swift */,
+				B90000000000000000000014 /* CastingCoordinator.swift */,
+				B90000000000000000000015 /* FleetCredentialSyncCoordinator.swift */,
+				B90000000000000000000022 /* NativeRoomCoordinator.swift */,
+			);
+			path = Application;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000009 /* Infrastructure */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000017 /* Registry */,
+				A10000000000000000000018 /* Credentials */,
+				A10000000000000000000019 /* Support */,
+				A1000000000000000000001A /* Fleet */,
+				A1000000000000000000001B /* Discovery */,
+				A60000000000000000000001 /* Provisioning */,
+				A10000000000000000000020 /* Music */,
+				A10000000000000000000021 /* Casting */,
+			);
+			path = Infrastructure;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000001B /* Discovery */ = {
+			isa = PBXGroup;
+			children = (
+				B50000000000000000000001 /* BonjourBrowser.swift */,
+			);
+			path = Discovery;
+			sourceTree = "<group>";
+		};
+		A60000000000000000000001 /* Provisioning */ = {
+			isa = PBXGroup;
+			children = (
+				B60000000000000000000001 /* ADBRunner.swift */,
+				B2000000000000000000000C /* ArtifactVerifier.swift */,
+				B60000000000000000000002 /* TempWorkspace.swift */,
+			);
+			path = Provisioning;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000020 /* Music */ = {
+			isa = PBXGroup;
+			children = (
+				B90000000000000000000007 /* ReadOnlyServiceAdapters.swift */,
+			);
+			path = Music;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000021 /* Casting */ = {
+			isa = PBXGroup;
+			children = (
+				B90000000000000000000019 /* CastingAdapters.swift */,
+			);
+			path = Casting;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000001A /* Fleet */ = {
+			isa = PBXGroup;
+			children = (
+				B3000000000000000000000D /* HTTPTransport.swift */,
+				B3000000000000000000000E /* FleetHTTPClient.swift */,
+				B3000000000000000000000F /* FleetResponseClassifier.swift */,
+			);
+			path = Fleet;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000017 /* Registry */ = {
+			isa = PBXGroup;
+			children = (
+				B30000000000000000000008 /* JSONRegistryStore.swift */,
+			);
+			path = Registry;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000018 /* Credentials */ = {
+			isa = PBXGroup;
+			children = (
+				B30000000000000000000009 /* KeychainCredentialStore.swift */,
+				B3000000000000000000001D /* FleetCredentialSyncTransport.swift */,
+			);
+			path = Credentials;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000019 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				B3000000000000000000000A /* Redactor.swift */,
+				B90000000000000000000008 /* SystemServices.swift */,
+				B90000000000000000000018 /* BackgroundServiceController.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000A /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000002 /* RootView.swift */,
+				B90000000000000000000009 /* PortalTheme.swift */,
+				B9000000000000000000000A /* HomeView.swift */,
+				B9000000000000000000000B /* PortalsView.swift */,
+				B9000000000000000000000C /* MusicView.swift */,
+				B9000000000000000000000D /* BulkView.swift */,
+				B9000000000000000000000E /* ProvisioningView.swift */,
+				B9000000000000000000000F /* ReleaseEvidenceView.swift */,
+				B90000000000000000000016 /* CredentialSyncView.swift */,
+				B90000000000000000000017 /* BackgroundServiceView.swift */,
+				B90000000000000000000020 /* CastingView.swift */,
+				B90000000000000000000021 /* MultiRoomSetupView.swift */,
+				B90000000000000000000023 /* NativeRoomView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000005 /* Localizable.xcstrings */,
+				B10000000000000000000021 /* AppIcon.icns */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000C /* PortalManagerTests */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000003 /* PortalManagerTests.swift */,
+				B70000000000000000000001 /* SettingsPolicyTests.swift */,
+				B80000000000000000000002 /* SettingsCoordinatorTests.swift */,
+				B10000000000000000000007 /* ProvisioningContractsTests.swift */,
+				B10000000000000000000008 /* LocalArtifactVerifierTests.swift */,
+				B10000000000000000000009 /* TempWorkspaceTests.swift */,
+				B40000000000000000000002 /* ProvisioningCoordinatorTests.swift */,
+				B90000000000000000000010 /* EngineLayerTests.swift */,
+				B40000000000000000000006 /* CastingCoordinatorTests.swift */,
+				B40000000000000000000007 /* FleetCredentialSyncTests.swift */,
+				B40000000000000000000008 /* FleetCredentialSyncTransportTests.swift */,
+				B40000000000000000000009 /* BackgroundServiceControllerTests.swift */,
+				B40000000000000000000010 /* CastingAdapterTests.swift */,
+				B40000000000000000000011 /* MultiRoomSetupTests.swift */,
+				B40000000000000000000012 /* NativeRoomCoordinatorTests.swift */,
+				A40000000000000000000001 /* Support */,
+				A1000000000000000000000D /* Fixtures */,
+			);
+			path = PortalManagerTests;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000001 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				B40000000000000000000001 /* DeterministicFakes.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000D /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000000E /* Fleet */,
+				A1000000000000000000000F /* Pairing */,
+				A10000000000000000000010 /* Sources */,
+				A10000000000000000000011 /* Settings */,
+				A10000000000000000000012 /* Provisioning */,
+				A10000000000000000000013 /* MusicAssistant */,
+				A10000000000000000000014 /* Snapcast */,
+				A10000000000000000000015 /* ReleaseEvidence */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000E /* Fleet */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Fleet;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000F /* Pairing */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Pairing;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000010 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000011 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000012 /* Provisioning */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Provisioning;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000013 /* MusicAssistant */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = MusicAssistant;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000014 /* Snapcast */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Snapcast;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000015 /* ReleaseEvidence */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ReleaseEvidence;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000016 /* PortalManagerUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000004 /* PortalManagerUITests.swift */,
+			);
+			path = PortalManagerUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		T10000000000000000000001 /* PortalManager */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L10000000000000000000002 /* Build configuration list for PBXNativeTarget "PortalManager" */;
+			buildPhases = (
+				F10000000000000000000001 /* PortalManager Sources */,
+				F10000000000000000000002 /* PortalManager Frameworks */,
+				F10000000000000000000003 /* PortalManager Resources */,
+				F20000000000000000000010 /* Build Background Service */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PortalManager;
+			productName = PortalManager;
+			productReference = D10000000000000000000001 /* PortalManager.app */;
+			productType = "com.apple.product-type.application";
+		};
+		T10000000000000000000002 /* PortalManagerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L10000000000000000000003 /* Build configuration list for PBXNativeTarget "PortalManagerTests" */;
+			buildPhases = (
+				F10000000000000000000004 /* PortalManagerTests Sources */,
+				F10000000000000000000005 /* PortalManagerTests Frameworks */,
+				F10000000000000000000006 /* PortalManagerTests Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				P10000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = PortalManagerTests;
+			productName = PortalManagerTests;
+			productReference = D10000000000000000000002 /* PortalManagerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		T10000000000000000000003 /* PortalManagerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L10000000000000000000004 /* Build configuration list for PBXNativeTarget "PortalManagerUITests" */;
+			buildPhases = (
+				F10000000000000000000007 /* PortalManagerUITests Sources */,
+				F10000000000000000000008 /* PortalManagerUITests Frameworks */,
+				F10000000000000000000009 /* PortalManagerUITests Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				P10000000000000000000002 /* PBXTargetDependency */,
+			);
+			name = PortalManagerUITests;
+			productName = PortalManagerUITests;
+			productReference = D10000000000000000000003 /* PortalManagerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				ORGANIZATIONNAME = "Starbright Lab";
+				TargetAttributes = {
+					T10000000000000000000001 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					T10000000000000000000002 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = T10000000000000000000001;
+					};
+					T10000000000000000000003 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = T10000000000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = L10000000000000000000001 /* Build configuration list for PBXProject "PortalManager" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A10000000000000000000002;
+			productRefGroup = A10000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				T10000000000000000000001 /* PortalManager */,
+				T10000000000000000000002 /* PortalManagerTests */,
+				T10000000000000000000003 /* PortalManagerUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F10000000000000000000003 /* PortalManager Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E10000000000000000000018 /* Localizable.xcstrings in Resources */,
+				E10000000000000000000021 /* AppIcon.icns in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F10000000000000000000006 /* PortalManagerTests Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F10000000000000000000009 /* PortalManagerUITests Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		F20000000000000000000010 /* Build Background Service */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				BackgroundService/Cargo.toml,
+				BackgroundService/src/main.rs,
+			);
+			name = "Build Background Service";
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(PRODUCT_NAME).$(WRAPPER_EXTENSION)/Contents/Resources/portal-manager-background",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/zsh;
+			shellScript = "set -euo pipefail\ncargo build --release --manifest-path \"$SRCROOT/BackgroundService/Cargo.toml\"\nmkdir -p \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.$WRAPPER_EXTENSION/Contents/Resources\"\ncp -f \"$SRCROOT/BackgroundService/target/release/portal-manager-background\" \"$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.$WRAPPER_EXTENSION/Contents/Resources/portal-manager-background\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F10000000000000000000001 /* PortalManager Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E10000000000000000000001 /* PortalManagerApp.swift in Sources */,
+				E30000000000000000000001 /* AppDelegate.swift in Sources */,
+				E30000000000000000000002 /* AppCommands.swift in Sources */,
+				E30000000000000000000003 /* DependencyContainer.swift in Sources */,
+				E30000000000000000000004 /* SceneNavigation.swift in Sources */,
+				E30000000000000000000005 /* DependencyPorts.swift in Sources */,
+				E30000000000000000000006 /* PortalManagerStore.swift in Sources */,
+				E30000000000000000000007 /* ConnectionAdmission.swift in Sources */,
+				E3000000000000000000001A /* DiscoveryCandidateAdmission.swift in Sources */,
+				E30000000000000000000019 /* PortalRegistryCoordinator.swift in Sources */,
+				E30000000000000000000010 /* PortalSessionCoordinator.swift in Sources */,
+				E3000000000000000000000B /* SourceSecretCoordinator.swift in Sources */,
+				E30000000000000000000008 /* JSONRegistryStore.swift in Sources */,
+				E30000000000000000000009 /* KeychainCredentialStore.swift in Sources */,
+				E3000000000000000000000A /* Redactor.swift in Sources */,
+				E10000000000000000000002 /* RootView.swift in Sources */,
+				E20000000000000000000001 /* Portal.swift in Sources */,
+				E20000000000000000000002 /* PortalCapabilities.swift in Sources */,
+				E20000000000000000000003 /* ConnectionState.swift in Sources */,
+				E20000000000000000000004 /* ManagerError.swift in Sources */,
+				E20000000000000000000005 /* PortalInfoClassifier.swift in Sources */,
+				E20000000000000000000006 /* LANPolicy.swift in Sources */,
+				E20000000000000000000009 /* FleetRoute.swift in Sources */,
+				E20000000000000000000007 /* PortalRegistry.swift in Sources */,
+				E20000000000000000000008 /* SourceMutation.swift in Sources */,
+				E3000000000000000000000C /* OperationPlanner.swift in Sources */,
+				E3000000000000000000000D /* HTTPTransport.swift in Sources */,
+				E3000000000000000000000E /* FleetHTTPClient.swift in Sources */,
+				E3000000000000000000000F /* FleetResponseClassifier.swift in Sources */,
+				E50000000000000000000001 /* BonjourBrowser.swift in Sources */,
+				E3000000000000000000001B /* DiscoveryCoordinator.swift in Sources */,
+				E3000000000000000000001C /* ManualPortalCoordinator.swift in Sources */,
+				E2000000000000000000000A /* Provisioning.swift in Sources */,
+				E60000000000000000000001 /* ADBRunner.swift in Sources */,
+				E2000000000000000000000B /* ArtifactVerification.swift in Sources */,
+				E2000000000000000000000D /* SettingsSchema.swift in Sources */,
+				E2000000000000000000000E /* SettingsPolicy.swift in Sources */,
+				E80000000000000000000001 /* SettingsCoordinator.swift in Sources */,
+				E2000000000000000000000C /* ArtifactVerifier.swift in Sources */,
+				E60000000000000000000002 /* TempWorkspace.swift in Sources */,
+				E60000000000000000000003 /* ProvisioningCoordinator.swift in Sources */,
+				E90000000000000000000001 /* BulkOperation.swift in Sources */,
+				E90000000000000000000002 /* MusicTopology.swift in Sources */,
+				E90000000000000000000003 /* ReleaseEvidence.swift in Sources */,
+				E90000000000000000000004 /* BulkOperationEngine.swift in Sources */,
+				E90000000000000000000005 /* MusicServiceCoordinator.swift in Sources */,
+				E90000000000000000000006 /* ReleaseEvidenceCoordinator.swift in Sources */,
+				EA0000000000000000000023 /* ReleasePackaging.swift in Sources */,
+				E90000000000000000000007 /* ReadOnlyServiceAdapters.swift in Sources */,
+				E90000000000000000000008 /* SystemServices.swift in Sources */,
+				E90000000000000000000009 /* PortalTheme.swift in Sources */,
+				E9000000000000000000000A /* HomeView.swift in Sources */,
+				E9000000000000000000000B /* PortalsView.swift in Sources */,
+				E9000000000000000000000C /* MusicView.swift in Sources */,
+				E9000000000000000000000D /* BulkView.swift in Sources */,
+				E9000000000000000000000E /* ProvisioningView.swift in Sources */,
+				E9000000000000000000000F /* ReleaseEvidenceView.swift in Sources */,
+				E10000000000000000000022 /* CastingTarget.swift in Sources */,
+				E90000000000000000000011 /* CastingCoordinator.swift in Sources */,
+				E10000000000000000000023 /* FleetCredentialSync.swift in Sources */,
+				E90000000000000000000012 /* FleetCredentialSyncCoordinator.swift in Sources */,
+				E90000000000000000000013 /* CredentialSyncView.swift in Sources */,
+				E90000000000000000000014 /* BackgroundServiceView.swift in Sources */,
+				E90000000000000000000016 /* BackgroundServiceController.swift in Sources */,
+				E3000000000000000000001D /* FleetCredentialSyncTransport.swift in Sources */,
+				E90000000000000000000017 /* CastingAdapters.swift in Sources */,
+				E90000000000000000000018 /* CastingView.swift in Sources */,
+				E90000000000000000000019 /* MultiRoomSetupView.swift in Sources */,
+				E90000000000000000000020 /* MultiRoomSetup.swift in Sources */,
+				E20000000000000000000012 /* NativeRoom.swift in Sources */,
+				E90000000000000000000021 /* NativeRoomCoordinator.swift in Sources */,
+				E90000000000000000000022 /* NativeRoomView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F10000000000000000000004 /* PortalManagerTests Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E10000000000000000000003 /* PortalManagerTests.swift in Sources */,
+				E70000000000000000000001 /* SettingsPolicyTests.swift in Sources */,
+				E80000000000000000000002 /* SettingsCoordinatorTests.swift in Sources */,
+				E10000000000000000000007 /* ProvisioningContractsTests.swift in Sources */,
+				E10000000000000000000008 /* LocalArtifactVerifierTests.swift in Sources */,
+				E10000000000000000000009 /* TempWorkspaceTests.swift in Sources */,
+				E40000000000000000000002 /* ProvisioningCoordinatorTests.swift in Sources */,
+				E90000000000000000000010 /* EngineLayerTests.swift in Sources */,
+				E40000000000000000000003 /* CastingCoordinatorTests.swift in Sources */,
+				E40000000000000000000004 /* FleetCredentialSyncTests.swift in Sources */,
+				E40000000000000000000005 /* FleetCredentialSyncTransportTests.swift in Sources */,
+				E40000000000000000000006 /* BackgroundServiceControllerTests.swift in Sources */,
+				E40000000000000000000007 /* CastingAdapterTests.swift in Sources */,
+				E40000000000000000000008 /* MultiRoomSetupTests.swift in Sources */,
+				E40000000000000000000009 /* NativeRoomCoordinatorTests.swift in Sources */,
+				E40000000000000000000001 /* DeterministicFakes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F10000000000000000000007 /* PortalManagerUITests Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E10000000000000000000004 /* PortalManagerUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		P10000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T10000000000000000000001 /* PortalManager */;
+			targetProxy = Q10000000000000000000001 /* PBXContainerItemProxy */;
+		};
+		P10000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T10000000000000000000001 /* PortalManager */;
+			targetProxy = Q10000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		G10000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		G10000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf-with-dsym;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		G10000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = PortalManager/PortalManager.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = YES;
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SELECTED_FILES = read-write;
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INFOPLIST_KEY_CFBundleDisplayName = "Portal Manager";
+				INFOPLIST_FILE = PortalManager/Resources/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starbrightlab.portalmanager;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		G10000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = PortalManager/PortalManager.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = YES;
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = read-write;
+				INFOPLIST_KEY_CFBundleDevelopmentRegion = en;
+				INFOPLIST_KEY_CFBundleDisplayName = "Portal Manager";
+				INFOPLIST_FILE = PortalManager/Resources/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starbrightlab.portalmanager;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		G10000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starbrightlab.portalmanager.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PortalManager.app/Contents/MacOS/PortalManager";
+			};
+			name = Debug;
+		};
+		G10000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starbrightlab.portalmanager.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PortalManager.app/Contents/MacOS/PortalManager";
+			};
+			name = Release;
+		};
+		G10000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starbrightlab.portalmanager.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = PortalManager;
+			};
+			name = Debug;
+		};
+		G10000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starbrightlab.portalmanager.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = PortalManager;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		L10000000000000000000001 /* Build configuration list for PBXProject "PortalManager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10000000000000000000001 /* Debug */,
+				G10000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L10000000000000000000002 /* Build configuration list for PBXNativeTarget "PortalManager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10000000000000000000003 /* Debug */,
+				G10000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L10000000000000000000003 /* Build configuration list for PBXNativeTarget "PortalManagerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10000000000000000000005 /* Debug */,
+				G10000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L10000000000000000000004 /* Build configuration list for PBXNativeTarget "PortalManagerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10000000000000000000007 /* Debug */,
+				G10000000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A10000000000000000000001 /* Project object */;
+}

@@ -14,6 +14,7 @@ apks/*.apk
 fleetctl
 target/
 Cargo.lock
+!Cargo.lock
 
 # Device backups from fleet-backup.sh (tokens + cleartext credentials — never commit)
 backups/

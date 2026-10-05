@@ -11,6 +11,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import java.io.File
 import java.net.Inet4Address
@@ -36,6 +37,8 @@ import org.json.JSONObject
  */
 class FleetRoutes(private val context: Context) {
 
+  private val tag = "FleetRoutes"
+
   @Volatile private var catalog: List<CatalogApp> = emptyList()
   private val inFlight = ConcurrentHashMap.newKeySet<String>()
 
@@ -55,6 +58,7 @@ class FleetRoutes(private val context: Context) {
     return when (req.path) {
       "/info" -> requireMethod("GET", req) { info() }
       "/apps" -> requireMethod("GET", req) { apps() }
+      "/apps/profile" -> appProfiles(req)
       "/install" -> requireMethod("POST", req) { install(req) }
       "/update" -> requireMethod("POST", req) { update(req) }
       "/dev" -> dev(req)
@@ -108,6 +112,12 @@ class FleetRoutes(private val context: Context) {
                     .put("autoConfirm", SettingsGuard.isInstallConfirmEnabled(context)))
             .put("canWriteSecureSettings", SettingsGuard.canWriteSecureSettings(context))
             .put("devMode", DevMode.isEnabled(context))
+            .put(
+                "roomLink",
+                JSONObject()
+                    .put("mode", ImmortalSettings.intercomMode(context))
+                    .put("state", IntercomService.state)
+                    .put("detail", IntercomService.statusText))
             .put(
                 "capabilities",
                 JSONObject().put("files", true).put("diag", true).put("calendar", true).put("screensaver", true).put("dev", true).put("logcat", canReadLogs()))
@@ -203,6 +213,120 @@ class FleetRoutes(private val context: Context) {
     }
     return resp(200, ok().put("count", targets.size).put("updated", results))
   }
+
+  /**
+   * Read, set, or remove one desired-state app profile. A set reconciles through the
+   * existing install boundary and returns the resulting terminal state; a busy install
+   * remains pending rather than being reported as failed.
+   */
+  private fun appProfiles(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    return when (req.method) {
+        "GET" -> resp(200, profileSnapshot())
+        "POST" -> {
+          val body = parseJson(req.bodyText()) ?: return resp(400, err("bad_json"))
+          val pkg = body.optString("packageName").ifBlank { null }
+              ?: return resp(400, err("packageName_required"))
+          val retry = body.optBoolean("retry", false)
+          val action = body.optString("action").ifBlank { "install" }
+          fun reconcile(candidate: FleetAppProfiles.Profile): String =
+              when (candidate.action) {
+                FleetAppProfiles.ACTION_REMOVE ->
+                    FleetAppProfiles.reconcileRemove(context, candidate.packageName)
+                else -> FleetAppProfiles.reconcileInstall(this, context, candidate)
+              }
+
+          try {
+            if (retry) {
+              val profile = FleetAppProfiles.load(context)
+                  .firstOrNull { it.packageName == pkg }
+                  ?: return resp(404, err("profile_not_found"))
+              val result = reconcile(profile)
+              FleetAppProfiles.recordAttempt(
+                  context,
+                  profile.packageName,
+                  result,
+                  System.currentTimeMillis(),
+              )
+              return resp(200, profileResponse(profile.packageName).put("applied", result))
+            }
+
+            val (profile, result) = FleetAppProfiles.set(
+                context,
+                pkg,
+                action,
+                body.optString("apkUrl").ifBlank { null },
+                reconcile = ::reconcile,
+            )
+            if (result == FleetAppProfiles.RESULT_ALREADY_ABSENT ||
+                result == FleetAppProfiles.RESULT_REMOVED) {
+              return resp(200, ok().put("profile", profileJson(profile)).put("result", result))
+            }
+            FleetAppProfiles.recordAttempt(
+                context,
+                profile.packageName,
+                result,
+                System.currentTimeMillis(),
+            )
+            resp(200, profileResponse(profile.packageName).put("applied", result))
+          } catch (e: IllegalArgumentException) {
+            resp(400, err(sanitizedProfileError(e.message)))
+          } catch (e: Exception) {
+            resp(500, err("reconciliation_failed"))
+          }
+        }
+        "DELETE" -> {
+          val pkg = req.queryParam("packageName")
+              ?: return resp(400, err("packageName_required"))
+            runCatching { FleetAppProfiles.validatePackageName(pkg) }
+              .getOrElse { return resp(400, err("invalid_package_name")) }
+          val existed = FleetAppProfiles.remove(context, pkg)
+          if (!existed) return resp(404, err("profile_not_found"))
+          resp(200, ok().put("removed", true))
+        }
+        else -> resp(405, err("method_not_allowed"))
+      }
+  }
+
+  private fun profileSnapshot(): JSONObject {
+    val profiles = JSONArray()
+    for (profile in FleetAppProfiles.load(context)) profiles.put(profileJson(profile))
+    return ok()
+        .put("profiles", profiles)
+        .put("summary", profileSummary())
+  }
+
+  private fun profileResponse(packageName: String): JSONObject {
+    val profile = FleetAppProfiles.load(context).firstOrNull { it.packageName == packageName }
+    return if (profile == null) err("profile_not_found") else ok().put("profile", profileJson(profile))
+  }
+
+  private fun profileJson(profile: FleetAppProfiles.Profile): JSONObject =
+      JSONObject()
+          .put("packageName", profile.packageName)
+          .put("action", profile.action)
+          .put("state", profile.state)
+          .put("attempts", profile.attempts)
+          .put("lastAttemptAtMs", profile.lastAttemptAtMs ?: JSONObject.NULL)
+          .put("hasApkUrl", profile.apkUrl != null)
+
+  private fun profileSummary(): JSONObject {
+    val profiles = FleetAppProfiles.load(context)
+    val summary = JSONObject()
+    for (state in listOf(
+        FleetAppProfiles.STATE_PENDING,
+        FleetAppProfiles.STATE_INSTALLED,
+        FleetAppProfiles.STATE_FAILED)) {
+      summary.put(state, profiles.count { it.state == state })
+    }
+    return summary
+  }
+
+  private fun sanitizedProfileError(message: String?): String =
+      when (message) {
+        "invalid_action", "invalid_package_name", "packageName_required",
+        "profile_limit_reached", "apk_url_not_allowed" -> message
+        else -> "invalid_profile"
+      }
 
   /**
    * Read (GET) or toggle (POST `{"enabled":bool}`) developer mode. When on, the
@@ -420,6 +544,17 @@ class FleetRoutes(private val context: Context) {
           description = "",
           category = "")
 
+  internal fun installBusy(packageName: String): Boolean = !inFlight.add(packageName).also {
+    if (it) inFlight.remove(packageName)
+  }
+
+  internal fun installPaused(): Boolean = installMode().paused
+
+  internal fun installApp(app: CatalogApp): String = doInstall(app)
+
+  internal val currentCatalog: List<CatalogApp>
+    get() = catalog
+
   // --- files + logs -----------------------------------------------------------
 
   private fun fsRead(req: FleetHttpServer.Request): FleetHttpServer.Response {
@@ -502,6 +637,9 @@ class FleetRoutes(private val context: Context) {
 
   private fun authorized(req: FleetHttpServer.Request): Boolean {
     val got = req.header("authorization")?.removePrefix("Bearer ")?.trim() ?: return false
+    // Keep the raw header out of Android's log buffer; diagnostics and crash
+    // reports can otherwise retain the bearer token even though responses do not.
+    Log.i(tag, "fleet authorization ${if (got.isEmpty()) "missing" else "provided"}")
     return constantTimeEquals(got, FleetConfig.token(context))
   }
 

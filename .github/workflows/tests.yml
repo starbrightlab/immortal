@@ -6,6 +6,31 @@ on:
   pull_request:
 
 jobs:
+  portal-manager:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate scope, build, and tests
+        run: ./macos/validate.sh check
+
+      - name: Check offline Release verification tools
+        run: ./macos/package-release.sh --check-tools
+
+  rust-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run fleetctl tests
+        run: cargo test --locked --manifest-path provisioning/Cargo.toml
+
+      - name: Run background service tests
+        run: cargo test --locked --manifest-path macos/BackgroundService/Cargo.toml
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:
