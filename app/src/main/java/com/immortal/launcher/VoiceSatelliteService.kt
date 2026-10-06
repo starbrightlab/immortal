@@ -78,11 +78,21 @@ class VoiceSatelliteService : Service() {
   @Volatile private var paused = false
   // Consecutive capture sessions that never produced audio (microphone held by another app).
   private var micBusy = MicBackoff.Idle
+  // Wake word mode (VoiceConfig.wakeWord): WAKE_SERVER, or a model detected on the Portal.
+  @Volatile private var wakeMode = VoiceConfig.WAKE_SERVER
+  // On-device mode: between a local detection and the answer having played.
+  @Volatile private var inConversation = false
+  @Volatile private var conversationStartedMs = 0L
+  @Volatile private var resetDetector = false
+
+  private val localWake: Boolean
+    get() = wakeMode != VoiceConfig.WAKE_SERVER
 
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onCreate() {
     super.onCreate()
+    wakeMode = VoiceConfig.load(this).wakeWord
     startInForeground()
     running = true
     Thread(::serve, "voice-satellite-server").start()
@@ -95,6 +105,15 @@ class VoiceSatelliteService : Service() {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     // Every sync() from a visible Immortal screen re-arms a capture Android has silenced.
     rearm = true
+    val mode = VoiceConfig.load(this).wakeWord
+    if (mode != wakeMode) {
+      // Wake word moved between Home Assistant and the Portal: drop the satellite connection so
+      // Home Assistant reconnects, re-reads our info and runs the matching kind of pipeline.
+      wakeMode = mode
+      streaming = false
+      inConversation = false
+      client?.close()
+    }
     return START_STICKY
   }
 
@@ -162,15 +181,22 @@ class VoiceSatelliteService : Service() {
       "ping" -> conn.send(WyomingEvent("pong", JSONObject().put("text", e.data.optString("text"))))
       "run-satellite" -> {
         retryDelayMs = RETRY_MIN_MS
-        requestPipeline(conn)
-        conn.send(WyomingEvent("audio-start", WyomingEvent.audioFormat(MIC_RATE)))
         // A reconnecting Home Assistant replaces the previous satellite connection.
         val previous = client
         client = conn
         if (previous != null && previous !== conn) previous.close()
-        Log.i(TAG, "running as satellite")
-        streaming = true
-        VoiceStatus.set("Listening for the wake word")
+        Log.i(TAG, "running as satellite (wake word: $wakeMode)")
+        inConversation = false
+        if (localWake) {
+          // The wake word is ours to hear; nothing goes to Home Assistant until then.
+          streaming = false
+          VoiceStatus.set("Listening for the wake word")
+        } else {
+          requestPipeline(conn)
+          conn.send(WyomingEvent("audio-start", WyomingEvent.audioFormat(MIC_RATE)))
+          streaming = true
+          VoiceStatus.set("Listening for the wake word")
+        }
       }
       "pause-satellite" -> {
         if (client !== conn) return
@@ -183,8 +209,12 @@ class VoiceSatelliteService : Service() {
         if (VoiceConfig.load(this).wakeSound) wakeTone()
         if (showConversation()) VoiceHub.listening()
       }
-      "voice-stopped" -> if (showConversation()) VoiceHub.thinking()
+      "voice-stopped" -> {
+        stopLocalStream(conn)
+        if (showConversation()) VoiceHub.thinking()
+      }
       "transcript" -> {
+        stopLocalStream(conn)
         Log.i(TAG, "heard: ${e.data.optString("text")}")
         if (showConversation()) VoiceHub.heard(e.data.optString("text"))
       }
@@ -205,6 +235,12 @@ class VoiceSatelliteService : Service() {
         // satellite to ask again (so a broken config can't spin). Ask again, backing off.
         Log.w(TAG, "pipeline error: ${e.data.optString("code")} ${e.data.optString("text")}")
         if (VoiceHub.state.phase != VoiceHub.Phase.IDLE) VoiceHub.idle()
+        if (localWake) {
+          // On-device wake word: nothing to restart; go back to listening locally.
+          stopLocalStream(conn)
+          endConversation()
+          return
+        }
         val delay = retryDelayMs
         retryDelayMs = (retryDelayMs * 2).coerceAtMost(RETRY_MAX_MS)
         Thread {
@@ -236,6 +272,44 @@ class VoiceSatelliteService : Service() {
                 .put("restart_on_end", true)))
   }
 
+  /**
+   * On-device wake word heard: tell Home Assistant, then run the pipeline from speech-to-text on
+   * the audio that follows, until it hears the end of the sentence.
+   */
+  private fun onLocalWake(conn: Connection, model: String, timestampMs: Long) {
+    Log.i(TAG, "wake word (on device): $model")
+    inConversation = true
+    conversationStartedMs = System.currentTimeMillis()
+    conn.send(WyomingEvent("detection", JSONObject().put("name", model).put("timestamp", timestampMs)))
+    conn.send(
+        WyomingEvent(
+            "run-pipeline",
+            JSONObject()
+                .put("start_stage", "asr")
+                .put("end_stage", "tts")
+                .put("wake_word_name", model)))
+    conn.send(WyomingEvent("audio-start", WyomingEvent.audioFormat(MIC_RATE)))
+    streaming = true
+    VoiceStatus.set("Listening…")
+    if (VoiceConfig.load(this).wakeSound) wakeTone()
+    if (showConversation()) VoiceHub.listening()
+  }
+
+  /** On-device mode: the sentence is over, so stop sending audio. */
+  private fun stopLocalStream(conn: Connection) {
+    if (!localWake || !streaming) return
+    streaming = false
+    conn.send(WyomingEvent("audio-stop"))
+  }
+
+  /** On-device mode: back to listening for the wake word, after a one-second cool-off. */
+  private fun endConversation() {
+    if (!localWake) return
+    inConversation = false
+    resetDetector = true
+    VoiceStatus.set("Listening for the wake word")
+  }
+
   /** The `info` reply: a satellite with a 16 kHz mic and a speaker; no local wake word yet. */
   private fun info(): JSONObject {
     val attribution =
@@ -252,7 +326,7 @@ class VoiceSatelliteService : Service() {
         .put("tts", JSONArray())
         .put("handle", JSONArray())
         .put("intent", JSONArray())
-        .put("wake", JSONArray())
+        .put("wake", wakeInfo(attribution))
         .put(
             "mic",
             JSONArray().put(
@@ -267,9 +341,40 @@ class VoiceSatelliteService : Service() {
             "satellite",
             program(satelliteName(), "Immortal voice satellite")
                 .put("has_vad", false)
-                .put("active_wake_words", JSONArray())
-                .put("max_active_wake_words", 0)
+                .put("active_wake_words", if (localWake) JSONArray().put(wakeMode) else JSONArray())
+                .put("max_active_wake_words", if (localWake) 1 else 0)
                 .put("supports_trigger", true))
+  }
+
+  /** The on-device wake word engine, when one is in use, for Home Assistant's info. */
+  private fun wakeInfo(attribution: JSONObject): JSONArray {
+    if (!localWake) return JSONArray()
+    val models = JSONArray()
+    for (m in WakeWordDetector.MODELS) {
+      val phrase =
+          runCatching {
+                JSONObject(assets.open("wakeword/$m.json").bufferedReader().readText())
+                    .optString("wake_word", m)
+              }
+              .getOrDefault(m)
+      models.put(
+          JSONObject()
+              .put("name", m)
+              .put("phrase", phrase)
+              .put("languages", JSONArray().put("en"))
+              .put("attribution", JSONObject().put("name", "Kevin Ahrendt").put("url", "https://github.com/kahrendt/microWakeWord"))
+              .put("installed", true)
+              .put("description", phrase)
+              .put("version", "2"))
+    }
+    return JSONArray().put(
+        JSONObject()
+            .put("name", "microWakeWord")
+            .put("attribution", attribution)
+            .put("installed", true)
+            .put("description", "On-device wake word")
+            .put("version", appVersion())
+            .put("models", models))
   }
 
   // --- Microphone --------------------------------------------------------------------------
@@ -277,6 +382,8 @@ class VoiceSatelliteService : Service() {
   private fun capture() {
     val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
     val chunk = ByteArray(CHUNK_SAMPLES * 2)
+    val samples = ShortArray(CHUNK_SAMPLES)
+    var detector: WakeWordDetector? = null
     while (running) {
       if (!MicOwner.acquire(MIC_OWNER, MicOwner.PRIORITY_SATELLITE)) {
         VoiceStatus.set("Microphone in use")
@@ -330,6 +437,35 @@ class VoiceSatelliteService : Service() {
             }
           }
           val conn = client
+          // On-device wake word: run the detector while idle; it also needs the model swapped
+          // when the setting changes.
+          if (localWake && detector?.model != wakeMode) {
+            detector?.close()
+            detector =
+                runCatching { WakeWordDetector(this, wakeMode) }
+                    .onFailure { Log.w(TAG, "wake word model: $it") }
+                    .getOrNull()
+          } else if (!localWake && detector != null) {
+            detector.close()
+            detector = null
+          }
+          if (resetDetector) {
+            resetDetector = false
+            detector?.reset()
+          }
+          if (inConversation && now - conversationStartedMs > CONVERSATION_TIMEOUT_MS) {
+            // Home Assistant never finished the exchange; don't stay deaf to the wake word.
+            if (conn != null) stopLocalStream(conn)
+            endConversation()
+          }
+          val d = detector
+          if (d != null && conn != null && !inConversation && !am.isMicrophoneMute) {
+            val count = n / 2
+            for (i in 0 until count) {
+              samples[i] = ((chunk[2 * i + 1].toInt() shl 8) or (chunk[2 * i].toInt() and 0xFF)).toShort()
+            }
+            if (d.process(samples, 0, count)) onLocalWake(conn, d.model, timestampMs)
+          }
           if (streaming && conn != null && !am.isMicrophoneMute) {
             conn.send(
                 WyomingEvent(
@@ -344,6 +480,8 @@ class VoiceSatelliteService : Service() {
       } finally {
         runCatching { rec.stop() }
         rec.release()
+        detector?.close()
+        detector = null
         val lostToOwner = running && !MicOwner.holds(MIC_OWNER)
         if (lostToOwner) VoiceStatus.set("Microphone in use")
         MicOwner.release(MIC_OWNER)
@@ -443,6 +581,7 @@ class VoiceSatelliteService : Service() {
     }
     conn.send(WyomingEvent("played"))
     VoiceHub.finished()
+    endConversation()
     VoiceStatus.set("Listening for the wake word")
   }
 
@@ -542,6 +681,8 @@ class VoiceSatelliteService : Service() {
     private const val RETRY_MAX_MS = 60_000L
     // While the platform silences the capture, reopen it this often in case it would now work.
     private const val SILENCED_RETRY_MS = 30_000L
+    // On-device mode: give up on an exchange Home Assistant never finished after this long.
+    private const val CONVERSATION_TIMEOUT_MS = 45_000L
 
     /**
      * Start (or re-arm) the satellite when it is enabled, stop it otherwise. Call it from a

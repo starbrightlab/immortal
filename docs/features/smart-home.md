@@ -158,18 +158,23 @@ agent such as Google Gemini.
 
 1. On the Portal: **Settings → Immortal → Home Assistant → Voice assistant (Assist)**, turn on
    *Home Assistant voice satellite* and allow the microphone.
-2. In Home Assistant, install the **openWakeWord** add-on. The wake word is detected there.
+2. Pick the **Wake word**. *Okay Nabu* and *Hey Jarvis* are detected on the Portal itself, with
+   the same microWakeWord models a Voice PE runs, so audio only goes to Home Assistant after you
+   say it. *In Home Assistant* streams the microphone to the **openWakeWord** add-on instead, so
+   install that add-on if you choose it.
 3. Home Assistant discovers the Portal as a **Wyoming Protocol** device named after it
    (*Immortal Portal Go*, for example); select **Configure**. You can close the voice setup wizard
    it offers if you already have an assistant.
-4. On the device page, pick the **Assistant** to use. Then open that assistant under **Settings →
-   Voice assistants**, choose **⋮ → Add streaming wake word**, and select *openwakeword* and a
-   wake word (*ok_nabu*, *hey_jarvis*, …).
+4. On the device page, pick the **Assistant** to use. Only if the wake word is *In Home
+   Assistant*: open that assistant under **Settings → Voice assistants**, choose **⋮ → Add
+   streaming wake word**, and select *openwakeword* and a wake word (*ok_nabu*, *hey_jarvis*, …).
 
 **What to know:**
 
-- **The microphone streams to Home Assistant while it's on**, because the wake word runs there. It
-  stops while the Portal's microphone is muted (the same `mic_mute` the MQTT integration exposes),
+- **With an on-device wake word, audio leaves the Portal only after the wake word**, until Home
+  Assistant hears the end of the sentence. With *In Home Assistant* the microphone streams the
+  whole time, because the wake word runs there. Either way nothing is sent while the Portal's
+  microphone is muted (the same `mic_mute` the MQTT integration exposes),
   and it yields to the intercom and voice notes.
 - **Announcements.** `assist_satellite.announce` plays a message (or a sound) on the Portal, shown
   as an *Announcement* card while it plays.

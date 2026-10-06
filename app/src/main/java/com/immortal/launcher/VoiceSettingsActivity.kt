@@ -88,8 +88,9 @@ private fun VoiceSettingsScreen() {
       Text("Voice assistant", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
       Text(
           "Use this Portal as a Home Assistant voice satellite. In Home Assistant it appears " +
-              "under Settings → Devices as a discovered Wyoming device; pick its assistant and " +
-              "wake word there. The wake word needs the openWakeWord add-on.",
+              "under Settings → Devices as a discovered Wyoming device; pick its assistant " +
+              "there. Okay Nabu and Hey Jarvis are heard on this Portal; \"In Home Assistant\" " +
+              "needs the openWakeWord add-on.",
           color = Color(0xFF9A9A9A),
           fontSize = 15.sp,
           textAlign = TextAlign.Center,

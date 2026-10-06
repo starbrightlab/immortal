@@ -1405,6 +1405,22 @@ object SettingsDomains {
                       help =
                           "Talk to Home Assistant's Assist through this Portal, like a Voice PE. " +
                               "Keeps the microphone listening for the wake word while on."),
+                  EnumSpec(
+                      "wakeWord",
+                      "Wake word",
+                      get = { it.wakeWord },
+                      set = VoiceConfig::setWakeWord,
+                      options =
+                          listOf(
+                              VoiceConfig.WAKE_SERVER to "In Home Assistant",
+                              "okay_nabu" to "Okay Nabu",
+                              "hey_jarvis" to "Hey Jarvis"),
+                      coerce = { VoiceConfig.coerceWakeWord(it) },
+                      help =
+                          "Okay Nabu and Hey Jarvis are heard on this Portal, which only sends " +
+                              "audio to Home Assistant after the wake word. \"In Home Assistant\" " +
+                              "streams the microphone to its openWakeWord add-on instead.",
+                      visible = { _, s -> s.enabled }),
                   BoolSpec(
                       "wakeSound",
                       "Wake sound",
