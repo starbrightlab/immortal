@@ -124,6 +124,8 @@ dependencies {
   // QR encoder for the "Set up from your phone" screen (scan the LAN address). Core only — we
   // render the BitMatrix to a Bitmap ourselves, no Android-specific zxing module needed.
   implementation("com.google.zxing:core:3.5.3")
+  // On-device wake word (microWakeWord models). Standalone runtime, no Google Play Services.
+  implementation("org.tensorflow:tensorflow-lite:2.16.1")
 
   // Media3 Transformer: on-device, hardware-accelerated video downscale/transcode for the
   // screensaver media cache ([VideoTranscoder]) — turns near-original remote clips into

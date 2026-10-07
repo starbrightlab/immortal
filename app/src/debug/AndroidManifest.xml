@@ -13,5 +13,9 @@
             android:name=".PhotoFramePreviewActivity"
             android:exported="true"
             tools:replace="android:exported" />
+        <receiver
+            android:name=".WakeWordProbeReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver" />
     </application>
 </manifest>

@@ -668,6 +668,29 @@ private fun MqttNavRow(onOpen: () -> Unit) {
       Text("›", color = Color(0xFF7C7C7C), fontSize = 26.sp)
     }
   }
+  Spacer(Modifier.size(12.dp))
+  Card {
+    Row(
+        modifier =
+            Modifier.fillMaxWidth()
+                .tvFocusableRow {
+                  context.startActivity(Intent(context, VoiceSettingsActivity::class.java))
+                }
+                .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text("Voice assistant (Assist)", color = Color.White, fontSize = 17.sp)
+        Text(
+            if (VoiceConfig.load(context).enabled) VoiceStatus.text else "Off",
+            color = Color(0xFF9A9A9A),
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+      }
+      Text("›", color = Color(0xFF7C7C7C), fontSize = 26.sp)
+    }
+  }
 }
 
 /** Opens the phone-remote pairing screen ([RemotePairActivity]); shows on/off at a glance. */

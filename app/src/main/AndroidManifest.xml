@@ -69,6 +69,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- System-wide back-swipe gesture overlay runs as a special-use foreground service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- Lets the fleet agent's /logcat endpoint read system-wide logs. READ_LOGS is
          signature|privileged|development; the "development" flag means provisioning
          can grant it via `pm grant`. Without it the agent sees only its own logs. -->
@@ -334,6 +335,19 @@
 
         <!-- Immortal's own settings (weather unit, home-screen forecast widget, tile
              size), opened from the Immortal tile in the launcher's Settings folder. -->
+        <!-- Home Assistant voice satellite (Wyoming). Started from HomeActivity.onResume so the
+             capture begins while Immortal is in front, which Android 10 Portals require. -->
+        <service
+            android:name=".VoiceSatelliteService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <activity
+            android:name=".VoiceSettingsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.SampleApp" />
+
         <activity
             android:name=".ImmortalSettingsActivity"
             android:exported="false"

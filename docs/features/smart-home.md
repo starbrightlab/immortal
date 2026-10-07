@@ -146,6 +146,56 @@ records what was tried.
 - **Notifications** — push a toast (with optional image, sound, and a tap target) from any
   Home Assistant automation. See below.
 
+## Voice assistant (Assist satellite)
+
+The Portal can be a Home Assistant voice satellite, like a Voice PE: say the wake word, ask, and
+Home Assistant's Assist answers out loud through the Portal's speaker, with the conversation shown
+on screen. It speaks the [Wyoming protocol](https://www.home-assistant.io/integrations/wyoming/),
+so it works with any Assist pipeline: local (Whisper / Piper), Home Assistant Cloud, or an LLM
+agent such as Google Gemini.
+
+**Setup:**
+
+1. On the Portal: **Settings → Immortal → Home Assistant → Voice assistant (Assist)**, turn on
+   *Home Assistant voice satellite* and allow the microphone.
+2. Pick the **Wake word**. *Okay Nabu* and *Hey Jarvis* are detected on the Portal itself, with
+   the same microWakeWord models a Voice PE runs, so audio only goes to Home Assistant after you
+   say it. *In Home Assistant* streams the microphone to the **openWakeWord** add-on instead, so
+   install that add-on if you choose it.
+3. Home Assistant discovers the Portal as a **Wyoming Protocol** device named after it
+   (*Immortal Portal Go*, for example); select **Configure**. You can close the voice setup wizard
+   it offers if you already have an assistant.
+4. On the device page, pick the **Assistant** to use. Only if the wake word is *In Home
+   Assistant*: open that assistant under **Settings → Voice assistants**, choose **⋮ → Add
+   streaming wake word**, and select *openwakeword* and a wake word (*ok_nabu*, *hey_jarvis*, …).
+
+**What to know:**
+
+- **With an on-device wake word, audio leaves the Portal only after the wake word**, until Home
+  Assistant hears the end of the sentence. With *In Home Assistant* the microphone streams the
+  whole time, because the wake word runs there. Either way nothing is sent while the Portal's
+  microphone is muted (the same `mic_mute` the MQTT integration exposes),
+  and it yields to the intercom and voice notes.
+- **Announcements.** `assist_satellite.announce` plays a message (or a sound) on the Portal, shown
+  as an *Announcement* card while it plays.
+- **Voice volume.** Answers and announcements play on the alarm channel, like the notification
+  sounds below, so the media slider doesn't affect them. Set *Voice volume* (0–100 %) on the
+  Portal or from Home Assistant; the system alarm volume is its ceiling. With the MQTT
+  integration on, the Portal device in Home Assistant has an *Alarm volume* slider (the alarm
+  stream itself, which notify sounds also use) and a *Voice volume* slider.
+- **On/off and status from Home Assistant.** With MQTT on, the Portal's device also has a *Voice
+  assistant* switch and a *Voice assistant status* sensor (*Off*, *Waiting for Home Assistant*,
+  *Listening for the wake word*, *Listening…*, *Answering*, *Microphone in use*, *Paused — open
+  Immortal to resume*). Switched on remotely, it starts listening the next time Immortal is on
+  screen, for the same Android 10 reason as above.
+- **Leave *Microphone volume* at 1.0** on the device page. The Portal's microphone is already loud,
+  and extra gain clips the audio so the wake word stops matching.
+- **It starts from Immortal's own screen.** Android 10 Portals only give a background app real
+  microphone audio if the capture began while that app was in front. Immortal starts it from its
+  home screen. From then on it keeps listening on Immortal's home, photo frame and screensaver, and
+  with other apps open. If another app's screensaver ever silences it, it resumes the next time
+  Immortal is on screen. Measured on a Portal Go.
+
 ## Notifications
 
 Immortal renders a Portal-native bottom toast in response to MQTT-driven notify messages from
