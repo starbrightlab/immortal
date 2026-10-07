@@ -83,6 +83,7 @@ class PhotoFrameController(
   // network call), so an 8s geocode lookup can never stall the image-decode pipeline on [io].
   private val metaIo = Executors.newSingleThreadExecutor()
   private val ui = Handler(Looper.getMainLooper())
+  private val voiceCard by lazy { VoiceCardView(context) }
 
   private class PhotoLayer(
       val blurPhoto: ImageView,
@@ -275,6 +276,7 @@ class PhotoFrameController(
   val view: View by lazy { buildUi() }
 
   fun start() {
+    VoiceHub.attachInApp(voiceCard)
     settings = ScreensaverConfig.load(context)
     // Caching off? Reclaim any space a previous "on" session left behind (best-effort, off-thread).
     if (!settings.cacheEnabled) Thread { MediaCache.purge(context) }.start()
@@ -501,6 +503,7 @@ class PhotoFrameController(
   }
 
   fun stop() {
+    VoiceHub.unlisten(voiceCard)
     ui.removeCallbacks(dashboardCycle)
     ui.removeCallbacksAndMessages(null)
     runCatching { gestureCamera?.stop() }
@@ -588,6 +591,9 @@ class PhotoFrameController(
     welcomeOverlay = buildWelcomeOverlay()
     welcomeOverlay.visibility = View.GONE
     root.addView(welcomeOverlay, FrameLayout.LayoutParams(MATCH, MATCH))
+    // The voice satellite's conversation card. The frame (and the screensaver built on it) sits
+    // above app overlays, so it draws the card itself while it is showing.
+    root.addView(voiceCard, voiceCard.frameParams())
     return root
   }
 
@@ -1690,6 +1696,7 @@ class PhotoFrameController(
     if (this::calendarPanel.isInitialized) calendarPanel.bringToFront()
     dashboardPanel?.bringToFront()
     welcomeOverlay?.bringToFront()
+    voiceCard.bringToFront()
 
     // Start Ken Burns motion on incoming photo
     startKenBurns(targetLayer.photo, isPortrait)

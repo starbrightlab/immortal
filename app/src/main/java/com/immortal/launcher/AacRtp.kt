@@ -106,6 +106,13 @@ object MicOwner {
   /** A voice note being recorded deliberately by the user. */
   const val PRIORITY_NOTE = 90
 
+  /**
+   * The Home Assistant voice satellite ([VoiceSatelliteService]): always listening for the wake
+   * word, so it yields to a person deliberately talking (intercom, voice note) but outranks the
+   * camera's background audio track.
+   */
+  const val PRIORITY_SATELLITE = 50
+
   /** The camera's audio track: continuous, and the first thing that should yield. */
   const val PRIORITY_STREAM = 10
 

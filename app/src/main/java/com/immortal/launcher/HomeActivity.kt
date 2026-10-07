@@ -254,6 +254,9 @@ class HomeActivity : ComponentActivity() {
     // The user is back on the launcher: end the idle session and, inside the overnight window,
     // arm the touch-renewed "you have the device" session. SleepScheduler owns that policy.
     SleepScheduler.onReturnedToLauncher(this)
+    // Start (or re-arm) the HA voice satellite from here, while Immortal is on screen: on Android
+    // 10 Portals a capture only gets real audio if it began with the app in front.
+    VoiceSatelliteService.sync(this)
   }
 
   override fun onPause() {
