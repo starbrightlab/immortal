@@ -6,4 +6,5 @@
     <string name="voice_listening">Escuchando…</string>
     <string name="voice_thinking">Pensando…</string>
     <string name="voice_answering">Home Assistant</string>
+    <string name="voice_announcement">📢 Aviso</string>
 </resources>

@@ -36,6 +36,8 @@ object VoiceHub {
     LISTENING,
     THINKING,
     ANSWERING,
+    /** Home Assistant is announcing something (assist_satellite.announce), no conversation. */
+    ANNOUNCING,
   }
 
   data class State(
@@ -101,6 +103,10 @@ object VoiceHub {
       main.removeCallbacks(goIdle)
       main.postDelayed(goIdle, LINGER_MS)
     }
+  }
+
+  fun announcing() {
+    publish(State(Phase.ANNOUNCING))
   }
 
   fun idle() {
@@ -180,11 +186,19 @@ class VoiceCardView(context: Context) : LinearLayout(context), VoiceHub.Listener
           VoiceHub.Phase.THINKING -> R.string.voice_thinking
           else -> R.string.voice_answering
         })
-    heard.text = state.heard.orEmpty()
-    heard.visibility = if (state.heard.isNullOrBlank()) GONE else VISIBLE
+    // An announcement carries no text (Home Assistant only sends its audio), so say what it is.
+    val headline =
+        if (state.phase == VoiceHub.Phase.ANNOUNCING) context.getString(R.string.voice_announcement)
+        else state.heard
+    heard.text = headline.orEmpty()
+    heard.visibility = if (headline.isNullOrBlank()) GONE else VISIBLE
     answer.text = state.answer.orEmpty()
     answer.visibility = if (state.answer.isNullOrBlank()) GONE else VISIBLE
-    if (state.phase == VoiceHub.Phase.ANSWERING) dots.stop() else dots.start()
+    if (state.phase == VoiceHub.Phase.ANSWERING || state.phase == VoiceHub.Phase.ANNOUNCING) {
+      dots.stop()
+    } else {
+      dots.start()
+    }
     if (visibility != VISIBLE) {
       // Hosts that reorder their children (the photo frame's crossfading layers) could bury it.
       bringToFront()

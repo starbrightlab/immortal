@@ -25,6 +25,8 @@ object VoiceConfig {
       val wakeSound: Boolean = true,
       // Show what you said and Home Assistant's answer on screen.
       val showTranscript: Boolean = true,
+      // Volume of answers, announcements and the wake tone, 0..100 % of the alarm stream.
+      val voiceVolume: Int = 100,
   )
 
   private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -35,6 +37,7 @@ object VoiceConfig {
         enabled = p.getBoolean("enabled", false),
         wakeSound = p.getBoolean("wake_sound", true),
         showTranscript = p.getBoolean("show_transcript", true),
+        voiceVolume = p.getInt("voice_volume", 100).coerceIn(0, 100),
     )
   }
 
@@ -44,4 +47,7 @@ object VoiceConfig {
 
   fun setShowTranscript(c: Context, on: Boolean) =
       prefs(c).edit().putBoolean("show_transcript", on).apply()
+
+  fun setVoiceVolume(c: Context, v: Int) =
+      prefs(c).edit().putInt("voice_volume", v.coerceIn(0, 100)).apply()
 }

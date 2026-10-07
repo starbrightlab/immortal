@@ -1412,6 +1412,20 @@ object SettingsDomains {
                       set = VoiceConfig::setWakeSound,
                       help = "A short tone when the wake word is heard.",
                       visible = { _, s -> s.enabled }),
+                  IntSpec(
+                      "voiceVolume",
+                      "Voice volume",
+                      get = { it.voiceVolume },
+                      set = VoiceConfig::setVoiceVolume,
+                      min = 0,
+                      max = 100,
+                      step = 10,
+                      format = { "$it%" },
+                      help =
+                          "Answers and announcements play on the alarm channel, like Immortal's " +
+                              "notification sounds, so the media volume doesn't change them. The " +
+                              "system alarm volume sets the maximum.",
+                      visible = { _, s -> s.enabled }),
                   BoolSpec(
                       "showTranscript",
                       "Show the conversation",

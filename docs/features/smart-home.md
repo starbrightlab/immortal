@@ -171,6 +171,11 @@ agent such as Google Gemini.
 - **The microphone streams to Home Assistant while it's on**, because the wake word runs there. It
   stops while the Portal's microphone is muted (the same `mic_mute` the MQTT integration exposes),
   and it yields to the intercom and voice notes.
+- **Announcements.** `assist_satellite.announce` plays a message (or a sound) on the Portal, shown
+  as an *Announcement* card while it plays.
+- **Voice volume.** Answers and announcements play on the alarm channel, like the notification
+  sounds below, so the media slider doesn't affect them. Set *Voice volume* (0–100 %) on the
+  Portal; the system alarm volume is its ceiling.
 - **Leave *Microphone volume* at 1.0** on the device page. The Portal's microphone is already loud,
   and extra gain clips the audio so the wake word stops matching.
 - **It starts from Immortal's own screen.** Android 10 Portals only give a background app real

@@ -13,4 +13,5 @@
     <string name="voice_listening">Listening…</string>
     <string name="voice_thinking">Thinking…</string>
     <string name="voice_answering">Home Assistant</string>
+    <string name="voice_announcement">📢 Announcement</string>
 </resources>

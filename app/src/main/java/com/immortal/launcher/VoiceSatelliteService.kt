@@ -188,6 +188,8 @@ class VoiceSatelliteService : Service() {
       }
       "audio-start" -> {
         Log.i(TAG, "answer audio at ${e.data.optInt("rate")} Hz")
+        // Audio with no conversation in progress is an announcement (assist_satellite.announce).
+        if (showConversation() && VoiceHub.state.phase == VoiceHub.Phase.IDLE) VoiceHub.announcing()
         playback.execute { startPlayback(e.data) }
       }
       "audio-chunk" -> e.payload?.let { pcm -> playback.execute { writePlayback(pcm) } }
@@ -360,7 +362,9 @@ class VoiceSatelliteService : Service() {
         AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                    // The alarm stream, like Immortal's notify sounds: on a Portal it is the one
+                    // volume besides calls that the media slider doesn't drive.
+                    .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build())
             .setAudioFormat(
@@ -372,7 +376,10 @@ class VoiceSatelliteService : Service() {
             .setBufferSizeInBytes(maxOf(min, rate))
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
-            .also { it.play() }
+            .also {
+              it.setVolume(VoiceConfig.load(this).voiceVolume / 100f)
+              it.play()
+            }
     playedFrames = 0
     VoiceStatus.set("Answering")
   }
@@ -402,7 +409,7 @@ class VoiceSatelliteService : Service() {
 
   private fun wakeTone() {
     runCatching {
-      val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 70)
+      val tone = ToneGenerator(AudioManager.STREAM_ALARM, (VoiceConfig.load(this).voiceVolume * 0.7f).toInt())
       tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 160)
       Thread {
             sleepQuietly(400)
