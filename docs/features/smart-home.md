@@ -178,6 +178,11 @@ agent such as Google Gemini.
   Portal or from Home Assistant; the system alarm volume is its ceiling. With the MQTT
   integration on, the Portal device in Home Assistant has an *Alarm volume* slider (the alarm
   stream itself, which notify sounds also use) and a *Voice volume* slider.
+- **On/off and status from Home Assistant.** With MQTT on, the Portal's device also has a *Voice
+  assistant* switch and a *Voice assistant status* sensor (*Off*, *Waiting for Home Assistant*,
+  *Listening for the wake word*, *Listening…*, *Answering*, *Microphone in use*, *Paused — open
+  Immortal to resume*). Switched on remotely, it starts listening the next time Immortal is on
+  screen, for the same Android 10 reason as above.
 - **Leave *Microphone volume* at 1.0** on the device page. The Portal's microphone is already loud,
   and extra gain clips the audio so the wake word stops matching.
 - **It starts from Immortal's own screen.** Android 10 Portals only give a background app real

@@ -83,6 +83,7 @@ class MqttPublisher(private val appContext: Context) {
 
   private val presenceListener = PresenceHub.Listener { st -> send { publishPresence(st) } }
   private val nowPlayingListener = NowPlayingHub.Listener { st -> send { publishMedia(st) } }
+  private val voiceStatusListener: (String) -> Unit = { s -> send { publishVoiceStatus(s) } }
   private var batteryReceiver: BroadcastReceiver? = null
   private var screenReceiver: BroadcastReceiver? = null
   private var micMuteReceiver: BroadcastReceiver? = null
@@ -266,6 +267,7 @@ class MqttPublisher(private val appContext: Context) {
     // Each addListener replays current state immediately, so this also does the initial publish.
     PresenceHub.addListener(presenceListener)
     NowPlayingHub.addListener(nowPlayingListener)
+    VoiceStatus.addListener(voiceStatusListener)
     val r =
         object : BroadcastReceiver() {
           override fun onReceive(c: Context, i: Intent) = send { publishBattery(i) }
@@ -314,6 +316,7 @@ class MqttPublisher(private val appContext: Context) {
     CameraStreamService.onStateChanged = null
     runCatching { PresenceHub.removeListener(presenceListener) }
     runCatching { NowPlayingHub.removeListener(nowPlayingListener) }
+    runCatching { VoiceStatus.removeListener(voiceStatusListener) }
     batteryReceiver?.let { r -> runCatching { appContext.unregisterReceiver(r) } }
     batteryReceiver = null
     screenReceiver?.let { r -> runCatching { appContext.unregisterReceiver(r) } }
@@ -367,6 +370,12 @@ class MqttPublisher(private val appContext: Context) {
               audio.setStreamVolume(AudioManager.STREAM_ALARM, value.coerceIn(0, max), 0)
               publishAlarmVolume()
             }
+          }
+          "voice_satellite" -> {
+            // On/off through the registry, which starts or stops the satellite and republishes.
+            val on = payload.trim().equals("ON", ignoreCase = true)
+            SettingsDomains.voice.apply(appContext, JSONObject().put("enabled", on))
+            publishVoiceSatellite()
           }
           "voice_volume" -> {
             // Through the registry, so validation and the voice domain's side effects apply.
@@ -649,7 +658,22 @@ class MqttPublisher(private val appContext: Context) {
       publishAlarmVolume()
     }
     publishVoiceVolume()
+    publishVoiceSatellite()
     publishMicMute()
+  }
+
+  private fun publishVoiceSatellite() {
+    val c = client ?: return
+    c.publish(
+        "$base/voice_satellite/state",
+        if (VoiceConfig.load(appContext).enabled) "ON" else "OFF",
+        retain = true,
+    )
+  }
+
+  private fun publishVoiceStatus(status: String) {
+    val c = client ?: return
+    c.publish("$base/voice_status/state", status, retain = true)
   }
 
   private fun publishAlarmVolume() {
@@ -770,6 +794,9 @@ class MqttPublisher(private val appContext: Context) {
       publishConfig(c, "button", "volume_down", null)
       publishConfig(c, "number", "alarm_volume", null)
     }
+    // The voice assistant (Home Assistant voice satellite): on/off and its live state, always.
+    switchEntity(c, "voice_satellite", "Voice assistant", icon = "mdi:account-voice")
+    sensor(c, "voice_status", "Voice assistant status", icon = "mdi:message-processing")
     // The voice assistant's own volume (a share of the alarm stream), while it is on.
     if (VoiceConfig.load(appContext).enabled) {
       numberEntity(c, "voice_volume", "Voice volume", icon = "mdi:account-voice", min = 0, max = 100, step = 10)
@@ -820,6 +847,8 @@ class MqttPublisher(private val appContext: Context) {
           "number" to "media_volume",
           "number" to "alarm_volume",
           "number" to "voice_volume",
+          "switch" to "voice_satellite",
+          "sensor" to "voice_status",
           "switch" to "speaker_mute",
           "button" to "volume_up",
           "button" to "volume_down",

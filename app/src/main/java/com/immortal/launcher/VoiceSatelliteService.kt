@@ -73,6 +73,8 @@ class VoiceSatelliteService : Service() {
   private var playedFrames = 0L
   private var overlay: VoiceOverlayWindow? = null
   @Volatile private var retryDelayMs = RETRY_MIN_MS
+  // The platform is silencing the capture (status says so until it recovers).
+  @Volatile private var paused = false
 
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -142,7 +144,8 @@ class VoiceSatelliteService : Service() {
       if (client === conn) {
         client = null
         streaming = false
-        VoiceStatus.set("Waiting for Home Assistant")
+        // Not while shutting down: a closing connection must not overwrite "Off".
+        if (running) VoiceStatus.set("Waiting for Home Assistant")
       }
     }
   }
@@ -286,6 +289,7 @@ class VoiceSatelliteService : Service() {
       rearm = false
       var timestampMs = 0L
       var lastCheck = 0L
+      var silencedSince = 0L
       try {
         rec.startRecording()
         while (running && MicOwner.holds(MIC_OWNER)) {
@@ -296,9 +300,19 @@ class VoiceSatelliteService : Service() {
             lastCheck = now
             if (isSilenced(am, rec)) {
               // Silenced by the platform (e.g. another app's dream). Reading on gets zeros;
-              // reopen once Immortal is back in front and sync() asks us to re-arm.
+              // reopen when Immortal is back in front (sync() asks us to re-arm), and retry now
+              // and then anyway, in case it already is.
+              if (silencedSince == 0L) silencedSince = now
+              paused = true
               VoiceStatus.set("Paused — open Immortal to resume")
-              if (rearm) break
+              if (rearm || now - silencedSince > SILENCED_RETRY_MS) break
+            } else {
+              silencedSince = 0L
+              if (paused) {
+                paused = false
+                VoiceStatus.set(
+                    if (client != null) "Listening for the wake word" else "Waiting for Home Assistant")
+              }
             }
           }
           val conn = client
@@ -316,7 +330,7 @@ class VoiceSatelliteService : Service() {
       } finally {
         runCatching { rec.stop() }
         rec.release()
-        if (!MicOwner.holds(MIC_OWNER)) VoiceStatus.set("Microphone in use")
+        if (running && !MicOwner.holds(MIC_OWNER)) VoiceStatus.set("Microphone in use")
         MicOwner.release(MIC_OWNER)
       }
       sleepQuietly(500)
@@ -501,6 +515,8 @@ class VoiceSatelliteService : Service() {
     private const val CHUNK_SAMPLES = 1024
     private const val RETRY_MIN_MS = 3000L
     private const val RETRY_MAX_MS = 60_000L
+    // While the platform silences the capture, reopen it this often in case it would now work.
+    private const val SILENCED_RETRY_MS = 30_000L
 
     /**
      * Start (or re-arm) the satellite when it is enabled, stop it otherwise. Call it from a
@@ -528,13 +544,29 @@ class VoiceSatelliteService : Service() {
   }
 }
 
-/** Human-readable satellite state for the settings screen. */
+/**
+ * Human-readable satellite state, for the settings screen and Home Assistant (the MQTT
+ * "Voice assistant status" sensor). Listeners hear each change, and the current state on add.
+ */
 object VoiceStatus {
   @Volatile
   var text: String = "Off"
     private set
 
+  private val listeners = java.util.concurrent.CopyOnWriteArraySet<(String) -> Unit>()
+
   fun set(s: String) {
+    if (s == text) return
     text = s
+    listeners.forEach { it(s) }
+  }
+
+  fun addListener(l: (String) -> Unit) {
+    listeners.add(l)
+    l(text)
+  }
+
+  fun removeListener(l: (String) -> Unit) {
+    listeners.remove(l)
   }
 }
