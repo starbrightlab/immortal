@@ -175,7 +175,9 @@ agent such as Google Gemini.
   as an *Announcement* card while it plays.
 - **Voice volume.** Answers and announcements play on the alarm channel, like the notification
   sounds below, so the media slider doesn't affect them. Set *Voice volume* (0–100 %) on the
-  Portal; the system alarm volume is its ceiling.
+  Portal or from Home Assistant; the system alarm volume is its ceiling. With the MQTT
+  integration on, the Portal device in Home Assistant has an *Alarm volume* slider (the alarm
+  stream itself, which notify sounds also use) and a *Voice volume* slider.
 - **Leave *Microphone volume* at 1.0** on the device page. The Portal's microphone is already loud,
   and extra gain clips the audio so the wake word stops matching.
 - **It starts from Immortal's own screen.** Android 10 Portals only give a background app real

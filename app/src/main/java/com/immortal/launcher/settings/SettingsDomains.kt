@@ -1435,7 +1435,11 @@ object SettingsDomains {
                       visible = { _, s -> s.enabled }),
               ),
           defaults = { VoiceConfig.Settings() },
-          onApplied = { c, _ -> VoiceSatelliteService.sync(c) },
+          onApplied = { c, _ ->
+            VoiceSatelliteService.sync(c)
+            // The voice entities on Home Assistant's MQTT device follow these settings.
+            MqttService.sync(c, reconfigure = true)
+          },
       )
 
   val all: List<SettingsDomain<*>> =

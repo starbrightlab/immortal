@@ -20,6 +20,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import com.immortal.launcher.settings.SettingsDomains
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.Executors
@@ -357,6 +358,24 @@ class MqttPublisher(private val appContext: Context) {
               publishSpeakerMute()
             }
           }
+          "alarm_volume" -> {
+            // The alarm stream is the Portal's one speaker volume the media slider doesn't
+            // drive; Immortal's notify sounds and the voice assistant play on it.
+            val max = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            val value = payload.trim().toIntOrNull()
+            if (value != null) {
+              audio.setStreamVolume(AudioManager.STREAM_ALARM, value.coerceIn(0, max), 0)
+              publishAlarmVolume()
+            }
+          }
+          "voice_volume" -> {
+            // Through the registry, so validation and the voice domain's side effects apply.
+            val value = payload.trim().toDoubleOrNull()?.toInt()
+            if (value != null) {
+              SettingsDomains.voice.apply(appContext, JSONObject().put("voiceVolume", value))
+              publishVoiceVolume()
+            }
+          }
           "speaker_mute" -> {
             val mute = payload.trim().equals("ON", ignoreCase = true)
             audio.adjustStreamVolume(
@@ -627,8 +646,25 @@ class MqttPublisher(private val appContext: Context) {
     if (volumeIsControllable()) {
       publishMediaVolume()
       publishSpeakerMute()
+      publishAlarmVolume()
     }
+    publishVoiceVolume()
     publishMicMute()
+  }
+
+  private fun publishAlarmVolume() {
+    val c = client ?: return
+    c.publish(
+        "$base/alarm_volume/state",
+        audio.getStreamVolume(AudioManager.STREAM_ALARM).toString(),
+        retain = true,
+    )
+  }
+
+  private fun publishVoiceVolume() {
+    val c = client ?: return
+    if (!VoiceConfig.load(appContext).enabled) return
+    c.publish("$base/voice_volume/state", VoiceConfig.load(appContext).voiceVolume.toString(), retain = true)
   }
 
   private fun publishMediaVolume() {
@@ -716,6 +752,15 @@ class MqttPublisher(private val appContext: Context) {
       switchEntity(c, "speaker_mute", "Speaker mute", icon = "mdi:volume-off")
       button(c, "volume_up", "Volume up", icon = "mdi:volume-plus")
       button(c, "volume_down", "Volume down", icon = "mdi:volume-minus")
+      numberEntity(
+          c,
+          "alarm_volume",
+          "Alarm volume",
+          icon = "mdi:bell-ring",
+          min = 0,
+          max = audio.getStreamMaxVolume(AudioManager.STREAM_ALARM),
+          step = 1,
+      )
     } else {
       // Fixed-volume device (Portal TV / HDMI): clear these in case an earlier
       // version published them, so they don't orphan in Home Assistant.
@@ -723,6 +768,13 @@ class MqttPublisher(private val appContext: Context) {
       publishConfig(c, "switch", "speaker_mute", null)
       publishConfig(c, "button", "volume_up", null)
       publishConfig(c, "button", "volume_down", null)
+      publishConfig(c, "number", "alarm_volume", null)
+    }
+    // The voice assistant's own volume (a share of the alarm stream), while it is on.
+    if (VoiceConfig.load(appContext).enabled) {
+      numberEntity(c, "voice_volume", "Voice volume", icon = "mdi:account-voice", min = 0, max = 100, step = 10)
+    } else {
+      publishConfig(c, "number", "voice_volume", null)
     }
     switchEntity(c, "mic_mute", "Microphone mute", icon = "mdi:microphone-off")
 
@@ -766,6 +818,8 @@ class MqttPublisher(private val appContext: Context) {
           "button" to "media_next",
           "button" to "media_previous",
           "number" to "media_volume",
+          "number" to "alarm_volume",
+          "number" to "voice_volume",
           "switch" to "speaker_mute",
           "button" to "volume_up",
           "button" to "volume_down",
