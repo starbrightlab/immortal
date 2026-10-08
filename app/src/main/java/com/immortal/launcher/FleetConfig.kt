@@ -46,6 +46,19 @@ object FleetConfig {
     writeManifest(c)
   }
 
+  /**
+   * Accept notifications on `POST /notify` — a toast, a sound, and/or a spoken line sent by
+   * anything on the LAN that holds the agent token.
+   *
+   * OFF by default and independent of the MQTT notify path: a Home Assistant automation
+   * publishing to `immortal/<id>/notify/set` is unaffected by this flag (that surface has its
+   * own enable switch in MQTT settings). This gates only the HTTP door.
+   */
+  fun notifyEnabled(c: Context): Boolean = prefs(c).getBoolean("notify_enabled", false)
+
+  fun setNotifyEnabled(c: Context, on: Boolean) =
+      prefs(c).edit().putBoolean("notify_enabled", on).apply()
+
   /** Friendly device/room name shown in the fleet dashboard. Defaults to the model. */
   fun name(c: Context): String =
       prefs(c).getString("name", null)?.ifBlank { null } ?: (Build.MODEL ?: "Portal")

@@ -138,6 +138,21 @@ Device actions:
 ./fleetctl action reboot   --device …
 ```
 
+Push a notification (toast / sound / spoken line). **Opt-in per device:** the owner must
+turn on *Accept notifications from your network* in Settings > Notifications, else the route answers
+`403 notify_disabled`. Same payload schema as the MQTT notify topic, no broker involved:
+
+```bash
+./fleetctl notify "Backup finished" --device "Kitchen"
+./fleetctl notify --speak "The washing machine is done" --device all   # TTS only, no toast
+./fleetctl notify "Front door" --title "Motion" --duration 8 --on-tap lovelace/security
+```
+
+Options: `--title TEXT` `--speak TEXT` `--image URL` `--sound URL` `--on-tap TARGET`
+`--duration SEC` (0 = until tapped) `--volume 0.0-1.0` `--position top|bottom` `--no-wake`.
+The positional argument is the toast body; `--speak` is read aloud through the device's TTS
+voice. The reply says what happened: `{"shown":…,"sound":…,"spoke":…}`.
+
 Escape hatch — call any agent endpoint directly (keeps working as the API grows):
 
 ```bash

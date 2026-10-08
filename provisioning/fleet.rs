@@ -330,6 +330,7 @@ enum Field {
     B(bool),
     I(i64),
     S(String),
+    F(f64),
 }
 
 fn build_obj(fields: &[(&str, Field)]) -> String {
@@ -344,6 +345,7 @@ fn build_obj(fields: &[(&str, Field)]) -> String {
             Field::B(b) => o.push_str(if *b { "true" } else { "false" }),
             Field::I(n) => o.push_str(&n.to_string()),
             Field::S(s) => o.push_str(&encode_str(s)),
+            Field::F(x) => o.push_str(&x.to_string()),
         }
     }
     o.push('}');
@@ -648,7 +650,7 @@ impl Args {
 }
 
 // Flags that don't take a value.
-const VALUELESS: &[&str] = &["all", "check", "help", "no-pause"];
+const VALUELESS: &[&str] = &["all", "check", "help", "no-pause", "no-wake"];
 
 fn parse_args(argv: &[String]) -> Args {
     let mut cmd = String::new();
@@ -979,6 +981,58 @@ fn cmd_action(args: &Args) -> i32 {
     post_json(args, "/action", build_obj(&[("action", Field::S(name))]))
 }
 
+// Push a notification to the device(s): a toast, a sound, a spoken line, or any mix.
+// Same payload schema Home Assistant publishes over MQTT, so behaviour matches an automation.
+// Requires "Accept notifications from your network" to be on in Settings > Notifications (403 otherwise).
+fn cmd_notify(args: &Args) -> i32 {
+    let mut fields: Vec<(&str, Field)> = Vec::new();
+    // The positional is the message, so the common case reads like a sentence:
+    //   fleetctl notify "Dinner is ready" --device all
+    if let Some(m) = args.pos(0) {
+        fields.push(("message", Field::S(m.clone())));
+    }
+    if let Some(t) = args.flag("title") {
+        fields.push(("title", Field::S(t)));
+    }
+    if let Some(t) = args.flag("speak") {
+        fields.push(("speak", Field::S(t)));
+    }
+    if let Some(u) = args.flag("image") {
+        fields.push(("image", Field::S(u)));
+    }
+    if let Some(u) = args.flag("sound") {
+        fields.push(("sound", Field::S(u)));
+    }
+    if let Some(d) = args.flag("duration") {
+        let n: i64 = d.parse().unwrap_or_else(|_| die("--duration expects seconds (0 = stay until tapped)"));
+        fields.push(("duration", Field::I(n)));
+    }
+    if let Some(v) = args.flag("volume") {
+        let x: f64 = v.parse().unwrap_or_else(|_| die("--volume expects 0.0-1.0"));
+        if !(0.0..=1.0).contains(&x) {
+            die("--volume expects 0.0-1.0");
+        }
+        fields.push(("volume", Field::F(x)));
+    }
+    if let Some(pos) = args.flag("position") {
+        let p = pos.to_ascii_lowercase();
+        if p != "top" && p != "bottom" {
+            die("--position expects top|bottom");
+        }
+        fields.push(("position", Field::S(p)));
+    }
+    if let Some(t) = args.flag("on-tap") {
+        fields.push(("on_tap", Field::S(t)));
+    }
+    if args.has("no-wake") {
+        fields.push(("wake_screen", Field::B(false)));
+    }
+    if fields.is_empty() {
+        die("notify: pass a message, or --title/--speak/--sound");
+    }
+    post_json(args, "/notify", build_obj(&fields))
+}
+
 fn cmd_dev(args: &Args) -> i32 {
     let action = args.pos(0).map(|s| s.as_str()).unwrap_or("status");
     match action {
@@ -1094,7 +1148,14 @@ COMMANDS:
   push <local> <remote>         upload a local file
   logcat [--lines N]            fetch recent logs (default 500)
   action <reaffirm|identify|reboot>
+  notify [message]              show a message on the device (see below)
   raw <METHOD> <path> [json]    call any endpoint directly (escape hatch)
+
+NOTIFY options (needs \"Accept notifications from your network\" on in Settings > Notifications):
+  --title TEXT --speak TEXT --image URL --sound URL --on-tap TARGET
+  --duration SEC (0 = until tapped) --volume 0.0-1.0 --position top|bottom --no-wake
+  The positional argument is the toast body; --speak reads a line aloud through the
+  device's TTS voice. Either alone works: --speak with no message speaks without a toast.
 
 SCREENSAVER set options:
   --enabled BOOL --source default --folder PATH --album-url URL
@@ -1143,6 +1204,7 @@ fn main() {
         "push" => cmd_push(&args),
         "logcat" => cmd_logcat(&args),
         "action" => cmd_action(&args),
+        "notify" => cmd_notify(&args),
         "raw" => cmd_raw(&args),
         other => {
             eprintln!("unknown command: {}\n\n{}", other, HELP);

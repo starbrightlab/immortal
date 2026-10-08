@@ -62,6 +62,7 @@ class FleetRoutes(private val context: Context) {
       "/calendar" -> calendar(req)
       "/screensaver" -> screensaver(req)
       "/action" -> requireMethod("POST", req) { action(req) }
+      "/notify" -> requireMethod("POST", req) { notify(req) }
       "/fs/list" -> requireMethod("GET", req) { resp(200, FleetFs.list(req.queryParam("path") ?: "/sdcard")) }
       "/fs/read" -> requireMethod("GET", req) { fsRead(req) }
       "/fs/write" -> requireMethod("POST", req) { fsWrite(req) }
@@ -307,6 +308,37 @@ class FleetRoutes(private val context: Context) {
       "reboot" -> resp(200, JSONObject().put("ok", false).put("action", "reboot").put("result", "not_permitted"))
       else -> resp(400, err("unknown_action"))
     }
+  }
+
+  /**
+   * Push a notification to this Portal: a toast, a sound, a spoken line, or any combination.
+   *
+   * The body is the same schema Home Assistant publishes to the MQTT notify topic
+   * ([NotifyPayload]), rendered by the same [NotifyDispatch] — so an HTTP caller and an
+   * automation can't drift, and MQTT doesn't have to be configured at all for this to work.
+   * Full schema in `docs/design/mqtt-notifications.md`.
+   *
+   * Unlike the fire-and-forget MQTT path, this answers with what it actually did — the point
+   * of having an HTTP surface is that the caller finds out.
+   *
+   * Opt-in: holding the agent token is enough to manage the device, but it shouldn't by itself
+   * be enough to make it talk in someone's living room. The owner turns this on in
+   * Settings > Device ([FleetConfig.notifyEnabled]); until then the route reports why it said no.
+   */
+  private fun notify(req: FleetHttpServer.Request): FleetHttpServer.Response {
+    if (!FleetConfig.notifyEnabled(context)) return resp(403, err("notify_disabled"))
+    val raw = req.bodyText()
+    // Separate "you sent garbage" from "that parsed to a no-op" — over MQTT both are a silent
+    // drop, but an HTTP caller can act on the difference.
+    parseJson(raw) ?: return resp(400, err("bad_json"))
+    val spec = NotifyPayload.parse(raw) ?: return resp(400, err("empty_payload"))
+    NotifyDispatch.deliver(context, spec)
+    return resp(
+        200,
+        ok()
+            .put("shown", spec.hasVisual)
+            .put("sound", !spec.sound.isNullOrBlank())
+            .put("spoke", !spec.speak.isNullOrBlank()))
   }
 
   // --- install plumbing -------------------------------------------------------

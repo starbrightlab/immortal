@@ -153,6 +153,39 @@ class MqttNotifyPayloadTest {
   }
 
   @Test
+  fun speakOnly_isNotEmpty_butHasNoVisual() {
+    // The pure-TTS payload: nothing on screen, a line spoken aloud. Must survive the
+    // "parsed to a no-op" filter that {} falls through.
+    val p = NotifyPayload.parse("""{"speak":"Dinner is ready"}""")!!
+    assertEquals("Dinner is ready", p.speak)
+    assertFalse(p.hasVisual)
+    assertFalse(p.isEmpty)
+  }
+
+  @Test
+  fun speak_combinesWithToastAndCarriesVolume() {
+    val p = NotifyPayload.parse("""{"message":"Doorbell","speak":"Someone is at the door","volume":0.4}""")!!
+    assertEquals("Doorbell", p.message)
+    assertEquals("Someone is at the door", p.speak)
+    assertEquals(0.4f, p.volume, 0.0001f)
+    assertTrue(p.hasVisual)
+  }
+
+  @Test
+  fun blankSpeak_isNull_andDoesNotRescueAnEmptyPayload() {
+    assertNull(NotifyPayload.parse("""{"speak":"   "}"""))
+    assertNull(NotifyPayload.parse("""{"speak":""}"""))
+  }
+
+  @Test
+  fun absentSpeak_isNull_soExistingPayloadsAreUnchanged() {
+    // Every payload written before `speak` existed must parse exactly as it did before.
+    val p = NotifyPayload.parse("""{"title":"Front door","message":"Motion"}""")!!
+    assertNull(p.speak)
+    assertFalse(p.isEmpty)
+  }
+
+  @Test
   fun inlineImageDataUri_passesThroughAsString() {
     val raw = """{"message":"x","image":"data:image/png;base64,iVBOR"}"""
     val p = NotifyPayload.parse(raw)!!
