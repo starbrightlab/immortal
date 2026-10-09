@@ -40,10 +40,48 @@ class HomeGridTest {
         HomeGrid.normalizeSlotsWhenReady(
             saved, partialKeys, cols = 3, dynamicTilesLoaded = false),
     )
+    // The stale slots after calls are trailing blanks, so the new store tile takes the first one.
     assertEquals(
-        listOf("builtin:calls", null, null, "builtin:store", null, null, null, null, null),
+        listOf("builtin:calls", "builtin:store", null, null, null, null),
         HomeGrid.normalizeSlotsWhenReady(
             saved, partialKeys, cols = 3, dynamicTilesLoaded = true),
+    )
+  }
+
+  @Test
+  fun normalize_newTileFillsRowPadding_insteadOfStartingNewRow() {
+    // Saved list was padded to whole rows (as normalizeSlots persists it); c is new.
+    val saved = listOf<String?>("a", "b", "x", null, null, null)
+    val result = HomeGrid.normalizeSlots(saved, listOf("a", "b", "x", "c"), cols = 3)
+    assertEquals(listOf("a", "b", "x", "c", null, null, null, null, null), result)
+  }
+
+  @Test
+  fun normalizeToPages_newTileLandsOnFirstPage_whenSavedPageIsPadded() {
+    // One saved page of 4, padded with blanks (as the launcher persists it); d is a new app.
+    val saved = listOf<String?>("a", "b", "c", null)
+    assertEquals(
+        listOf("a", "b", "c", "d"),
+        HomeGrid.normalizeToPages(saved, listOf("a", "b", "c", "d"), 4, keepSpare = false),
+    )
+  }
+
+  @Test
+  fun normalizeToPages_newTileKeepsInnerUserGap() {
+    // The user left a gap between a and b; new tiles go after b, never into the gap.
+    val saved = listOf<String?>("a", null, "b", null, null, null)
+    assertEquals(
+        listOf("a", null, "b", "c", "d", null),
+        HomeGrid.normalizeToPages(saved, listOf("a", "b", "c", "d"), 6, keepSpare = false),
+    )
+  }
+
+  @Test
+  fun normalizeToPages_appendsToNextPage_whenNoBlankLeftAfterLastTile() {
+    val saved = listOf<String?>("a", null, "b", "c")
+    assertEquals(
+        listOf("a", null, "b", "c", "d", null, null, null),
+        HomeGrid.normalizeToPages(saved, listOf("a", "b", "c", "d"), 4, keepSpare = false),
     )
   }
 
