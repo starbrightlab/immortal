@@ -1183,11 +1183,15 @@ class PhotoFrameController(
    *
    * The bound never upscales (small images decode untouched) and uses a power-of-two
    * [BitmapFactory.Options.inSampleSize], the only value the decoder honours efficiently.
+   * Beyond the crash cap it also stops at what the panel can show — see the companion
+   * [sampleSizeFor].
    */
-  private fun sampleSizeFor(w: Int, h: Int): Int {
-    val longest = maxOf(w, h)
-    return if (longest > MAX_EDGE) Integer.highestOneBit(longest / MAX_EDGE) else 1
-  }
+  private fun sampleSizeFor(w: Int, h: Int): Int = sampleSizeFor(w, h, displayLongEdge())
+
+  /** The panel's long edge in px (orientation-agnostic), floored at the smallest Portal panel. */
+  private fun displayLongEdge(): Int =
+      android.content.res.Resources.getSystem().displayMetrics.let { maxOf(it.widthPixels, it.heightPixels) }
+          .coerceAtLeast(MIN_PANEL_EDGE)
 
   private fun decodeBoundedFile(path: String): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -2409,6 +2413,22 @@ class PhotoFrameController(
 
   internal companion object {
     /**
+     * Power-of-two inSampleSize for a [w]×[h] photo on a panel whose long edge is [panelLongEdge].
+     * Starts from the [MAX_EDGE] crash cap, then keeps halving while the photo's SHORT edge still
+     * covers the panel's long edge: a 4032×3024 phone photo on a 1280px Portal otherwise lands
+     * as a ~48MB bitmap every slide, 4× what the panel can show. Measuring the short edge against
+     * the long one means fill mode never has to upscale whichever way round the photo and panel
+     * are (Ken Burns zooms in a little on top). Pure.
+     */
+    internal fun sampleSizeFor(w: Int, h: Int, panelLongEdge: Int): Int {
+      val longest = maxOf(w, h)
+      var s = if (longest > MAX_EDGE) Integer.highestOneBit(longest / MAX_EDGE) else 1
+      val shortest = minOf(w, h)
+      if (panelLongEdge > 0) while (shortest / (s * 2) >= panelLongEdge) s *= 2
+      return s
+    }
+
+    /**
      * The view size (w × h) that makes a [videoW]×[videoH] clip cover a [screenW]×[screenH]
      * screen with its aspect preserved — the geometry behind [applyVideoFit]'s fill mode. Null
      * when any dimension is unknown (callers fall back to match-parent letterboxing). Clamped to
@@ -2444,6 +2464,9 @@ class PhotoFrameController(
     // Ken-Burns overscan headroom (2560²·4 ≈ 26MB) while staying far under the cap. See
     // [decodeBoundedFile]/[decodeBoundedStream].
     const val MAX_EDGE = 2560
+    // Smallest Portal panel long edge (Mini / Go / 10"); a floor for [displayLongEdge] so an odd
+    // display-metrics read can never push the decode below what any Portal shows.
+    const val MIN_PANEL_EDGE = 1280
     // Bundled fallback photos live under app/src/main/assets/<FALLBACK_DIR>/.
     const val FALLBACK_DIR = "photoframe_fallback"
     // How long to skip a web source after it fails, so a dead host (e.g. a Picsum

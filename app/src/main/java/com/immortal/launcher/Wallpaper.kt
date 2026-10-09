@@ -128,6 +128,18 @@ object WallpaperConfig {
           }
           .getOrNull()
 
+  // The wallpaper is shrunk and blurred right after decoding, so there's no point decoding a
+  // camera original at full size first.
+  private const val WALLPAPER_EDGE = 720
+
+  private fun decodeSampled(path: String, edge: Int): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    var s = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (s * 2) >= edge) s *= 2
+    return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = s })
+  }
+
   private fun screensaverPhoto(context: Context): Bitmap? {
     val cfg = ScreensaverConfig.load(context)
     val folder = cfg.folderPath
@@ -137,7 +149,7 @@ object WallpaperConfig {
               .filterNot { it.isVideo }
               .randomOrNull()
       if (pick != null) {
-        runCatching { BitmapFactory.decodeFile(pick.path) }.getOrNull()?.let { return it }
+        runCatching { decodeSampled(pick.path, WALLPAPER_EDGE) }.getOrNull()?.let { return it }
       }
     }
     return anyBundled(context)

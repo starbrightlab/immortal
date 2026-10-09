@@ -39,10 +39,20 @@ object NowPlayingHub {
    */
   fun publish(state: NowPlayingState?) {
     val next = state?.takeIf { it.active }
+    val prev = current
     current = next
+    // Players report playback position every few seconds while playing. [current] always takes
+    // the fresh position (the phone remote reads it on demand), but listeners — the header, the
+    // screensaver card and the MQTT publisher — only show what's playing, so waking all of them
+    // (and logging) for a position tick is pure overhead on a Portal.
+    if (sameTrack(prev, next)) return
     Log.i(TAG, "now-playing: ${next?.state ?: "—"} ${next?.artist.orEmpty()} — ${next?.title.orEmpty()}")
     listeners.forEach { runCatching { it.onNowPlaying(next) } }
   }
+
+  /** True when [a] and [b] differ at most in playback position. */
+  internal fun sameTrack(a: NowPlayingState?, b: NowPlayingState?): Boolean =
+      a == b || (a != null && b != null && a.copy(positionMs = 0L) == b.copy(positionMs = 0L))
 
   /** Subscribe (in-process). Immediately replays [current] to the new listener. */
   fun addListener(l: Listener) {

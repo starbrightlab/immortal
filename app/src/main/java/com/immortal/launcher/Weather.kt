@@ -318,7 +318,52 @@ object Weather {
     return out
   }
 
-  private fun httpGet(spec: String): String {
+  // The header, the home weather widgets, the screensaver face and its photo caption each poll
+  // Open-Meteo on their own schedule, and the face and the caption both fire the moment the
+  // screensaver starts. A short shared cache (concurrent callers for a URL wait on the one request
+  // in flight) turns those into one request per URL per window. Only forecast URLs are cached:
+  // place searches and IP geolocation always go to the network.
+  private const val FORECAST_API = "https://api.open-meteo.com/v1/forecast"
+  private const val CACHE_TTL_MS = 10L * 60 * 1000
+  private val forecastCache = ResponseCache(CACHE_TTL_MS)
+
+  private fun httpGet(spec: String): String =
+      if (spec.startsWith(FORECAST_API)) forecastCache.get(spec) { httpGetUncached(spec) }
+      else httpGetUncached(spec)
+
+  /**
+   * A tiny TTL cache of response bodies keyed by URL. A miss holds a per-key lock while it
+   * loads, so callers racing for the same URL share one request; failures (a throwing [get]
+   * loader) are never cached. Expired entries are pruned on each store. [clock] is injectable
+   * for tests.
+   */
+  internal class ResponseCache(
+      private val ttlMs: Long,
+      private val clock: () -> Long = System::currentTimeMillis,
+  ) {
+    private val entries = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, String>>()
+    private val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+    fun get(key: String, load: () -> String): String {
+      fresh(key)?.let { return it }
+      synchronized(locks.computeIfAbsent(key) { Any() }) {
+        fresh(key)?.let { return it }
+        val body = load()
+        val now = clock()
+        entries.entries.removeIf { now - it.value.first >= ttlMs }
+        entries[key] = now to body
+        return body
+      }
+    }
+
+    private fun fresh(key: String): String? {
+      val (at, body) = entries[key] ?: return null
+      val age = clock() - at
+      return if (age in 0 until ttlMs) body else null
+    }
+  }
+
+  private fun httpGetUncached(spec: String): String {
     val c = URL(spec).openConnection() as HttpURLConnection
     c.connectTimeout = 8000
     c.readTimeout = 8000

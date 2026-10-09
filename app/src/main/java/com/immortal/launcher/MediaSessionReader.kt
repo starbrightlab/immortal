@@ -55,6 +55,11 @@ object MediaSessionReader {
   // session's state/metadata transitions (not just the one we're currently showing).
   private val watched = HashMap<MediaSession.Token, MediaController>()
 
+  // Last logged pick and last downscaled art (handler thread only): see [reselect] / [publishFrom].
+  private var lastPick: String? = null
+  private var lastArtKey: String? = null
+  private var lastArt: Bitmap? = null
+
   // Any session changing → re-query everything and re-pick. One instance shared
   // across all controllers; reselect figures out which one wins.
   private val genericCb =
@@ -176,10 +181,14 @@ object MediaSessionReader {
                 it.sessionToken == lastPlayingToken
           }
         }
+    val pick = "${controllers.size}/${chosen?.packageName}/${chosen?.playbackState?.state}"
+    if (pick != lastPick) {
+      lastPick = pick
+      Log.i(
+          TAG,
+          "sessions=${controllers.size} chosen=${chosen?.packageName} state=${chosen?.playbackState?.state}")
+    }
     active = chosen
-    Log.i(
-        TAG,
-        "sessions=${controllers.size} chosen=${chosen?.packageName} state=${chosen?.playbackState?.state}")
     if (chosen != null) publishFrom(chosen) else NowPlayingHub.publish(null)
   }
 
@@ -208,7 +217,19 @@ object MediaSessionReader {
         md?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: md?.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: md?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-    val artBitmap = rawArt?.let { downscale(it) }
+    // The metadata is re-read on every playback-state tick (every few seconds while playing), and
+    // each read hands back a fresh copy of the art — so reuse the downscaled bitmap for the same
+    // track instead of rescaling (and handing every consumer a "new" image) each time.
+    val artKey = rawArt?.let { "${c.packageName}|$title|$artist|$album|${it.width}x${it.height}" }
+    val artBitmap =
+        when {
+          rawArt == null -> null
+          artKey == lastArtKey && lastArt != null -> lastArt
+          else -> downscale(rawArt).also {
+            lastArtKey = artKey
+            lastArt = it
+          }
+        }
     val artUri =
         if (artBitmap != null) null
         else

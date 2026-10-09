@@ -125,6 +125,17 @@ class MultiRoomService : Service() {
     onState(eff)
   }
 
+  /** Each MA poll is a fresh WebSocket + auth + full `players/all` read, so only poll fast while
+   *  something is actually playing; idle, or with the screen off, a slower check is plenty. */
+  private fun maPollDelay(s: NowPlayingState): Long {
+    val pm = getSystemService(android.os.PowerManager::class.java)
+    return when {
+      pm?.isInteractive == false -> POLL_MA_SCREEN_OFF_MS
+      s.active -> POLL_MA_MS
+      else -> POLL_MA_IDLE_MS
+    }
+  }
+
   /** Poll MA for our player's current track (the AirPlay fill-in). Always runs while the relay
    *  is connected: [MaControl.nowPlaying] returns IDLE with no network when MA creds aren't set,
    *  so Snapcast-only Portals are unaffected — and creds entered later are picked up on the next
@@ -143,7 +154,7 @@ class MultiRoomService : Service() {
                             }
                             .getOrDefault(NowPlayingState(PlaybackState.IDLE))
                     if (polling) onMaState(s)
-                    runCatching { Thread.sleep(POLL_MA_MS) }
+                    runCatching { Thread.sleep(maPollDelay(s)) }
                   }
                 },
                 "ma-nowplaying")
@@ -305,6 +316,8 @@ class MultiRoomService : Service() {
     private const val NOTIF_ID = 5022
     private const val PORT = 1705 // snapserver JSON-RPC control port
     private const val POLL_MA_MS = 4000L // how often to poll MA for the AirPlay-source track
+    private const val POLL_MA_IDLE_MS = 12_000L // …while nothing is playing
+    private const val POLL_MA_SCREEN_OFF_MS = 30_000L // …while the screen is off
 
     /** The standalone Snapcast player that actually renders the synced audio. The
      *  multi-room now-playing UI is gated on this being installed. */

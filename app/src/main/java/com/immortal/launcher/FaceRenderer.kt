@@ -528,16 +528,14 @@ class FaceRenderer(
           val now = Date()
           blinkOn = !blinkOn
           clockFace?.update(now, blinkOn)
-          if (face.clock.showDate)
-              dateView?.text =
-                  face.clock.dateFormat.format(now)
-          val (pct, charging) = batteryInfo()
+          if (face.clock.showDate) dateView?.setTextIfChanged(face.clock.dateFormat.format(now))
+          val (pct, charging) = cachedBatteryInfo(now.time)
           val hasBattery = pct >= 0
-          batteryView?.text = if (hasBattery) (if (charging) "$pct% ⚡" else "$pct%") else ""
+          batteryView?.setTextIfChanged(if (hasBattery) (if (charging) "$pct% ⚡" else "$pct%") else "")
           batteryView?.visibility = if (hasBattery) View.VISIBLE else View.GONE
           batteryDivider?.visibility = if (hasBattery) View.VISIBLE else View.GONE
           val hasWeather = weatherText.isNotBlank()
-          weatherView?.text = weatherText
+          weatherView?.setTextIfChanged(weatherText)
           weatherView?.visibility = if (hasWeather) View.VISIBLE else View.GONE
           weatherDivider?.visibility = if (hasWeather) View.VISIBLE else View.GONE
           // Shared countdown timer: show "M:SS" while running, the alarm banner while ringing.
@@ -546,7 +544,7 @@ class FaceRenderer(
           if (timerRemaining > 0L && !timerState.ringing) {
             val tm = (timerRemaining / 60_000).toInt()
             val ts = ((timerRemaining / 1000) % 60).toInt()
-            timerView?.text = "⏱ %d:%02d".format(tm, ts)
+            timerView?.setTextIfChanged("⏱ %d:%02d".format(tm, ts))
             timerView?.visibility = View.VISIBLE
           } else {
             timerView?.visibility = View.GONE
@@ -651,6 +649,24 @@ class FaceRenderer(
       }
 
   // --- data -------------------------------------------------------------------
+  // The face ticks every second (for the blinking colon), but the battery only needs a look every
+  // half minute — each read is a binder round-trip to the system for the sticky broadcast.
+  private var batteryAt = 0L
+  private var battery: Pair<Int, Boolean> = -1 to false
+
+  private fun cachedBatteryInfo(nowMs: Long): Pair<Int, Boolean> {
+    if (nowMs - batteryAt >= 30_000L || nowMs < batteryAt) {
+      battery = batteryInfo()
+      batteryAt = nowMs
+    }
+    return battery
+  }
+
+  /** Skip the relayout a TextView does on every setText when the text hasn't changed. */
+  private fun TextView.setTextIfChanged(t: CharSequence) {
+    if (text?.toString() != t.toString()) text = t
+  }
+
   /** Battery percent (-1 = no battery / mains-only Portal) and whether it's charging. */
   private fun batteryInfo(): Pair<Int, Boolean> {
     val i =

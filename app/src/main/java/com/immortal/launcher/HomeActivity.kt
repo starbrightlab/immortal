@@ -1401,13 +1401,6 @@ private fun customWidgetLabel(kind: String): String =
 
 @Composable
 private fun HeaderBar(onScreensaver: () -> Unit) {
-  var now by remember { mutableStateOf(Date()) }
-  androidx.compose.runtime.LaunchedEffect(Unit) {
-    while (true) {
-      now = Date()
-      delay(1000)
-    }
-  }
   val context = androidx.compose.ui.platform.LocalContext.current
   // The unit preference is re-read on resume and keys the fetch loop, so flipping
   // °F/°C in Immortal Settings updates the header the moment the user returns.
@@ -1470,13 +1463,7 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
   Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
     // Clock anchors the top-left corner; the action buttons sit just to its right
     // (now that there's a group of them, leading with the buttons looked off).
-    Text(
-        SimpleDateFormat(if (use24Hour) "H:mm" else "h:mm", Locale.getDefault()).format(now),
-        color = Color.White,
-        fontSize = 56.sp,
-        fontWeight = FontWeight.Light,
-        lineHeight = 56.sp,
-    )
+    MinuteClockText(use24Hour, fontSize = 56.sp)
     Spacer(Modifier.size(28.dp))
     // Screensaver entry — the stock launcher's stacked-photo icon so the affordance
     // reads the same as the Portal users already know.
@@ -1550,12 +1537,7 @@ private fun HeaderBar(onScreensaver: () -> Unit) {
           Text(weather, color = Color.White, fontSize = 30.sp)
         }
       }
-      Text(
-          DateFormatter.format(now, "EEEEMMMMd"),
-          color = Color(0xFFDADADA),
-          fontSize = 18.sp,
-          modifier = Modifier.padding(top = 4.dp),
-      )
+      MinuteDateText(fontSize = 18.sp, color = Color(0xFFDADADA), modifier = Modifier.padding(top = 4.dp))
     }
   }
 
