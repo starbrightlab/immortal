@@ -153,4 +153,20 @@ class SleepSchedulerTest {
     assertFalse(SleepScheduler.inWindow(0, 600, 600))
     assertFalse(SleepScheduler.inWindow(600, 600, 600))
   }
+
+  // ----- overnight window end wake classification -----
+
+  @Test
+  fun windowEnd_screensaverEnabled_wakesAndLaunchesScreensaver() {
+    assertEquals(
+        SleepScheduler.OvernightWake.WAKE_AND_SCREENSAVER,
+        SleepScheduler.classifyOvernightWake(screensaverEnabled = true))
+  }
+
+  @Test
+  fun windowEnd_screensaverDisabled_wakesOnly() {
+    assertEquals(
+        SleepScheduler.OvernightWake.WAKE_ONLY,
+        SleepScheduler.classifyOvernightWake(screensaverEnabled = false))
+  }
 }

@@ -339,11 +339,36 @@ object SleepScheduler {
     scheduleOvernight(context)
   }
 
+  internal enum class OvernightWake {
+    /** Screensaver enabled: wake panel and launch screensaver over keyguard. */
+    WAKE_AND_SCREENSAVER,
+    /** Screensaver disabled: wake panel back to launcher. */
+    WAKE_ONLY,
+  }
+
+  internal fun classifyOvernightWake(screensaverEnabled: Boolean): OvernightWake =
+      if (screensaverEnabled) OvernightWake.WAKE_AND_SCREENSAVER else OvernightWake.WAKE_ONLY
+
   /** The window-end alarm fired: restore the screensaver per the user's setting, re-arm tomorrow. */
   fun onWindowEnd(context: Context) {
     Log.i(TAG, "overnight end → restore screensaver")
     SettingsGuard.reaffirmScreensaver(context)
     scheduleOvernight(context)
+
+    // Wake the panel from overnight sleep. The dark window locked the display via ScreenControl.sleep
+    // (lockNow), so reaffirming Settings.Secure alone leaves the panel powered off. An explicit
+    // wake turns the display on; and launching PhotoFramePreviewActivity surfaces the frame
+    // over the keyguard (issue #158) with setShowWhenLocked / setTurnScreenOn.
+    ScreenControl.wake(context)
+    val cfg = ScreensaverConfig.load(context)
+    if (classifyOvernightWake(cfg.enabled) == OvernightWake.WAKE_AND_SCREENSAVER) {
+      runCatching {
+        context.startActivity(
+            Intent(context, PhotoFramePreviewActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+      }
+          .onFailure { Log.w(TAG, "screensaver launch on window end failed", it) }
+    }
   }
 
   /**
