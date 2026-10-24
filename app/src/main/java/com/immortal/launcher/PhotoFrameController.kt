@@ -19,6 +19,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.os.Message
 import android.speech.tts.TextToSpeech
 import android.text.TextUtils
 import android.util.Log
@@ -82,7 +83,16 @@ class PhotoFrameController(
   // A separate single-thread executor for caption work (EXIF read + the reverse-geocode
   // network call), so an 8s geocode lookup can never stall the image-decode pipeline on [io].
   private val metaIo = Executors.newSingleThreadExecutor()
-  private val ui = Handler(Looper.getMainLooper())
+  // Set once by stop(). A task still running on [io] when the frame stops can post its result
+  // after stop() cleared the queue; running it would resubmit to the shut-down executors and
+  // crash the launcher with RejectedExecutionException, so [ui] drops everything once stopped.
+  private var stopped = false
+  private val ui =
+      object : Handler(Looper.getMainLooper()) {
+        override fun dispatchMessage(msg: Message) {
+          if (!stopped) super.dispatchMessage(msg)
+        }
+      }
 
   private class PhotoLayer(
       val blurPhoto: ImageView,
@@ -501,6 +511,7 @@ class PhotoFrameController(
   }
 
   fun stop() {
+    stopped = true
     ui.removeCallbacks(dashboardCycle)
     ui.removeCallbacksAndMessages(null)
     runCatching { gestureCamera?.stop() }
