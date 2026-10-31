@@ -18,7 +18,7 @@ network use free, keyless public endpoints.
 | **Intercom** | Talk to another Portal on your Wi-Fi — a push-to-talk intercom (or a one-way baby monitor), streamed directly between devices with no server. Needs microphone permission the first time. (`IntercomActivity`) |
 | **Timers** | Kitchen timers with a live countdown. |
 | **Leave a note** | A sticky note or a quick voice memo, left on the device for the next person. |
-| **Converter** | Units and currency. |
+| **Converter** | Units and currency (ECB rates via Frankfurter; Bank of England rates via [allratestoday.com](https://allratestoday.com) when Frankfurter is unreachable). |
 | **ISS passes** | When the International Space Station next flies over your location. |
 | **Aurora outlook** | The northern-lights chance for your location. |
 | **Speed test** | Check your internet speed (via Cloudflare). |
