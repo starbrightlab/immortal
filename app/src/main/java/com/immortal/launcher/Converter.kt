@@ -71,7 +71,7 @@ object Converter {
     }
   }
 
-  // ---- Currency (keyless Frankfurter / ECB) ------------------------------------
+  // ---- Currency (keyless Frankfurter / ECB, Bank of England fallback) ----------
 
   /** A small, common set so the picker stays glanceable on a 50–100 cm screen. */
   val CURRENCIES =
@@ -95,17 +95,47 @@ object Converter {
     if (fresh) {
       prefs.getString(cacheKey, null)?.let { return parseRates(it) }
     }
-    val fetched =
-        runCatching {
-              httpGet("https://api.frankfurter.app/latest?from=$base&to=${CURRENCIES.filter { it != base }.joinToString(",")}")
-            }
-            .getOrNull()
+    val fetched = fetchRatesJson(base)
     if (fetched != null && parseRates(fetched) != null) {
       prefs.edit().putString(cacheKey, fetched).putLong(tsKey, System.currentTimeMillis()).apply()
       return parseRates(fetched)
     }
     // Stale cache beats nothing.
     return prefs.getString(cacheKey, null)?.let { parseRates(it) }
+  }
+
+  /** Frankfurter's `{"rates":{...}}` for [base], or the same shape built from the Bank of
+   * England's daily table (keyless, via allratestoday.com) when Frankfurter is unreachable. */
+  private fun fetchRatesJson(base: String): String? {
+    val targets = CURRENCIES.filter { it != base }.joinToString(",")
+    runCatching { httpGet("https://api.frankfurter.app/latest?from=$base&to=$targets") }
+        .getOrNull()
+        ?.takeIf { parseRates(it) != null }
+        ?.let {
+          return it
+        }
+    return runCatching { boeRatesJson(base) }.getOrNull()
+  }
+
+  /** The Bank of England table lists each pair as "1 base = value quote" against GBP; rebase
+   * it to [base] and re-encode in Frankfurter's shape so the cache and parser stay as they are.
+   * Null when the table has no rate for [base] (e.g. RON, CZK, HUF). */
+  private fun boeRatesJson(base: String): String? {
+    val table = JSONObject(httpGet("https://allratestoday.com/api/open/central-bank/boe")).getJSONArray("rates")
+    val perPound = hashMapOf("GBP" to 1.0)
+    for (i in 0 until table.length()) {
+      val row = table.getJSONObject(i)
+      val value = row.optDouble("value")
+      if (row.optString("type") != "reference" || value.isNaN() || value <= 0.0) continue
+      when {
+        row.optString("base") == "GBP" -> perPound[row.getString("quote")] = value
+        row.optString("quote") == "GBP" -> perPound[row.getString("base")] = 1.0 / value
+      }
+    }
+    val baseUnits = perPound[base] ?: return null
+    val rates = JSONObject()
+    for (c in CURRENCIES) if (c != base) perPound[c]?.let { rates.put(c, it / baseUnits) }
+    return if (rates.length() == 0) null else JSONObject().put("rates", rates).toString()
   }
 
   private fun parseRates(json: String): Map<String, Double>? =
