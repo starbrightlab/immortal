@@ -238,14 +238,18 @@ private fun ImmortalSettingsScreen() {
 
 /**
  * Nav row on the main settings page that opens the Multi-room audio subpage. Install-
- * context-aware: shown only when the Snapcast player ([MultiRoomService.SNAPCAST_PACKAGE])
- * is installed — i.e. when this Portal is set up as a synced speaker.
+ * context-aware: shown only when a player ([MultiRoomService.PLAYER_PACKAGES]) is installed
+ * or multi-room is already on — i.e. when this Portal is set up as a synced speaker.
  */
 @Composable
 private fun MultiRoomNavRow(onOpen: () -> Unit) {
   val context = LocalContext.current
-  val installed = remember { StoreCatalog.isInstalled(context, MultiRoomService.SNAPCAST_PACKAGE) }
-  if (!installed) return
+  val speaker = remember {
+    MultiRoomService.isSpeaker(ImmortalSettings.multiRoomEnabled(context)) {
+      StoreCatalog.isInstalled(context, it)
+    }
+  }
+  if (!speaker) return
 
   Spacer(Modifier.size(26.dp))
   SectionLabel("Multi-room audio")
