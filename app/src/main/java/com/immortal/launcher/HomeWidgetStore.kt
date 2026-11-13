@@ -41,6 +41,7 @@ object HomeWidgetStore {
   const val KIND_APP_WIDGET = "appwidget"
   const val KIND_WEATHER = "weather"
   const val KIND_WORLD_CLOCK = "world_clock"
+  const val KIND_WORLD_CLOCK_DIGITAL = "world_clock_digital"
   const val KIND_TIMERS = "timers"
 
   const val DEFAULT_SPAN_X = 2

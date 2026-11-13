@@ -1395,6 +1395,7 @@ private fun customWidgetLabel(kind: String): String =
     when (kind) {
       HomeWidgetStore.KIND_WEATHER -> "Weather"
       HomeWidgetStore.KIND_WORLD_CLOCK -> "World Clock"
+      HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL -> "Digital World Clock"
       HomeWidgetStore.KIND_TIMERS -> "Timers"
       else -> "Widget"
     }
@@ -2595,6 +2596,7 @@ private fun ImmortalWidgetContent(widget: HomeWidgetStore.HomeWidget, modifier: 
   when (widget.kind) {
     HomeWidgetStore.KIND_WEATHER -> ImmortalWeatherWidget(modifier)
     HomeWidgetStore.KIND_WORLD_CLOCK -> ImmortalWorldClockWidget(modifier)
+    HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL -> ImmortalDigitalWorldClockWidget(modifier)
     HomeWidgetStore.KIND_TIMERS -> ImmortalTimersWidget(modifier)
     else -> UnknownImmortalWidget(widget.kind, modifier)
   }
@@ -2719,8 +2721,15 @@ private fun weatherGradient(code: Int, isDay: Boolean): Pair<Color, Color> {
   }
 }
 
+/** The clocks the world-clock widgets show: the first four zones, each with its display name. */
+private data class WorldClockEntry(val zone: String, val name: String)
+
+/**
+ * The world-clock selection shared by the analog and digital widgets, re-read on every resume so a
+ * change made in Settings shows up when you come back to the home screen.
+ */
 @Composable
-private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
+private fun rememberWorldClocks(): List<WorldClockEntry> {
   val context = androidx.compose.ui.platform.LocalContext.current
   var zones by remember { mutableStateOf(ImmortalSettings.worldClockZones(context)) }
   var labels by remember { mutableStateOf(ImmortalSettings.worldClockLabels(context)) }
@@ -2735,6 +2744,14 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
     lifecycleOwner.lifecycle.addObserver(obs)
     onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
   }
+  return remember(zones, labels) {
+    zones.take(4).map { WorldClockEntry(it, labels[it] ?: worldClockLabel(it)) }
+  }
+}
+
+@Composable
+private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
+  val clocks = rememberWorldClocks()
   var now by remember { mutableStateOf(Date()) }
   LaunchedEffect(Unit) {
     while (true) {
@@ -2752,21 +2769,95 @@ private fun ImmortalWorldClockWidget(modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
-      zones.take(4).forEach { zone ->
+      clocks.forEach { clock ->
         Column(
             modifier = Modifier.weight(1f).fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
           Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            AnalogClock(zone, now, Modifier.fillMaxHeight().aspectRatio(1f))
+            AnalogClock(clock.zone, now, Modifier.fillMaxHeight().aspectRatio(1f))
           }
           Spacer(Modifier.size(6.dp))
           // One line: the clock's name, custom if it has one, else the city from its zone id.
           // The offset and the underlying zone live in the world-clock settings screen, so the
           // widget stays a row of clocks with names under them.
           Text(
-              labels[zone] ?: worldClockLabel(zone),
+              clock.name,
               color = Color.White,
+              fontSize = 12.sp,
+              fontWeight = FontWeight.Medium,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+          )
+        }
+      }
+    }
+  }
+}
+
+/**
+ * The same clocks as [ImmortalWorldClockWidget], as digital times. The face shows only hours and
+ * minutes, so it wakes on each minute boundary rather than every second.
+ */
+@Composable
+private fun ImmortalDigitalWorldClockWidget(modifier: Modifier = Modifier) {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val clocks = rememberWorldClocks()
+  var use24Hour by remember { mutableStateOf(ImmortalSettings.use24HourClock(context)) }
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner) {
+    val obs = LifecycleEventObserver { _, e ->
+      if (e == Lifecycle.Event.ON_RESUME) use24Hour = ImmortalSettings.use24HourClock(context)
+    }
+    lifecycleOwner.lifecycle.addObserver(obs)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+  }
+  var now by remember { mutableStateOf(Date()) }
+  LaunchedEffect(Unit) {
+    while (true) {
+      now = Date()
+      delay(60_000L - System.currentTimeMillis() % 60_000L)
+    }
+  }
+  // Locale-aware pattern for the chosen 12/24h mode, e.g. "HH:mm", "h:mm a" or "H:mm".
+  val pattern = remember(use24Hour) {
+    android.text.format.DateFormat.getBestDateTimePattern(
+        Locale.getDefault(), if (use24Hour) "Hm" else "hm")
+  }
+  // Fewer clocks get more room, so the times grow with them.
+  val timeSize =
+      when (clocks.size) {
+        1 -> 34.sp
+        2 -> 24.sp
+        3 -> 18.sp
+        else -> 15.sp
+      }
+  ImmortalWidgetShell(title = "World Clock", accent = Color(0xFFFFC857), modifier = modifier) {
+    Row(
+        modifier = Modifier.fillMaxWidth().weight(1f),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      clocks.forEach { clock ->
+        val time = remember(clock.zone, pattern, now) {
+          SimpleDateFormat(pattern, Locale.getDefault())
+              .apply { timeZone = TimeZone.getTimeZone(clock.zone) }
+              .format(now)
+        }
+        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+          Text(
+              time,
+              color = Color.White,
+              fontSize = timeSize,
+              fontWeight = FontWeight.Bold,
+              maxLines = 1,
+              softWrap = false,
+              overflow = TextOverflow.Ellipsis,
+          )
+          Spacer(Modifier.size(4.dp))
+          Text(
+              clock.name,
+              color = Color(0xFFE0E0E0),
               fontSize = 12.sp,
               fontWeight = FontWeight.Medium,
               maxLines = 1,
@@ -3135,6 +3226,7 @@ private fun CustomWidgetGlyph(kind: String) {
       when (kind) {
         HomeWidgetStore.KIND_WEATHER -> "☁"
         HomeWidgetStore.KIND_WORLD_CLOCK -> "◷"
+        HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL -> "🕒"
         HomeWidgetStore.KIND_TIMERS -> "⏱"
         else -> "+"
       }
@@ -3382,6 +3474,15 @@ private fun loadWidgetProviders(context: Context, tileDp: Dp): List<WidgetProvid
               spanX = 2,
               spanY = 2,
               customKind = HomeWidgetStore.KIND_WORLD_CLOCK,
+          ),
+          WidgetProviderEntry(
+              label = "Digital World Clock",
+              packageLabel = "Immortal",
+              icon = null,
+              info = null,
+              spanX = 2,
+              spanY = 2,
+              customKind = HomeWidgetStore.KIND_WORLD_CLOCK_DIGITAL,
           ),
           WidgetProviderEntry(
               label = "Timers",
