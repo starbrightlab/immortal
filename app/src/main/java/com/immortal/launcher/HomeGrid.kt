@@ -15,7 +15,13 @@ package com.immortal.launcher
  */
 object HomeGrid {
 
-  /** Keep blanks, drop stale/duplicate keys (→ blank), append new tiles, trim trailing blanks. */
+  /**
+   * Keep blanks, drop stale/duplicate keys (→ blank), place new tiles, trim trailing blanks.
+   *
+   * New tiles fill the blanks after the last kept tile first (the saved list is usually padded to
+   * whole rows/pages), and are appended only when none are left. Blanks before the last kept tile
+   * are gaps the user made, so they are never filled.
+   */
   private fun reconcile(saved: List<String?>, keys: List<String>): MutableList<String?> {
     val keySet = keys.toHashSet()
     val seen = HashSet<String>()
@@ -23,7 +29,11 @@ object HomeGrid {
     for (s in saved) {
       if (s != null && s in keySet && seen.add(s)) out.add(s) else out.add(null)
     }
-    for (k in keys) if (seen.add(k)) out.add(k)
+    var free = out.indexOfLast { it != null } + 1
+    for (k in keys) {
+      if (!seen.add(k)) continue
+      if (free < out.size) out[free++] = k else out.add(k)
+    }
     while (out.isNotEmpty() && out.last() == null) out.removeAt(out.lastIndex)
     return out
   }
@@ -32,7 +42,7 @@ object HomeGrid {
    * Reconcile a saved slot list with the tiles that currently exist:
    * - keeps blanks (`null`) where the user left them,
    * - drops keys that no longer exist or are duplicated (their slot becomes blank),
-   * - appends any brand-new tiles at the end,
+   * - places brand-new tiles in the first blanks after the last tile, else appends them,
    * - trims trailing blanks, then pads so the last row is full plus one spare blank row to drop into.
    *
    * [cols] is the column count; padding is by slot count (wide widgets are an approximation, which
