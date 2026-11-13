@@ -174,13 +174,18 @@ object ScreensaverConfig {
       val showGradient: Boolean = true,
       // Which lines the photo caption may show (see [PhotoCaption]). Date and location come from
       // EXIF for your own files (folder / SMB) and from the server for Immich; description, tags
-      // and people are Immich-only, because it's the only source that knows them. All on by
-      // default — a photo with nothing to say still shows no caption.
+      // and people are Immich-only, because it's the only source that knows them.
+      //
+      // Date and location are on by default — they're the "taken at <place> · <date>" line the
+      // frame has always shown, and they read as a caption rather than a data dump. The three
+      // Immich-only lines default OFF: they can carry names of people in the room and whatever
+      // was typed into a description, which is not something to put on a wall display until it's
+      // asked for. Turning one on is a single switch under Photo details.
       val captionDate: Boolean = true,
       val captionLocation: Boolean = true,
-      val captionDescription: Boolean = true,
-      val captionTags: Boolean = true,
-      val captionPeople: Boolean = true,
+      val captionDescription: Boolean = false,
+      val captionTags: Boolean = false,
+      val captionPeople: Boolean = false,
       // Draw a small glyph ahead of each caption line (pin / calendar / note / people / tag).
       val captionIcons: Boolean = true,
       // The caption's layout, owned by CaptionStyleActivity and stored as two compact strings
@@ -333,9 +338,9 @@ object ScreensaverConfig {
         showGradient = p.getBoolean("show_gradient", true),
         captionDate = p.getBoolean("caption_date", true),
         captionLocation = p.getBoolean("caption_location", true),
-        captionDescription = p.getBoolean("caption_description", true),
-        captionTags = p.getBoolean("caption_tags", true),
-        captionPeople = p.getBoolean("caption_people", true),
+        captionDescription = p.getBoolean("caption_description", false),
+        captionTags = p.getBoolean("caption_tags", false),
+        captionPeople = p.getBoolean("caption_people", false),
         captionIcons = p.getBoolean("caption_icons", true),
         captionOrder = p.getString("caption_order", "") ?: "",
         captionStyles = p.getString("caption_styles", "") ?: "",

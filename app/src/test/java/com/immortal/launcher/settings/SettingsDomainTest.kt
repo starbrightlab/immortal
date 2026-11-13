@@ -236,6 +236,24 @@ class SettingsDomainTest {
   }
 
   @Test
+  fun captionDefaults_keepTheImmichOnlyLinesOffUntilAskedFor() {
+    // A wall display shows whoever walks past it. The place/date line is the caption the frame
+    // has always had; names of recognised people, a typed description and tag names are not
+    // things to surface by default. Pinned here so a default can't drift back on unnoticed.
+    val d = com.immortal.launcher.ScreensaverConfig.Settings()
+    assertTrue(d.captionLocation)
+    assertTrue(d.captionDate)
+    assertFalse(d.captionDescription)
+    assertFalse(d.captionPeople)
+    assertFalse(d.captionTags)
+    // The switches still exist and still reach both surfaces — only the default changed.
+    val keys = SettingsDomains.screensaver.specs.map { it.key }
+    listOf("captionDescription", "captionPeople", "captionTags").forEach {
+      assertTrue("$it must still be a spec", keys.contains(it))
+    }
+  }
+
+  @Test
   fun screensaverCaptionLines_onlyOfferWhatTheActiveSourceCanSupply() {
     // The caption lines are declaratively gated so a control never promises something the source
     // can't deliver: date + location wherever the photo carries them (own files via EXIF, Immich
@@ -274,7 +292,12 @@ class SettingsDomainTest {
         SettingsDomains.screensaver.specs.first { it.key == "captionLayout" }
             as NavSpec<com.immortal.launcher.ScreensaverConfig.Settings>
 
-    val allOn = com.immortal.launcher.ScreensaverConfig.Settings()
+    // Shipped defaults: place + date only. The three Immich-only lines (description, people,
+    // tags) are off until asked for, so a fresh frame shows the caption it always has.
+    val defaults = com.immortal.launcher.ScreensaverConfig.Settings()
+    assertEquals("Location, Photo date", nav.value(ctx, defaults))
+
+    val allOn = defaults.copy(captionDescription = true, captionPeople = true, captionTags = true)
     assertEquals("Location, Photo date +3", nav.value(ctx, allOn))
 
     // Reordered, and down to two lines: both are reflected, in the user's order.

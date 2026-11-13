@@ -45,8 +45,12 @@ object ImmichSource {
   /** A library album, for the connection picker. */
   data class Album(val id: String, val name: String, val count: Int)
 
-  /** One playable asset: its Immich id, plus a preview-image or video-playback URL. */
-  data class Media(val id: String, val url: String, val isVideo: Boolean)
+  /**
+   * One playable asset: a preview-image URL, or a video-playback URL when [isVideo]. The asset id
+   * isn't carried here — it's recoverable from the URL via [assetIdFrom], which is what the
+   * caption uses, since a cached photo is replayed without the listing that produced it.
+   */
+  data class Media(val url: String, val isVideo: Boolean)
 
   /**
    * What Immich knows about one photo that its re-encoded preview JPEG can't carry: when and
@@ -88,6 +92,20 @@ object ImmichSource {
   fun playbackUrl(base: String, assetId: String): String =
       "${normalizeBase(base)}/api/assets/$assetId/video/playback"
 
+  /**
+   * The asset id inside a [previewUrl] or [playbackUrl], or null if this isn't one.
+   *
+   * The caption needs the id for a URL the slideshow is *already* showing, and the list that
+   * produced it may be long gone: with the media cache on, a resident [CachePool] plays from disk
+   * without contacting the server at all, and its entries carry only `url` + `isVideo`. Reading
+   * the id back out of the URL we minted works on every path — cached, pooled, or streamed —
+   * without a parallel map to keep in step or a change to the pool's on-disk format.
+   */
+  fun assetIdFrom(url: String): String? =
+      ASSET_PATH.find(url)?.groupValues?.get(1)?.takeIf { it.isNotBlank() }
+
+  private val ASSET_PATH = Regex("""/api/assets/([^/?#]+)""")
+
   /** Confirm the server is reachable and the key is valid (`GET /api/users/me` → 200). */
   fun testConnection(base: String, apiKey: String): Boolean =
       runCatching {
@@ -128,7 +146,7 @@ object ImmichSource {
               Log.w(TAG, "search returned no assets (album=${albumId ?: "library"})")
             }
             assets.map { (id, isVideo) ->
-              Media(id, if (isVideo) playbackUrl(b, id) else previewUrl(b, id), isVideo)
+              Media(if (isVideo) playbackUrl(b, id) else previewUrl(b, id), isVideo)
             }
           }
           .onFailure { Log.w(TAG, "media list failed (album=${albumId ?: "library"})", it) }

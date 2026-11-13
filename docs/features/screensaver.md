@@ -66,7 +66,10 @@ match its text. Turn them off with **Show icons**.
 Which sources can fill these in depends on what survives to the Portal:
 
 - **Immich** supplies all five. The frame asks the server for each photo as it comes up
-  (`GET /api/assets/{id}`) and caches the answer, so a looping album asks once per photo.
+  (`GET /api/assets/{id}`) and caches the answer, so a looping album asks once per photo. This
+  works with **Store media on this device** on too: the asset id is read back out of the photo's
+  own URL, so a photo replayed from the on-device pool is still captioned even though that pool
+  plays without contacting the server.
 - **Your own folder** and a **network share (SMB)** supply the date and location, read from the
   photo's own EXIF block; the location is reverse-geocoded to a place name.
 - The remaining sources (built-in feed, iCloud/Google shared albums, WebDAV) serve re-encoded
@@ -74,8 +77,15 @@ Which sources can fill these in depends on what survives to the Portal:
 
 Each line has its own switch under **Photo details** in the screensaver settings (on the Portal or
 from the [phone remote](remote.md)); a switch only appears when the active source can actually
-supply that line. All five are on by default. Captions are hidden on a full-bleed clock face
-(which owns the whole frame) and while a video is playing.
+supply that line.
+
+**Location** and **photo date** are on by default — that's the caption the frame has always
+shown. **Description**, **people** and **tags** start **off**: a photo frame is on show to whoever
+walks past it, and the names of recognised people or a description typed on a photo aren't things
+to put on a wall display until you ask for them. Each is a single switch away.
+
+Captions are hidden on a full-bleed clock face (which owns the whole frame) and while a video is
+playing.
 
 ### Layout and type
 

@@ -198,12 +198,14 @@ class PhotoFrameController(
   // public shares, the x-api-key for Immich. Applied in [advanceRemote]/[downloadBitmap]/
   // [showRemoteVideo].
   private var remoteHeaders: Map<String, String> = emptyMap()
-  // Immich captions: the asset id behind each remote URL, so a displayed photo can be traced back
+  // Immich captions: true while Immich is the live source, so a displayed photo can be traced back
   // to the server and asked for its stored detail (date / description / place / people / tags).
-  // Non-empty exactly while Immich is the live source. The fetched detail is cached for the
-  // session — a frame loops the same album for days and a photo's detail doesn't change under it,
-  // so each asset is asked for once. Bounded by the listing cap (1000 assets of short strings).
-  private var immichAssetIds: Map<String, String> = emptyMap()
+  // The id comes from the URL itself ([ImmichSource.assetIdFrom]) rather than a map built at list
+  // time — with the cache on, a resident pool plays straight from disk and never lists the server,
+  // so there is no list to carry ids from. The fetched detail is cached for the session: a frame
+  // loops the same album for days and a photo's detail doesn't change under it, so each asset is
+  // asked for once. Bounded by the pool/listing cap (short strings per asset).
+  private var immichCaptions = false
   private val immichDetails = ConcurrentHashMap<String, ImmichSource.Details>()
   // The subset of [remoteUrls] that are videos (Immich with "Play videos" on); these stream
   // through the VideoView instead of the bitmap download. See [showRemoteVideo].
@@ -403,6 +405,9 @@ class PhotoFrameController(
         }
       }
       is PhotoFrameSource.Immich -> {
+        // Set before the pooled path can return: captions must work whether this source plays
+        // from the pool, from a first-fill stream, or uncached.
+        immichCaptions = true
         val poolKey =
             "immich|${ImmichSource.normalizeBase(source.url)}|${source.albumId.orEmpty()}|video=${source.includeVideo}"
         val pooled =
@@ -420,7 +425,6 @@ class PhotoFrameController(
               val ordered = if (source.shuffle) media.shuffled() else media
               remoteUrls = ordered.map { it.url }
               remoteVideos = media.filter { it.isVideo }.mapTo(HashSet()) { it.url }
-              immichAssetIds = ordered.associate { it.url to it.id }
               remoteHeaders = ImmichSource.authHeaders(source.key)
               remoteMode = true
               remoteIndex = -1
@@ -661,7 +665,7 @@ class PhotoFrameController(
    * photo is dropped, and served from [immichDetails] on every loop after the first.
    */
   private fun loadCaptionForImmich(url: String, g: Int) {
-    val assetId = immichAssetIds[url]
+    val assetId = ImmichSource.assetIdFrom(url)
     val base = settings.immichUrl
     val key = settings.immichKey
     if (assetId == null || base.isNullOrBlank() || key.isNullOrBlank()) {
@@ -1452,7 +1456,7 @@ class PhotoFrameController(
         // serve EXIF-stripped images with no metadata API, so they carry no caption.
         when {
           smbSource != null -> loadCaptionForSmb(url, g)
-          immichAssetIds.isNotEmpty() -> loadCaptionForImmich(url, g)
+          immichCaptions -> loadCaptionForImmich(url, g)
           else -> faceRenderer.setCaption(null)
         }
         ui.postDelayed(remoteTick, intervalMs())
@@ -1579,7 +1583,7 @@ class PhotoFrameController(
     remoteMode = false
     remoteHeaders = emptyMap()
     remoteVideos = emptySet()
-    immichAssetIds = emptyMap()
+    immichCaptions = false
     remoteFetch = null
     poolLive = false
     smbSource?.let { s -> io.execute { runCatching { s.close() } } }

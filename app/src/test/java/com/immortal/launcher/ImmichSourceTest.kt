@@ -44,6 +44,29 @@ class ImmichSourceTest {
     assertEquals(mapOf("x-api-key" to "secret"), ImmichSource.authHeaders(" secret "))
   }
 
+  @Test
+  fun assetIdFrom_roundTripsTheUrlsWeMint() {
+    // The caption's whole link back to the server. A pooled/cached photo is replayed from disk
+    // with no listing in hand, so the id has to come back out of the URL itself.
+    val base = "http://immich:2283"
+    assertEquals("abc-123", ImmichSource.assetIdFrom(ImmichSource.previewUrl(base, "abc-123")))
+    assertEquals("abc-123", ImmichSource.assetIdFrom(ImmichSource.playbackUrl(base, "abc-123")))
+    // A real Immich id is a UUID; a sub-path base must not confuse the match.
+    val uuid = "8f2a1c4e-9b3d-4a7f-8e6c-1d2b3a4c5d6e"
+    assertEquals(uuid, ImmichSource.assetIdFrom(ImmichSource.previewUrl("https://photos.example/", uuid)))
+    assertEquals(uuid, ImmichSource.assetIdFrom("https://host/photos/api/assets/$uuid/thumbnail?size=preview"))
+    // The detail endpoint itself (no trailing segment) still yields the id.
+    assertEquals("abc", ImmichSource.assetIdFrom("$base/api/assets/abc"))
+  }
+
+  @Test
+  fun assetIdFrom_nullForAnythingThatIsNotAnAssetUrl() {
+    assertNull(ImmichSource.assetIdFrom("https://photos.example/share/xyz/image.jpg"))
+    assertNull(ImmichSource.assetIdFrom("http://immich:2283/api/albums"))
+    assertNull(ImmichSource.assetIdFrom("http://immich:2283/api/assets/"))
+    assertNull(ImmichSource.assetIdFrom(""))
+  }
+
   // --- asset detail (the screensaver caption) ---------------------------------
 
   @Test
