@@ -8,6 +8,7 @@
 package com.immortal.launcher
 
 import android.content.Context
+import androidx.annotation.StringRes
 
 /**
  * How the frame relates to the Portal's presence-driven power policy.
@@ -80,14 +81,15 @@ object ScreensaverConfig {
   const val SOUND_BROWN = "brown"
   val SOUNDSCAPES =
       listOf(SOUND_OFF, SOUND_RAIN, SOUND_OCEAN, SOUND_FIREPLACE, SOUND_WHITE, SOUND_PINK, SOUND_BROWN)
-  fun soundscapeLabel(s: String): String = when (s) {
-    SOUND_RAIN -> "Rain"
-    SOUND_OCEAN -> "Ocean waves"
-    SOUND_FIREPLACE -> "Fireplace"
-    SOUND_WHITE -> "White noise"
-    SOUND_PINK -> "Pink noise"
-    SOUND_BROWN -> "Brown noise"
-    else -> "Off"
+  @StringRes
+  fun soundscapeLabelRes(s: String): Int = when (s) {
+    SOUND_RAIN -> R.string.soundscape_rain
+    SOUND_OCEAN -> R.string.soundscape_ocean
+    SOUND_FIREPLACE -> R.string.soundscape_fireplace
+    SOUND_WHITE -> R.string.soundscape_white
+    SOUND_PINK -> R.string.soundscape_pink
+    SOUND_BROWN -> R.string.soundscape_brown
+    else -> R.string.soundscape_off
   }
 
   // Online photo feeds (used when source == SOURCE_DEFAULT). All keyless.
@@ -97,12 +99,13 @@ object ScreensaverConfig {
   const val FEED_WIKIMEDIA = "wikimedia" // Wikimedia Picture of the Day
   const val FEED_APOD = "apod" // NASA Astronomy Picture of the Day (DEMO_KEY)
   val FEEDS = listOf(FEED_PICSUM, FEED_MET, FEED_ARTIC, FEED_WIKIMEDIA, FEED_APOD)
-  fun feedLabel(feed: String): String = when (feed) {
-    FEED_MET -> "The Met — art"
-    FEED_ARTIC -> "Art Institute of Chicago"
-    FEED_WIKIMEDIA -> "Wikimedia Picture of the Day"
-    FEED_APOD -> "NASA Astronomy Picture"
-    else -> "Random photos (Picsum)"
+  @StringRes
+  fun feedLabelRes(feed: String): Int = when (feed) {
+    FEED_MET -> R.string.feed_met
+    FEED_ARTIC -> R.string.feed_artic
+    FEED_WIKIMEDIA -> R.string.feed_wikimedia
+    FEED_APOD -> R.string.feed_apod
+    else -> R.string.feed_picsum
   }
 
   data class Settings(

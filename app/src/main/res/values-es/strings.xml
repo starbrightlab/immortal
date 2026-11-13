@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2026 Starbright Lab.
+     This source code is licensed under the MIT license found in the
+     LICENSE file in the root directory of this source tree. -->
+<resources>
+    <string name="install_confirm_desc">Permite a Immortal confirmar automáticamente el diálogo de instalación de apps, para que las apps enviadas por WiFi desde el gestor de flota se instalen sin tocar este Portal.</string>
+    <string name="bar_watch_desc">Permite a Immortal mostrar sus botones rápidos (como el selector de apps) a la vez que la barra superior del Portal: detecta cuándo aparece la barra. No lee el contenido de la pantalla.</string>
+    <string name="back_gesture_service_label">Atrás de Immortal</string>
+    <string name="back_gesture_service_description">Desliza desde el borde derecho de la pantalla para volver atrás en cualquier app. Para que funcione, Immortal tiene que estar activado en los ajustes de Accesibilidad.</string>
+    <string name="remote_key_service_label">Botones del mando de Immortal</string>
+    <string name="remote_key_service_description">Asigna los botones Netflix, Prime Video, Watch y de voz del mando del Portal TV a las acciones que elijas, como silenciar el micrófono. Solo lee esas cuatro teclas: el resto de botones pasan tal cual, y no lee el contenido de la pantalla.</string>
+
+    <string name="language_system">Idioma del sistema</string>
+
+    <string name="dismiss_title">Abrir al salir</string>
+    <string name="dismiss_intro">Elige qué se abre al tocar el salvapantallas para despertar el Portal.</string>
+    <string name="dismiss_ha_subtitle">Abre tu panel de Home Assistant al tocar.</string>
+    <string name="dismiss_ha_dashboard">Panel</string>
+    <string name="dismiss_ha_path_help">La ruta que va tras la dirección de tu Home Assistant (p. ej., lovelace/0). Déjala en blanco para abrir tu panel predeterminado.</string>
+    <string name="dismiss_section_or_app">O una app</string>
+    <string name="dismiss_section_open">Abrir</string>
+    <string name="dismiss_launcher_title">Launcher de Immortal</string>
+    <string name="dismiss_launcher_subtitle">Vuelve a tu pantalla de inicio (predeterminado).</string>
+    <string name="dismiss_finding_apps">Buscando tus apps…</string>
+    <string name="dismiss_opens">Abre %1$s</string>
+
+    <string name="source_immortal_photos">Fotos de Immortal</string>
+    <string name="source_local_folder">Carpeta local</string>
+    <string name="source_shared_album">Álbum compartido</string>
+    <string name="source_web_page">Página web</string>
+    <string name="source_network_share">Carpeta de red</string>
+
+    <string name="feed_picsum">Fotos al azar (Picsum)</string>
+    <string name="feed_met">The Met — arte</string>
+    <string name="feed_artic">Art Institute of Chicago</string>
+    <string name="feed_wikimedia">Imagen del día de Wikimedia</string>
+    <string name="feed_apod">Imagen astronómica de la NASA</string>
+
+    <string name="soundscape_off">Desactivado</string>
+    <string name="soundscape_rain">Lluvia</string>
+    <string name="soundscape_ocean">Olas del mar</string>
+    <string name="soundscape_fireplace">Chimenea</string>
+    <string name="soundscape_white">Ruido blanco</string>
+    <string name="soundscape_pink">Ruido rosa</string>
+    <string name="soundscape_brown">Ruido marrón</string>
+</resources>
