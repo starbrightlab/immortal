@@ -180,9 +180,17 @@ agent such as Google Gemini.
   stream itself, which notify sounds also use) and a *Voice volume* slider.
 - **On/off and status from Home Assistant.** With MQTT on, the Portal's device also has a *Voice
   assistant* switch and a *Voice assistant status* sensor (*Off*, *Waiting for Home Assistant*,
-  *Listening for the wake word*, *Listening…*, *Answering*, *Microphone in use*, *Paused — open
-  Immortal to resume*). Switched on remotely, it starts listening the next time Immortal is on
+  *Listening for the wake word*, *Listening…*, *Answering*, *Microphone in use*, *Microphone
+  busy — another app is using it*, *Paused — open Immortal to resume*). Switched on remotely, it starts listening the next time Immortal is on
   screen, for the same Android 10 reason as above.
+- **Any device on your network can claim it.** Like other Wyoming satellites, the Portal listens on
+  TCP port 10700 with no pairing or password: whatever connects and asks it to run gets its
+  microphone stream and can play audio on it. Home Assistant is normally the only thing that does,
+  but keep the Portal on a network you trust (not a guest or shared Wi-Fi), and turn the voice
+  satellite off when you don't use it.
+- **If another app holds the microphone** (on Android 9 Portals only one app can record at a
+  time), the status shows *Microphone busy — another app is using it* and the Portal retries less
+  and less often, up to every 30 seconds, until the microphone is free.
 - **Leave *Microphone volume* at 1.0** on the device page. The Portal's microphone is already loud,
   and extra gain clips the audio so the wake word stops matching.
 - **It starts from Immortal's own screen.** Android 10 Portals only give a background app real

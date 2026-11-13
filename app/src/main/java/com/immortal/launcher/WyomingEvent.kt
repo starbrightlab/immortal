@@ -54,6 +54,8 @@ data class WyomingEvent(
     private val EMPTY = ByteArray(0)
     /** A header line longer than this is not a Wyoming peer; refuse rather than buffer it. */
     private const val MAX_HEADER = 64 * 1024
+    /** Extra JSON data is metadata (names, settings), never audio; cap it like the header. */
+    private const val MAX_DATA = 64 * 1024
     private const val MAX_PAYLOAD = 8 * 1024 * 1024
 
     /**
@@ -66,6 +68,7 @@ data class WyomingEvent(
       val type = header.optString("type").ifBlank { throw IOException("event without type") }
       val data = header.optJSONObject("data") ?: JSONObject()
       val dataLength = header.optInt("data_length", 0)
+      if (dataLength < 0 || dataLength > MAX_DATA) throw IOException("bad data length")
       if (dataLength > 0) {
         val extra = JSONObject(String(readExactly(input, dataLength), Charsets.UTF_8))
         extra.keys().forEach { k -> data.put(k, extra.get(k)) }

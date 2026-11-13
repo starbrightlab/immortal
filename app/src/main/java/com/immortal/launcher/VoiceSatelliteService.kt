@@ -31,6 +31,7 @@ import android.provider.Settings
 import android.util.Log
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.IOException
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -75,6 +76,8 @@ class VoiceSatelliteService : Service() {
   @Volatile private var retryDelayMs = RETRY_MIN_MS
   // The platform is silencing the capture (status says so until it recovers).
   @Volatile private var paused = false
+  // Consecutive capture sessions that never produced audio (microphone held by another app).
+  private var micBusy = MicBackoff.Idle
 
   override fun onBind(intent: Intent?): IBinder? = null
 
@@ -283,18 +286,29 @@ class VoiceSatelliteService : Service() {
       val rec = openRecord()
       if (rec == null) {
         MicOwner.release(MIC_OWNER)
-        sleepQuietly(5000)
+        micBusy = MicBackoff.failed(micBusy)
+        sleepQuietly(maxOf(micBusy.delayMs, 5000))
         continue
       }
       rearm = false
       var timestampMs = 0L
       var lastCheck = 0L
       var silencedSince = 0L
+      val openedAt = System.currentTimeMillis()
+      var reads = 0
       try {
         rec.startRecording()
+        // Android 9 (Portal Gen 1) lets only one app capture at a time: while another app holds
+        // the mic, startRecording() leaves us stopped or read() fails at once.
+        if (rec.recordingState != AudioRecord.RECORDSTATE_RECORDING) throw IOException("mic busy")
         while (running && MicOwner.holds(MIC_OWNER)) {
           val n = rec.read(chunk, 0, chunk.size)
           if (n <= 0) break
+          if (++reads == 1 && micBusy.failures > 0) {
+            // The other app let go: clear the "busy" status as soon as audio flows again.
+            VoiceStatus.set(
+                if (client != null) "Listening for the wake word" else "Waiting for Home Assistant")
+          }
           val now = System.currentTimeMillis()
           if (now - lastCheck > 5000) {
             lastCheck = now
@@ -330,10 +344,21 @@ class VoiceSatelliteService : Service() {
       } finally {
         runCatching { rec.stop() }
         rec.release()
-        if (running && !MicOwner.holds(MIC_OWNER)) VoiceStatus.set("Microphone in use")
+        val lostToOwner = running && !MicOwner.holds(MIC_OWNER)
+        if (lostToOwner) VoiceStatus.set("Microphone in use")
         MicOwner.release(MIC_OWNER)
+        micBusy =
+            if (lostToOwner || reads > 0 && System.currentTimeMillis() - openedAt >= MicBackoff.HEALTHY_MS)
+                MicBackoff.Idle
+            else MicBackoff.failed(micBusy)
       }
-      sleepQuietly(500)
+      if (micBusy.failures > 0 && running) {
+        // Another app holds the microphone: back off instead of reopening it twice a second,
+        // and say so where the user looks (settings, MQTT status sensor).
+        Log.i(TAG, "mic unavailable, retry in ${micBusy.delayMs} ms")
+        VoiceStatus.set("Microphone busy — another app is using it")
+      }
+      sleepQuietly(micBusy.delayMs)
     }
   }
 

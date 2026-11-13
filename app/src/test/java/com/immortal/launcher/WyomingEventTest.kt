@@ -78,4 +78,19 @@ class WyomingEventTest {
     val thrown = runCatching { WyomingEvent.read(ByteArrayInputStream("not json\n".toByteArray())) }
     assertTrue(thrown.exceptionOrNull() is IOException)
   }
+
+  @Test
+  fun read_oversizedDataLengthThrowsWithoutAllocating() {
+    // A peer announcing ~2 GB of extra data must be refused up front, not buffered.
+    val wire = """{"type":"run-pipeline","data_length":2147483647}""" + "\n"
+    val thrown = runCatching { WyomingEvent.read(ByteArrayInputStream(wire.toByteArray())) }
+    assertTrue(thrown.exceptionOrNull() is IOException)
+  }
+
+  @Test
+  fun read_negativeDataLengthThrows() {
+    val wire = """{"type":"ping","data_length":-1}""" + "\n"
+    val thrown = runCatching { WyomingEvent.read(ByteArrayInputStream(wire.toByteArray())) }
+    assertTrue(thrown.exceptionOrNull() is IOException)
+  }
 }
