@@ -165,4 +165,18 @@ class MediaCacheTest {
     // Nearly-full device (free <= headroom) → 0, so caching never fills the disk.
     assertEquals(0L, MediaCache.defaultBudget(1 * gb, ceilingBytes = 32 * gb))
   }
+
+  @Test
+  fun defaultBudget_countsWhatTheCacheAlreadyHolds() {
+    val mb = 1024L * 1024
+    val gb = 1024 * mb
+    // A Portal with 2.3 GB free starts with a ~300 MB budget...
+    assertEquals(300 * mb, MediaCache.defaultBudget(2 * gb + 300 * mb, ceilingBytes = 2 * gb))
+    // ...and after caching 70 MB of photos it has 2.23 GB free. The budget must not shrink by the
+    // cache's own 70 MB.
+    assertEquals(
+        300 * mb, MediaCache.defaultBudget(2 * gb + 230 * mb, ceilingBytes = 2 * gb, ownBytes = 70 * mb))
+    // Still capped by the user's ceiling.
+    assertEquals(1 * gb, MediaCache.defaultBudget(4 * gb, ceilingBytes = 1 * gb, ownBytes = 500 * mb))
+  }
 }

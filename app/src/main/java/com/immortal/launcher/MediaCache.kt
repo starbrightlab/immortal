@@ -74,10 +74,7 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
   }
 
   /** Resident media files: committed images and videos, never temps or the pool file. */
-  private fun mediaFiles(): List<File> =
-      dir.listFiles()?.filter {
-        it.isFile && !it.name.startsWith(".") && (it.name.endsWith(".jpg") || it.name.endsWith(".mp4"))
-      } ?: emptyList()
+  private fun mediaFiles(): List<File> = mediaFilesIn(dir)
 
   /** The cached file for [url] if present and non-empty, touched as most-recently-used; else null. */
   fun getIfPresent(url: String, isVideo: Boolean): File? {
@@ -170,8 +167,27 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
      * fixed [HEADROOM_BYTES] reserve. The wall Portals are dedicated to the frame, so we let the
      * cache use nearly all their spare space (keep-2GB) rather than only half — while a nearly-full
      * device (free ≤ headroom) yields 0, so caching simply never fills the disk.
+     *
+     * [ownBytes] is what the cache already holds on disk. Those bytes are the cache's own, so they
+     * count towards its budget rather than against it. Without this the budget shrank as the cache
+     * filled — every cached photo came straight out of "free" — so on a Portal with only a little
+     * more than [HEADROOM_BYTES] free, a cache that had filled a few dozen MB dropped below
+     * [PhotoFrameController.MIN_CACHE_BUDGET_BYTES] on the next start and switched itself off.
      */
-    fun defaultBudget(freeBytes: Long, ceilingBytes: Long = 4L * 1024 * 1024 * 1024): Long =
-        minOf(ceilingBytes, (freeBytes - HEADROOM_BYTES).coerceAtLeast(0L))
+    fun defaultBudget(
+        freeBytes: Long,
+        ceilingBytes: Long = 4L * 1024 * 1024 * 1024,
+        ownBytes: Long = 0L,
+    ): Long = minOf(ceilingBytes, (freeBytes + ownBytes - HEADROOM_BYTES).coerceAtLeast(0L))
+
+    /** Bytes of committed media in the cache directory (0 when there is no cache yet). */
+    fun residentBytes(context: Context): Long =
+        runCatching { mediaFilesIn(File(context.filesDir, DIR)).sumOf { it.length() } }.getOrDefault(0L)
+
+    /** Resident media files in [dir]: committed images and videos, never temps or the pool file. */
+    internal fun mediaFilesIn(dir: File): List<File> =
+        dir.listFiles()?.filter {
+          it.isFile && !it.name.startsWith(".") && (it.name.endsWith(".jpg") || it.name.endsWith(".mp4"))
+        } ?: emptyList()
   }
 }

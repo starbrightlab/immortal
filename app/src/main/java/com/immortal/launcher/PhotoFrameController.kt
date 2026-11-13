@@ -2096,14 +2096,23 @@ class PhotoFrameController(
     if (mediaCache != null || !settings.cacheEnabled) return
     val ceiling = settings.cacheBudgetGb.toLong() * 1024L * 1024L * 1024L
     val free = context.filesDir.usableSpace
-    val budget = MediaCache.defaultBudget(free, ceiling)
+    // What the cache already holds counts towards its budget: those bytes came out of "free"
+    // once, so counting them against it again would shrink the budget as the cache fills.
+    val own = MediaCache.residentBytes(context)
+    val budget = MediaCache.defaultBudget(free, ceiling, ownBytes = own)
     if (budget < MIN_CACHE_BUDGET_BYTES) {
-      Log.w(TAG, "media cache enabled but disk too full (free=${free / MB}MB -> budget=${budget / MB}MB); not caching")
+      Log.w(
+          TAG,
+          "media cache enabled but disk too full (free=${free / MB}MB + cached=${own / MB}MB -> " +
+              "budget=${budget / MB}MB); not caching")
       return
     }
     mediaCache = MediaCache(context, budget).also { it.enforceBudget() } // apply a lowered cap now
     transcoder = VideoTranscoder(context)
-    Log.i(TAG, "media cache on: budget=${budget / MB}MB (cap=${settings.cacheBudgetGb}GB, free=${free / MB}MB)")
+    Log.i(
+        TAG,
+        "media cache on: budget=${budget / MB}MB (cap=${settings.cacheBudgetGb}GB, free=${free / MB}MB, " +
+            "cached=${own / MB}MB)")
   }
 
   /**
@@ -2288,7 +2297,10 @@ class PhotoFrameController(
               var streak = 0
               var cut = false
               for (e in fresh) {
-                if (!remoteMode || Thread.currentThread().isInterrupted) {
+                // isShutdown as well as the interrupt flag: stop() shuts this executor down, and a
+                // blocking read can swallow the interrupt. The remaining fetches would then each
+                // fail at once and count as source failures.
+                if (!remoteMode || Thread.currentThread().isInterrupted || transcodeIo.isShutdown) {
                   cut = true
                   break
                 }
@@ -2300,6 +2312,10 @@ class PhotoFrameController(
                   streak = 0
                   ui.post { poolAdded(e) }
                 } else {
+                  if (transcodeIo.isShutdown) {
+                    cut = true // stopped mid-download: not a failure of the source
+                    break
+                  }
                   failed++
                   if (++streak >= POOL_FAIL_STREAK) {
                     Log.w(TAG, "pool sync: $streak downloads failed in a row; stopping until retry")
