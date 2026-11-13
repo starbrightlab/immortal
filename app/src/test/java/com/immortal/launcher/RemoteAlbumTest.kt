@@ -198,6 +198,9 @@ class RemoteAlbumTest {
     assertTrue(
         RemoteAlbum.isGoogleAvatarUrl(
             "https://lh3.googleusercontent.com/a-/AOh14GgHasItem=s40"))
+    // Account-widget avatar — Google's silhouette for an account with no photo (issue #233).
+    assertTrue(
+        RemoteAlbum.isGoogleAvatarUrl("https://lh3.googleusercontent.com/ogw/AF2bZyiXyZ=s83"))
     // Photo URLs — keep these.
     assertFalse(
         RemoteAlbum.isGoogleAvatarUrl(
@@ -205,6 +208,37 @@ class RemoteAlbumTest {
     assertFalse(
         RemoteAlbum.isGoogleAvatarUrl(
             "https://lh3.googleusercontent.com/abc123/photo=w1024-h768-no"))
+  }
+
+  @Test
+  fun googleAlbumPhotoUrls_keepsOnlyAlbumMedia() {
+    // A shared-album page: photos under /pw/, plus avatar chrome that must not become photos.
+    val page =
+        listOf(
+            "https://lh3.googleusercontent.com/pw/AP1GczPhotoOne=w1920-h1080-no",
+            "https://lh3.googleusercontent.com/ogw/AF2bZyiXyZ=s83",
+            "https://lh3.googleusercontent.com/a/ACg8ocAbCdEf=s20-p-no",
+            "https://lh3.googleusercontent.com/pw/AP1GczPhotoTwo",
+            "https://lh3.googleusercontent.com/someOtherChrome=s64")
+    assertEquals(
+        listOf(
+            "https://lh3.googleusercontent.com/pw/AP1GczPhotoOne=w1920-h1080-no",
+            "https://lh3.googleusercontent.com/pw/AP1GczPhotoTwo"),
+        RemoteAlbum.googleAlbumPhotoUrls(page))
+  }
+
+  @Test
+  fun googleAlbumPhotoUrls_withoutPwFallsBackToDroppingAvatars() {
+    // No /pw/ URL at all (older or changed page format): keep everything that isn't an avatar
+    // rather than returning an empty album.
+    val page =
+        listOf(
+            "https://lh3.googleusercontent.com/abc123/photo=w1024-h768-no",
+            "https://lh3.googleusercontent.com/ogw/AF2bZyiXyZ=s83",
+            "https://lh3.googleusercontent.com/a-/AOh14GgHasItem=s40")
+    assertEquals(
+        listOf("https://lh3.googleusercontent.com/abc123/photo=w1024-h768-no"),
+        RemoteAlbum.googleAlbumPhotoUrls(page))
   }
 
   @Test
