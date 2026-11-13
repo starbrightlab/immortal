@@ -323,7 +323,8 @@ class FleetRoutes(private val context: Context) {
    *
    * Opt-in: holding the agent token is enough to manage the device, but it shouldn't by itself
    * be enough to make it talk in someone's living room. The owner turns this on in
-   * Settings > Device ([FleetConfig.notifyEnabled]); until then the route reports why it said no.
+   * Settings > Notifications ([FleetConfig.notifyEnabled]); until then the route reports why it
+   * said no.
    */
   private fun notify(req: FleetHttpServer.Request): FleetHttpServer.Response {
     if (!FleetConfig.notifyEnabled(context)) return resp(403, err("notify_disabled"))
@@ -332,13 +333,10 @@ class FleetRoutes(private val context: Context) {
     // drop, but an HTTP caller can act on the difference.
     parseJson(raw) ?: return resp(400, err("bad_json"))
     val spec = NotifyPayload.parse(raw) ?: return resp(400, err("empty_payload"))
-    NotifyDispatch.deliver(context, spec)
-    return resp(
-        200,
-        ok()
-            .put("shown", spec.hasVisual)
-            .put("sound", !spec.sound.isNullOrBlank())
-            .put("spoke", !spec.speak.isNullOrBlank()))
+    // Report what actually happened, not what was asked for: under Do Not Disturb the toast
+    // still renders but sound/spoke come back false.
+    val done = NotifyDispatch.deliver(context, spec)
+    return resp(200, ok().put("shown", done.shown).put("sound", done.sound).put("spoke", done.spoke))
   }
 
   // --- install plumbing -------------------------------------------------------

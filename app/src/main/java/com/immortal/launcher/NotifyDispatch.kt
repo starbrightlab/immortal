@@ -28,6 +28,20 @@ import android.util.Log
  * (TTS through the voice picked in Sounds settings).
  */
 object NotifyDispatch {
+  /** What a delivery actually did — the fleet route reports this verbatim. */
+  data class Delivery(val shown: Boolean, val sound: Boolean, val spoke: Boolean)
+
+  /**
+   * Decide what [spec] will do given whether audio is allowed right now. Pure, so the DND rule
+   * is unit-testable: the toast always renders; sound and speech only when [audible].
+   */
+  fun plan(spec: NotifyPayload, audible: Boolean): Delivery =
+      Delivery(
+          shown = spec.hasVisual,
+          sound = audible && !spec.sound.isNullOrBlank(),
+          spoke = audible && !spec.speak.isNullOrBlank(),
+      )
+
   private const val TAG = "ImmortalNotify"
   private val main = Handler(Looper.getMainLooper())
 
@@ -39,9 +53,10 @@ object NotifyDispatch {
    * Audio (sound and speech alike) is suppressed under Do Not Disturb; the visual toast
    * still renders, because a silent on-screen alert is also the "it arrived" signal.
    */
-  fun deliver(context: Context, spec: NotifyPayload) {
+  fun deliver(context: Context, spec: NotifyPayload): Delivery {
     val app = context.applicationContext
-    if (spec.hasVisual) {
+    val plan = plan(spec, audible = dndOff(app))
+    if (plan.shown) {
       // wake_screen defaults to true. Always call wake when requested — idempotent if the
       // device is already interactive, dismisses the photo dream if it's in front (PowerManager
       // reports isInteractive=true while dreaming, so a screen-on check alone misses it; and
@@ -51,18 +66,14 @@ object NotifyDispatch {
       val tap: (() -> Unit)? = spec.onTap?.let { target -> { routeTarget(app, target) } }
       NotificationOverlay.show(spec, tap)
     }
-    val audible = dndOff(app)
-    if (!spec.sound.isNullOrBlank()) {
-      if (audible) SoundPlayer.play(app, spec.sound, spec.volume)
-      else Log.i(TAG, "DND active; suppressing notify sound")
-    }
-    if (!spec.speak.isNullOrBlank()) {
-      // TTS is an audible interruption like the chime, so it takes the same DND gate. It
-      // rides the platform engine via ChimePlayer rather than a second TTS instance —
-      // same voice the spoken clock and timers use.
-      if (audible) main.post { ChimePlayer.announce(app, spec.speak, spec.volume) }
-      else Log.i(TAG, "DND active; suppressing notify speech")
-    }
+    if (plan.sound) SoundPlayer.play(app, spec.sound!!, spec.volume)
+    else if (!spec.sound.isNullOrBlank()) Log.i(TAG, "DND active; suppressing notify sound")
+    // TTS is an audible interruption like the chime, so it takes the same DND gate. It rides
+    // the platform engine via ChimePlayer rather than a second TTS instance — same voice the
+    // spoken clock and timers use.
+    if (plan.spoke) main.post { ChimePlayer.announce(app, spec.speak!!, spec.volume) }
+    else if (!spec.speak.isNullOrBlank()) Log.i(TAG, "DND active; suppressing notify speech")
+    return plan
   }
 
   /**

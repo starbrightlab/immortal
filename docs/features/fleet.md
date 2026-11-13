@@ -72,7 +72,8 @@ curl -X POST http://<portal-ip>:8723/notify \
   -d '{"title":"Deploy","message":"Build 1.70 is live","speak":"Deploy finished"}'
 ```
 
-Response reports what actually happened: `{"ok":true,"shown":true,"sound":false,"spoke":true}`.
+Response reports what actually happened, not what was asked for: `{"ok":true,"shown":true,"sound":false,"spoke":true}`.
+Under Do Not Disturb the toast still renders, but `sound` and `spoke` come back `false`.
 
 ### Every field at once
 

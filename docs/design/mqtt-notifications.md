@@ -76,7 +76,7 @@ Field semantics:
 | `volume`      | float  | `1.0`      | Sound volume `0.0`–`1.0` of the alarm-stream max. Bounded by the user's system alarm-volume slider (so `1.0` ≠ "loudest possible," it's "loudest the alarm slider is set to"). On Portal, alarm is the only stream independent from the "media volume" group — see *Sound → Portal volume quirk*. |
 | `wake_screen` | bool   | `true`     | If the screen is off when the notify arrives, call `ScreenControl.wake` so the toast is visible. Set `false` for low-priority chimes that shouldn't wake a sleeping room. |
 | `on_tap`      | string | `null`     | Same string grammar as the existing `open` entity: full URL, installed package name, or bare HA dashboard path. |
-| `speak`       | string | `null`     | Spoken through the platform TTS engine (the voice chosen in Sounds settings) via `ChimePlayer.announce`, at `volume`. Independent of `message`: a `speak`-only payload is audible with no toast. DND-suppressed like `sound`. |
+| `speak`       | string | `null`     | Spoken through the platform TTS engine (the voice chosen in Sounds settings) via `ChimePlayer.announce`, at `volume`. Independent of `message`: a `speak`-only payload is audible with no toast. Truncated to 280 characters. DND-suppressed like `sound`. |
 
 ### Special cases
 
@@ -427,7 +427,8 @@ The HTTP route differs from MQTT in exactly two ways, both deliberate:
 - **It answers.** `{"ok":true,"shown":…,"sound":…,"spoke":…}`, and it separates
   `400 bad_json` from `400 empty_payload` — over MQTT both are a silent drop, but a
   caller that gets a response should be able to tell "I sent garbage" from "that parsed
-  to nothing."
+  to nothing." The flags describe what actually happened (`NotifyDispatch.plan`), so under
+  DND `sound` and `spoke` come back `false` even when the payload asked for them.
 - **It is opt-in.** `FleetConfig.notifyEnabled`, off by default, surfaced as *Accept
   notifications from your network* — a Notifications section on the device's settings page,
   and a row in the `fleet` domain on the phone remote. Both hidden until the agent is on.

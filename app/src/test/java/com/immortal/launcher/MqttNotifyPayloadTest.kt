@@ -186,6 +186,19 @@ class MqttNotifyPayloadTest {
   }
 
   @Test
+  fun speak_overTheCap_isTruncatedNotRejected() {
+    val long = "a".repeat(NotifyPayload.MAX_SPEAK_CHARS + 50)
+    val p = NotifyPayload.parse("""{"speak":"$long"}""")!!
+    assertEquals(NotifyPayload.MAX_SPEAK_CHARS, p.speak!!.length)
+  }
+
+  @Test
+  fun speak_atTheCap_isKeptWhole() {
+    val exact = "b".repeat(NotifyPayload.MAX_SPEAK_CHARS)
+    assertEquals(exact, NotifyPayload.parse("""{"speak":"$exact"}""")!!.speak)
+  }
+
+  @Test
   fun inlineImageDataUri_passesThroughAsString() {
     val raw = """{"message":"x","image":"data:image/png;base64,iVBOR"}"""
     val p = NotifyPayload.parse(raw)!!

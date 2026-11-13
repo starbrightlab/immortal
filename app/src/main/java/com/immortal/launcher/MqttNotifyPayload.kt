@@ -52,6 +52,13 @@ data class NotifyPayload(
     const val DEFAULT_VOLUME = 1.0f
 
     /**
+     * Longest `speak` line accepted; longer input is truncated, not rejected (the parser is
+     * forgiving everywhere else too). Keeps a runaway payload from monologuing in the room —
+     * a notification line, not an audiobook.
+     */
+    const val MAX_SPEAK_CHARS = 280
+
+    /**
      * Parse a payload string. Returns null for empty/malformed/no-op payloads — the
      * caller treats both "couldn't parse" and "parsed to no-op" the same way. Out-of-range
      * `duration` / `volume` are clamped, unknown `position` falls back to BOTTOM.
@@ -84,7 +91,7 @@ data class NotifyPayload(
               onTap = obj.optString("on_tap", "").ifBlank { null },
               // Spoken aloud through the device's TTS engine (the voice picked in Sounds
               // settings). Independent of `message` — speak-only payloads render no toast.
-              speak = obj.optString("speak", "").ifBlank { null },
+              speak = obj.optString("speak", "").trim().take(MAX_SPEAK_CHARS).trimEnd().ifBlank { null },
           )
       return if (payload.isEmpty) null else payload
     }

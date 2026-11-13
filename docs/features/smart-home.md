@@ -187,7 +187,7 @@ See [Fleet management](fleet.md#pushing-a-notification).
 | `volume`      | float  | `1.0`      | Sound volume `0.0`–`1.0` of the alarm-stream max. Bounded by the user's system alarm-volume slider.                              |
 | `wake_screen` | bool   | `true`     | If the screen is off when the notify arrives, wake it so the toast is visible. Set `false` for low-priority chimes that shouldn't wake a sleeping room. |
 | `on_tap`      | string | `null`     | Tap target. URL, installed package name, or HA dashboard path. See *Tap targets* below.                                          |
-| `speak`       | string | `null`     | Spoken aloud through the device's TTS voice (the one picked in Sounds settings). Independent of `message` — a payload with only `speak` says its line and renders no toast. Suppressed under Do Not Disturb, like `sound`. |
+| `speak`       | string | `null`     | Spoken aloud through the device's TTS voice (the one picked in Sounds settings). Independent of `message` — a payload with only `speak` says its line and renders no toast. Capped at 280 characters (longer input is truncated). Suppressed under Do Not Disturb, like `sound`. |
 
 ### Special cases
 
