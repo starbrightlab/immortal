@@ -19,7 +19,8 @@ import org.json.JSONObject
  *
  * Two production paths arrive here: Track 1 (HA `notify.send_message`) ships
  * `{"message": "..."}` via the entity's `command_template`; Track 2 (raw
- * `mqtt.publish`) ships the full schema. Same parsing path for both.
+ * `mqtt.publish`) ships the full schema. The fleet agent's `POST /notify` feeds the
+ * same parser, so an HTTP caller and an MQTT caller can't drift.
  */
 data class NotifyPayload(
     val title: String,
@@ -31,6 +32,7 @@ data class NotifyPayload(
     val volume: Float,
     val wakeScreen: Boolean,
     val onTap: String?,
+    val speak: String?,
 ) {
   enum class Position {
     TOP,
@@ -41,13 +43,20 @@ data class NotifyPayload(
   val hasVisual: Boolean
     get() = title.isNotEmpty() || message.isNotEmpty()
 
-  /** True when there's nothing to do — neither visual nor audio. */
+  /** True when there's nothing to do — no text, no sound, nothing to speak. */
   val isEmpty: Boolean
-    get() = !hasVisual && sound.isNullOrBlank()
+    get() = !hasVisual && sound.isNullOrBlank() && speak.isNullOrBlank()
 
   companion object {
     const val DEFAULT_DURATION_SEC = 6
     const val DEFAULT_VOLUME = 1.0f
+
+    /**
+     * Longest `speak` line accepted; longer input is truncated, not rejected (the parser is
+     * forgiving everywhere else too). Keeps a runaway payload from monologuing in the room —
+     * a notification line, not an audiobook.
+     */
+    const val MAX_SPEAK_CHARS = 280
 
     /**
      * Parse a payload string. Returns null for empty/malformed/no-op payloads — the
@@ -80,6 +89,9 @@ data class NotifyPayload(
                       .coerceIn(0f, 1f),
               wakeScreen = obj.optBoolean("wake_screen", true),
               onTap = obj.optString("on_tap", "").ifBlank { null },
+              // Spoken aloud through the device's TTS engine (the voice picked in Sounds
+              // settings). Independent of `message` — speak-only payloads render no toast.
+              speak = obj.optString("speak", "").trim().take(MAX_SPEAK_CHARS).trimEnd().ifBlank { null },
           )
       return if (payload.isEmpty) null else payload
     }
