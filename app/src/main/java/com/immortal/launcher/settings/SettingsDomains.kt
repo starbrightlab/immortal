@@ -9,6 +9,7 @@ package com.immortal.launcher.settings
 
 import android.content.Context
 import android.os.Build
+import com.immortal.launcher.AppLanguage
 import com.immortal.launcher.CalendarFeed
 import com.immortal.launcher.CalendarUrlEntryActivity
 import com.immortal.launcher.SunriseConfig
@@ -37,6 +38,7 @@ import com.immortal.launcher.QuickBar
 import com.immortal.launcher.QuickBarConfig
 import com.immortal.launcher.Weather
 import com.immortal.launcher.WeatherLocationActivity
+import com.immortal.launcher.R
 import com.immortal.launcher.ScreensaverConfig
 import com.immortal.launcher.SettingsGuard
 import org.json.JSONArray
@@ -180,17 +182,22 @@ object SettingsDomains {
    */
   private fun oneOf(vararg allowed: String): (String) -> String? = { v -> v.takeIf { it in allowed } }
 
-  /** Short label for the active photo source, shown on the "Photo source" nav row. */
-  private fun sourceLabel(s: ScreensaverConfig.Settings): String =
-      when {
-        s.usesImmich -> "Immich"
-        s.usesSmb -> "Network share"
-        s.usesDav -> "WebDAV"
-        s.usesWebUrl -> "Web page"
-        s.usesUrl -> "Shared album"
-        s.usesFolder -> "Local folder"
-        else -> "Immortal photos"
-      }
+  /**
+   * Short label for the active photo source, shown on the "Photo source" nav row, in the app's
+   * chosen language. Product names (Immich, WebDAV) aren't translated.
+   */
+  private fun sourceLabel(c: Context, s: ScreensaverConfig.Settings): String {
+    val r = AppLanguage.resources(c)
+    return when {
+      s.usesImmich -> "Immich"
+      s.usesSmb -> r.getString(R.string.source_network_share)
+      s.usesDav -> "WebDAV"
+      s.usesWebUrl -> r.getString(R.string.source_web_page)
+      s.usesUrl -> r.getString(R.string.source_shared_album)
+      s.usesFolder -> r.getString(R.string.source_local_folder)
+      else -> r.getString(R.string.source_immortal_photos)
+    }
+  }
 
   /**
    * The photo-frame display settings — the slice the legacy `FleetScreensaver.toJson` reports.
@@ -231,7 +238,7 @@ object SettingsDomains {
                   NavSpec(
                       "photoSource",
                       "Photo source",
-                      value = { _, s -> sourceLabel(s) },
+                      value = { c, s -> sourceLabel(c, s) },
                       activity = ScreensaverSourcesActivity::class.java,
                       help =
                           "Where your photos come from - the built-in feed, your own folder or a shared " +
@@ -240,7 +247,13 @@ object SettingsDomains {
                   NavSpec(
                       "dismissTarget",
                       "Open when you tap to exit",
-                      value = { c, _ -> ScreensaverDismiss.chosenLabel(c)?.let { "Opens $it" } ?: "Immortal launcher" },
+                      value = { c, _ ->
+                        // The chosen app's label is shown as installed; only the wording around it
+                        // follows the app language.
+                        val r = AppLanguage.resources(c)
+                        ScreensaverDismiss.chosenLabel(c)?.let { r.getString(R.string.dismiss_opens, it) }
+                            ?: r.getString(R.string.dismiss_launcher_title)
+                      },
                       activity = ScreensaverDismissAppActivity::class.java,
                       help =
                           "Tapping the screensaver wakes the Portal. By default that brings you home to " +
@@ -448,7 +461,8 @@ object SettingsDomains {
                       "Photo feed",
                       get = { it.feed },
                       set = ScreensaverConfig::setFeed,
-                      options = ScreensaverConfig.FEEDS.map { it to ScreensaverConfig.feedLabel(it) },
+                      options = ScreensaverConfig.FEEDS.map { it to it },
+                      labelRes = ScreensaverConfig::feedLabelRes,
                       coerce = { v -> v.takeIf { it in ScreensaverConfig.FEEDS } },
                       visible = { _, s -> s.source == ScreensaverConfig.SOURCE_DEFAULT },
                       help = "Which online photo feed to use with the built-in source."),
@@ -485,7 +499,8 @@ object SettingsDomains {
                       "Ambient sound",
                       get = { it.soundscape },
                       set = ScreensaverConfig::setSoundscape,
-                      options = ScreensaverConfig.SOUNDSCAPES.map { it to ScreensaverConfig.soundscapeLabel(it) },
+                      options = ScreensaverConfig.SOUNDSCAPES.map { it to it },
+                      labelRes = ScreensaverConfig::soundscapeLabelRes,
                       coerce = { v -> v.takeIf { it in ScreensaverConfig.SOUNDSCAPES } },
                       help = "Synthesised ambient sound played while the screensaver shows."),
                   IntSpec(
@@ -561,6 +576,28 @@ object SettingsDomains {
           load = ImmortalSettings::load,
           specs =
               listOf(
+                  EnumSpec(
+                      "language",
+                      "Language",
+                      get = { it.language },
+                      set = ImmortalSettings::setLanguage,
+                      options =
+                          listOf(
+                              AppLanguage.SYSTEM to "System default",
+                              AppLanguage.ENGLISH to "English",
+                              AppLanguage.SPANISH to "Español"),
+                      labelRes = { v ->
+                        when (v) {
+                          AppLanguage.ENGLISH -> R.string.language_english
+                          AppLanguage.SPANISH -> R.string.language_spanish
+                          else -> R.string.language_system
+                        }
+                      },
+                      coerce = oneOf(*AppLanguage.ALL.toTypedArray()),
+                      help =
+                          "The language of Immortal's own text. Screens are being translated one at " +
+                              "a time, so some still show English. Your folder, album and app names " +
+                              "are never translated."),
                   EnumSpec(
                       "weatherUnit",
                       "Temperature unit",
@@ -733,6 +770,7 @@ object SettingsDomains {
               ),
           sections =
               mapOf(
+                  "language" to "Language",
                   "weatherUnit" to "Weather",
                   "weatherWidget" to "Weather",
                   "tileSize" to "Home screen",

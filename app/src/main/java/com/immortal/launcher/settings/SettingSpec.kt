@@ -178,8 +178,21 @@ class EnumSpec<S>(
     val help: String? = null,
     val aliases: List<String> = emptyList(),
     val visible: (Context, S) -> Boolean = { _, _ -> true },
+    /**
+     * String resource for each option's label, read in the app's chosen language
+     * ([com.immortal.launcher.AppLanguage]) when the options are shown. Overrides the labels in
+     * [options], which then serve only as a fallback where resources aren't available.
+     */
+    val labelRes: ((String) -> Int)? = null,
 ) : SettingSpec<S> {
   override fun visibleWhen(c: Context, s: S) = visible(c, s)
+
+  /** [options] with their labels in the app's chosen language, for display. */
+  fun displayOptions(c: Context): List<Pair<String, String>> {
+    val res = labelRes ?: return options
+    val r = runCatching { com.immortal.launcher.AppLanguage.resources(c) }.getOrNull() ?: return options
+    return options.map { (v, fallback) -> v to (runCatching { r.getString(res(v)) }.getOrNull() ?: fallback) }
+  }
 
   override fun putValue(out: JSONObject, s: S) {
     out.put(key, get(s))
@@ -187,7 +200,7 @@ class EnumSpec<S>(
 
   override fun metaJson(c: Context, s: S): JSONObject {
     val opts = JSONArray()
-    options.forEach { (v, label) -> opts.put(JSONObject().put("value", v).put("label", label)) }
+    displayOptions(c).forEach { (v, label) -> opts.put(JSONObject().put("value", v).put("label", label)) }
     return JSONObject()
         .put("key", key)
         .put("type", "enum")

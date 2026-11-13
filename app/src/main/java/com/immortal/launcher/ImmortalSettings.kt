@@ -67,6 +67,8 @@ object ImmortalSettings {
       val tileSize: String = SIZE_STANDARD,
       val weatherWidget: String = WIDGET_OFF,
       val clockFormat: String = CLOCK_AUTO,
+      // Language of Immortal's own text (AppLanguage): "auto" follows the device.
+      val language: String = AppLanguage.SYSTEM,
       // Mini-player in the home header (cover art + controls), shown only while
       // something is actually playing. Defaults on — useful to everyone, unobtrusive.
       val showMiniPlayer: Boolean = true,
@@ -119,6 +121,7 @@ object ImmortalSettings {
         tileSize = p.getString("tile_size", SIZE_STANDARD) ?: SIZE_STANDARD,
         weatherWidget = p.getString("weather_widget", WIDGET_OFF) ?: WIDGET_OFF,
         clockFormat = p.getString("clock_format", CLOCK_AUTO) ?: CLOCK_AUTO,
+        language = language(context),
         showMiniPlayer = p.getBoolean("show_mini_player", true),
         portalPresence = p.getBoolean("portal_presence", true),
         hideStatusBar = p.getBoolean("hide_status_bar", true),
@@ -211,6 +214,14 @@ object ImmortalSettings {
 
   fun setWeatherWidget(c: Context, mode: String) =
       prefs(c).edit().putString("weather_widget", mode).apply()
+
+  /** Read on its own (not via [load]) because every translated screen reads it on creation. */
+  fun language(c: Context): String =
+      prefs(c).getString("language", AppLanguage.SYSTEM)?.takeIf { it in AppLanguage.ALL }
+          ?: AppLanguage.SYSTEM
+
+  fun setLanguage(c: Context, lang: String) =
+      prefs(c).edit().putString("language", lang).apply()
 
   fun setClockFormat(c: Context, fmt: String) =
       prefs(c).edit().putString("clock_format", fmt).apply()

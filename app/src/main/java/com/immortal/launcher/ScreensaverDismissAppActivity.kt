@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -193,6 +194,11 @@ private data class PickEntry(
  * screensaver settings.
  */
 class ScreensaverDismissAppActivity : ComponentActivity() {
+  // Text on this screen comes from strings.xml, in the language chosen in Immortal's settings.
+  override fun attachBaseContext(newBase: Context) {
+    super.attachBaseContext(AppLanguage.wrap(newBase))
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContent { SampleAppTheme(darkTheme = true) { DismissAppScreen { finish() } } }
@@ -244,14 +250,14 @@ private fun DismissAppScreen(onDone: () -> Unit) {
         }
         Spacer(Modifier.size(14.dp))
         Text(
-            "Open when dismissed",
+            stringResource(R.string.dismiss_title),
             color = Color.White,
             fontSize = 30.sp,
             fontWeight = FontWeight.SemiBold,
         )
       }
       Text(
-          "Choose what opens when you tap the screensaver to wake the Portal.",
+          stringResource(R.string.dismiss_intro),
           color = Color(0xFF9A9A9A),
           fontSize = 16.sp,
           modifier = Modifier.padding(top = 6.dp, start = 58.dp),
@@ -265,7 +271,7 @@ private fun DismissAppScreen(onDone: () -> Unit) {
           DismissRow(
               icon = haIcon,
               title = "Home Assistant",
-              subtitle = "Open your Home Assistant dashboard on tap.",
+              subtitle = stringResource(R.string.dismiss_ha_subtitle),
               selected = haMode,
           ) {
             haMode = true
@@ -275,7 +281,7 @@ private fun DismissAppScreen(onDone: () -> Unit) {
           if (haMode) {
             Divider()
             Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 16.dp)) {
-              Text("Dashboard", color = Color.White, fontSize = 15.sp)
+              Text(stringResource(R.string.dismiss_ha_dashboard), color = Color.White, fontSize = 15.sp)
               OutlinedTextField(
                   value = haPath,
                   onValueChange = {
@@ -290,8 +296,7 @@ private fun DismissAppScreen(onDone: () -> Unit) {
                   modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(top = 8.dp),
               )
               Text(
-                  "The path after your Home Assistant address (e.g. lovelace/0). " +
-                      "Leave blank to open your default dashboard.",
+                  stringResource(R.string.dismiss_ha_path_help),
                   color = Color(0xFF8A8A8A),
                   fontSize = 13.sp,
                   modifier = Modifier.padding(top = 8.dp),
@@ -303,12 +308,13 @@ private fun DismissAppScreen(onDone: () -> Unit) {
       }
 
       // --- Launcher + installed apps -------------------------------------------------
-      SectionLabel(if (haPkg != null) "Or an app" else "Open")
+      SectionLabel(
+          stringResource(if (haPkg != null) R.string.dismiss_section_or_app else R.string.dismiss_section_open))
       Card {
         DismissRow(
             icon = null,
-            title = "Immortal launcher",
-            subtitle = "Return to your home screen (default).",
+            title = stringResource(R.string.dismiss_launcher_title),
+            subtitle = stringResource(R.string.dismiss_launcher_subtitle),
             selected = !haMode && selectedComponent == null,
         ) {
           ScreensaverConfig.setDismissLauncher(context)
@@ -319,7 +325,7 @@ private fun DismissAppScreen(onDone: () -> Unit) {
         if (list == null) {
           Divider()
           Text(
-              "Finding your apps…",
+              stringResource(R.string.dismiss_finding_apps),
               color = Color(0xFF9A9A9A),
               fontSize = 15.sp,
               modifier = Modifier.padding(18.dp),

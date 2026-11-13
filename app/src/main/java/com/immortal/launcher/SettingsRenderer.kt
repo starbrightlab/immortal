@@ -88,7 +88,7 @@ private fun <S> SettingControl(spec: SettingSpec<S>, snapshot: S, onApply: (Stri
         ) {
           Text(s.title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
           // EnumSpec.options is value→label; Segmented wants label→value.
-          Segmented(s.options.map { (v, l) -> l to v }, s.get(snapshot)) { onApply(s.key, it) }
+          Segmented(s.displayOptions(context).map { (v, l) -> l to v }, s.get(snapshot)) { onApply(s.key, it) }
         }
         HelpText(s.help)
       }
