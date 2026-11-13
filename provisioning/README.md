@@ -43,12 +43,18 @@ installs → freeze OS updates → set launcher → set screensaver. Each step i
 | Key | Meaning |
 |---|---|
 | `PKG`, `HOME_ACTIVITY`, `DREAM_SERVICE` | Your client app's package and components |
-| `SET_LAUNCHER`, `SET_SCREENSAVER`, `DISABLE_VERIFIER`, `DISABLE_OTA` | `true`/`false` per step |
+| `SET_LAUNCHER`, `SET_SCREENSAVER`, `DISABLE_VERIFIER`, `DISABLE_OTA`, `ENABLE_MULTI_WINDOW` | `true`/`false` per step |
 | `PERMISSIONS` | Runtime permissions to pre-grant |
 | `PREINSTALL_FDROID`, `PREINSTALL_APKS` | Apps to pre-install during setup (see below) |
 | `APK_GLOB` | Which APK to install (drop yours in `apks/`) |
 | `ASSET_DIR` | Photos pushed to the frame (first becomes `frame.jpg`) |
 | `RESTORE_ALEXA`, `INSTALL_ALEXA_WAKE_WORD` | First-gen Alexa restore and the separate opt-in wake-word helper |
+
+Set `ENABLE_MULTI_WINDOW=true` to enable Android's force-resizable-activities setting.
+This asks Android to allow resizing even for apps that opt out of it. It can expose split-screen
+for apps that support it, but an app may render poorly or fail when resized; the setting does not
+add split-screen controls if the Portal firmware does not provide them. The original setting is
+saved on the device and restored by `--restore`.
 
 To ship your own app instead of the sample, replace `apks/app-debug.apk`, drop photos in
 `assets/`, and update `PKG`/`HOME_ACTIVITY`/`DREAM_SERVICE` in `config.env`.

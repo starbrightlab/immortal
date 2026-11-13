@@ -220,6 +220,11 @@ function Push-Assets {
 }
 function Apply-SystemTweaks {
   Step "Applying system display tweaks"
+  if ($cfg["ENABLE_MULTI_WINDOW"] -eq "true") {
+    # Snapshot-Stock runs before this step so -Restore can return the prior value.
+    A shell settings put global force_resizable_activities 1 | Out-Null
+    Ok "Resizable activities enabled (multi-window where supported)"
+  }
   # Hide the status bar across all apps by default. Swipe from the top still
   # reveals it transiently. Eliminates the white-on-white problem on
   # light-background apps (Aurora, Android Settings, etc.). Android 5.0+.
@@ -616,7 +621,15 @@ function Restore-Alexa-Undo {
 $StateFile = "/sdcard/immortal_restore.env"
 
 function Snapshot-Stock {
-  if ("$(A shell "[ -f $StateFile ] && echo yes")".Trim() -eq "yes") { return }
+  if ("$(A shell "[ -f $StateFile ] && echo yes")".Trim() -eq "yes") {
+    if ($cfg["ENABLE_MULTI_WINDOW"] -eq "true" -and
+        "$(A shell "grep -q '^ORIGINAL_FORCE_RESIZABLE_ACTIVITIES=' $StateFile; echo `$?")".Trim() -ne "0") {
+      $originalResize = "$(A shell settings get global force_resizable_activities)".Trim()
+      if (-not $originalResize) { $originalResize = "null" }
+      A shell "echo 'ORIGINAL_FORCE_RESIZABLE_ACTIVITIES=$originalResize' >> $StateFile" | Out-Null
+    }
+    return
+  }
   $pkg = $cfg["PKG"]
   # NB: not "$home" - that's PowerShell's read-only $HOME automatic variable.
   $stockHome = ("$(A shell 'cmd package query-activities --components -a android.intent.action.MAIN -c android.intent.category.HOME')" -split "`n" |
@@ -628,7 +641,13 @@ function Snapshot-Stock {
   $ddream = "$(A shell settings get secure screensaver_default_component)".Trim()
   if (-not $dream  -or $dream  -eq "null" -or $dream  -like "$pkg/*") { $dream  = $cfg["STOCK_DREAM"] }
   if (-not $ddream -or $ddream -eq "null" -or $ddream -like "$pkg/*") { $ddream = $cfg["STOCK_DEFAULT_DREAM"] }
-  "STOCK_HOME=$stockHome`nSTOCK_DREAM=$dream`nSTOCK_DEFAULT_DREAM=$ddream`n" | A shell "cat > $StateFile" | Out-Null
+  $snapshot = "STOCK_HOME=$stockHome`nSTOCK_DREAM=$dream`nSTOCK_DEFAULT_DREAM=$ddream"
+  if ($cfg["ENABLE_MULTI_WINDOW"] -eq "true") {
+    $originalResize = "$(A shell settings get global force_resizable_activities)".Trim()
+    if (-not $originalResize) { $originalResize = "null" }
+    $snapshot += "`nORIGINAL_FORCE_RESIZABLE_ACTIVITIES=$originalResize"
+  }
+  "$snapshot`n" | A shell "cat > $StateFile" | Out-Null
   Ok "Saved this device's stock launcher/screensaver for restore"
 }
 
@@ -637,7 +656,7 @@ function Load-State {
     Warn "No saved snapshot on device - using config.env fallbacks for restore"; return
   }
   foreach ($line in ((A shell cat $StateFile) -split "`n")) {
-    if ($line.Trim() -match '^(STOCK_HOME|STOCK_DREAM|STOCK_DEFAULT_DREAM)=(.+)$') {
+    if ($line.Trim() -match '^(STOCK_HOME|STOCK_DREAM|STOCK_DEFAULT_DREAM|ORIGINAL_FORCE_RESIZABLE_ACTIVITIES)=(.*)$') {
       $cfg[$Matches[1]] = $Matches[2].Trim()
     }
   }
@@ -779,6 +798,7 @@ if ($Status) {
   Write-Host "  home:        $("$homePkg".Trim())"
   $pc = "$(A shell settings get global policy_control)".Trim()
   $dm = "$(A shell settings get secure ui_night_mode)".Trim()
+  Write-Host "  multi-window: $(if ("$(A shell settings get global force_resizable_activities)".Trim() -eq '1') {'enabled'} else {'disabled'})"
   Write-Host "  status bar:  $(if ($pc -like '*immersive*') {'hidden (immersive)'} else {'stock'})"
   Write-Host "  dark mode:   $(if ($dm -eq '2') {'on'} else {'off'})"
   Write-Host "  screensaver: $("$(A shell settings get secure screensaver_components)".Trim())"
@@ -803,6 +823,13 @@ if ($Restore) {
   A shell settings delete global hidden_api_policy_pre_p_apps | Out-Null
   A shell settings delete global hidden_api_policy_p_apps | Out-Null
   A shell settings delete global hidden_api_policy | Out-Null
+  if ($cfg.ContainsKey("ORIGINAL_FORCE_RESIZABLE_ACTIVITIES")) {
+    if ($cfg["ORIGINAL_FORCE_RESIZABLE_ACTIVITIES"] -eq "null") {
+      A shell settings delete global force_resizable_activities | Out-Null
+    } else {
+      A shell settings put global force_resizable_activities $cfg["ORIGINAL_FORCE_RESIZABLE_ACTIVITIES"] | Out-Null
+    }
+  }
   A shell settings put global development_settings_enabled 0 | Out-Null
   Ok "System settings restored"
   Step "Re-enabling Meta's install verifier"
@@ -855,12 +882,12 @@ Start-Shizuku
 Install-Apps
 Push-Assets
 Grant-Perms
+Snapshot-Stock
 Apply-SystemTweaks
 Disable-Verifier
 Disable-InstallerOverlay
 Disable-Ota
 Disable-Presence
-Snapshot-Stock
 Set-Launcher
 Set-Screensaver
 Enable-Fleet

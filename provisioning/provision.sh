@@ -39,6 +39,7 @@ die()  { printf "%sERROR:%s %s\n" "$R" "$N" "$1" >&2; exit 1; }
 [ -f config.env ] || die "config.env not found next to this script."
 # shellcheck disable=SC1091
 set -a; . ./config.env; set +a
+ORIGINAL_FORCE_RESIZABLE_ACTIVITIES=
 
 # Per-device snapshot of the ORIGINAL stock launcher/screensaver, written on the
 # device itself the first time we provision. Restore reads this so it works on
@@ -281,6 +282,11 @@ push_assets() {
 
 apply_system_tweaks() {
   step "Applying system display tweaks"
+  if [ "${ENABLE_MULTI_WINDOW:-false}" = true ]; then
+    # Snapshot-Stock ran before this step so --restore can return the prior value.
+    a shell settings put global force_resizable_activities 1 >/dev/null 2>&1
+    ok "Resizable activities enabled (multi-window where supported)"
+  fi
   # Hide the status bar across all apps by default. Swipe from the top still
   # reveals it transiently. Eliminates the white-on-white problem on
   # light-background apps (Aurora, Android Settings, etc.). Android 5.0+.
@@ -445,7 +451,16 @@ disable_presence() {
 snapshot_stock() {
   # Record this device's real stock components for an accurate restore. Done
   # once per device; a re-provision keeps the original values.
-  if a shell "[ -f $STATE_FILE ]" >/dev/null 2>&1; then return; fi
+  if a shell "[ -f $STATE_FILE ]" >/dev/null 2>&1; then
+    if [ "${ENABLE_MULTI_WINDOW:-false}" = true ] &&
+        ! a shell "grep -q '^ORIGINAL_FORCE_RESIZABLE_ACTIVITIES=' $STATE_FILE" >/dev/null 2>&1; then
+      local original_resize
+      original_resize="$(a shell settings get global force_resizable_activities 2>/dev/null | tr -d '\r')"
+      printf 'ORIGINAL_FORCE_RESIZABLE_ACTIVITIES=%s\n' "${original_resize:-null}" \
+        | a shell "cat >> $STATE_FILE" 2>/dev/null
+    fi
+    return
+  fi
   local home dream ddream
   # The stock home is whichever HOME activity isn't ours, the system resolver, or
   # Settings' fallback. query-activities lists them all as flattened components,
@@ -464,7 +479,15 @@ snapshot_stock() {
   [ -n "$home" ] || home="$STOCK_HOME"
   case "$dream" in "$PKG"/*|""|null) dream="$STOCK_DREAM" ;; esac
   case "$ddream" in "$PKG"/*|""|null) ddream="$STOCK_DEFAULT_DREAM" ;; esac
-  printf 'STOCK_HOME=%s\nSTOCK_DREAM=%s\nSTOCK_DEFAULT_DREAM=%s\n' "$home" "$dream" "$ddream" \
+  local snapshot
+  snapshot="$(printf 'STOCK_HOME=%s\nSTOCK_DREAM=%s\nSTOCK_DEFAULT_DREAM=%s' "$home" "$dream" "$ddream")"
+  if [ "${ENABLE_MULTI_WINDOW:-false}" = true ]; then
+    local original_resize
+    original_resize="$(a shell settings get global force_resizable_activities 2>/dev/null | tr -d '\r')"
+    snapshot="${snapshot}
+ORIGINAL_FORCE_RESIZABLE_ACTIVITIES=${original_resize:-null}"
+  fi
+  printf '%s\n' "$snapshot" \
     | a shell "cat > $STATE_FILE" 2>/dev/null
   ok "Saved this device's stock launcher/screensaver for restore"
 }
@@ -479,6 +502,7 @@ load_state() {
       STOCK_HOME) [ -n "$val" ] && STOCK_HOME="$val" ;;
       STOCK_DREAM) [ -n "$val" ] && STOCK_DREAM="$val" ;;
       STOCK_DEFAULT_DREAM) [ -n "$val" ] && STOCK_DEFAULT_DREAM="$val" ;;
+      ORIGINAL_FORCE_RESIZABLE_ACTIVITIES) ORIGINAL_FORCE_RESIZABLE_ACTIVITIES="$val" ;;
     esac
   done < <(a shell cat "$STATE_FILE" 2>/dev/null)
 }
@@ -862,12 +886,12 @@ do_provision() {
   install_apps
   push_assets
   grant_perms
+  snapshot_stock
   apply_system_tweaks
   disable_verifier
   disable_installer_overlay
   disable_ota
   disable_presence
-  snapshot_stock
   set_launcher
   set_screensaver
   enable_fleet
@@ -889,6 +913,13 @@ do_restore() {
   a shell settings delete global hidden_api_policy_pre_p_apps >/dev/null 2>&1
   a shell settings delete global hidden_api_policy_p_apps >/dev/null 2>&1
   a shell settings delete global hidden_api_policy >/dev/null 2>&1
+  if [ -n "$ORIGINAL_FORCE_RESIZABLE_ACTIVITIES" ]; then
+    if [ "$ORIGINAL_FORCE_RESIZABLE_ACTIVITIES" = null ]; then
+      a shell settings delete global force_resizable_activities >/dev/null 2>&1
+    else
+      a shell settings put global force_resizable_activities "$ORIGINAL_FORCE_RESIZABLE_ACTIVITIES" >/dev/null 2>&1
+    fi
+  fi
   a shell settings put global development_settings_enabled 0 >/dev/null 2>&1
   ok "System settings restored"
   step "Re-enabling Meta's install verifier"
@@ -935,6 +966,9 @@ do_status() {
   local pc dm
   pc="$(a shell settings get global policy_control 2>/dev/null | tr -d '\r')"
   dm="$(a shell settings get secure ui_night_mode 2>/dev/null | tr -d '\r')"
+  local resize
+  resize="$(a shell settings get global force_resizable_activities 2>/dev/null | tr -d '\r')"
+  printf "  multi-window: %s\n" "$([ "$resize" = "1" ] && echo enabled || echo disabled)"
   printf "  status bar: %s\n" "$(printf '%s' "$pc" | grep -q 'immersive' && echo 'hidden (immersive)' || echo 'stock')"
   printf "  dark mode:  %s\n" "$([ "$dm" = "2" ] && echo 'on' || echo 'off')"
   printf "  home:       %s\n" "$(a shell 'cmd package resolve-activity -a android.intent.action.MAIN -c android.intent.category.HOME' 2>/dev/null | awk -F= '/packageName/{print $2; exit}' | tr -d '\r')"
