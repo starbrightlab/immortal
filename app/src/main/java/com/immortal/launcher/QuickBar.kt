@@ -53,6 +53,9 @@ object QuickBar {
       host = service
       val wmgr = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
       wm = wmgr
+      val overlayFlags =
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+              WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
       val switcher = buildCluster(service, appSwitcherButton(service))
       val switcherLp =
           WindowManager.LayoutParams(
@@ -61,7 +64,7 @@ object QuickBar {
                   // matching the back/home buttons (rather than flush to the top edge).
                   statusBarHeight(service),
                   WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                  WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                  overlayFlags,
                   PixelFormat.TRANSLUCENT,
               )
               .apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL }
@@ -74,7 +77,7 @@ object QuickBar {
                   WindowManager.LayoutParams.WRAP_CONTENT,
                   statusBarHeight(service),
                   WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                  WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                  overlayFlags,
                   PixelFormat.TRANSLUCENT,
               )
               .apply {
