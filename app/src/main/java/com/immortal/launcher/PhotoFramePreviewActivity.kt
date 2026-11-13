@@ -152,11 +152,19 @@ class PhotoFramePreviewActivity : ComponentActivity() {
   // singleTask relaunch onto a live frame (most commonly DreamPolicy's force-wake continuation
   // when this instance survived under the dream) lands here, not onCreate. Re-derive the
   // dismiss behaviour from the fresh intent — last launch wins, matching what onCreate would
-  // have decided — and log it, so a reused instance is visible in a logcat capture.
+  // have decided. Rebuild the frame if the overnight clock mode has changed.
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
-    launchDismissOnExit = intent.getBooleanExtra(EXTRA_LAUNCH_DISMISS_APP, false) && !nightClock
+    val nextNightClock =
+        SleepScheduler.isOvernightNow(this) && ScreensaverConfig.load(this).overnightNightClock
+    launchDismissOnExit = intent.getBooleanExtra(EXTRA_LAUNCH_DISMISS_APP, false) && !nextNightClock
+    if (nextNightClock != nightClock) {
+      // The overnight alarm can reuse a daytime frame. Let onCreate rebuild the face,
+      // window brightness and timer callbacks for the new mode.
+      recreate()
+      return
+    }
     Log.i(TAG, "onNewIntent (reused instance): launchDismiss=$launchDismissOnExit")
   }
 
