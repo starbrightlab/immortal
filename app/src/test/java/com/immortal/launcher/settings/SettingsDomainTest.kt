@@ -277,6 +277,7 @@ class SettingsDomainTest {
             SettingsDomains.digitalclock to emptySet(),
             SettingsDomains.welcome to emptySet(),
             SettingsDomains.sunrise to emptySet(),
+            SettingsDomains.voice to emptySet(),
         )
     rendered.forEach { (dom, exclude) ->
       val blank =
@@ -346,6 +347,21 @@ class SettingsDomainTest {
             .toSet()
     val specKeys = SettingsDomains.digitalclock.specs.map { it.key }.toSet()
     assertEquals(fields, specKeys)
+  }
+
+  @Test
+  fun voiceRegistry_coversEveryPersistedField() {
+    // The voice-satellite screen and the phone remote both render from this domain, so every
+    // VoiceConfig.Settings field must have a spec.
+    val fields =
+        com.immortal.launcher.VoiceConfig.Settings::class.java.declaredFields
+            .filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) }
+            .map { it.name }
+            .toSet()
+    val specKeys = SettingsDomains.voice.specs.map { it.key }.toSet()
+    assertTrue(
+        "VoiceConfig.Settings has persisted fields not in the registry: ${fields - specKeys}",
+        (fields - specKeys).isEmpty())
   }
 
   @Test
@@ -437,6 +453,7 @@ class SettingsDomainTest {
             "WelcomeConfig",
             "SunriseConfig",
             "QuickBarConfig",
+            "VoiceConfig",
             // Context-typed domains (no aggregate Settings class); pinned by their own tests above.
             "MqttConfig",
             "FleetConfig",
