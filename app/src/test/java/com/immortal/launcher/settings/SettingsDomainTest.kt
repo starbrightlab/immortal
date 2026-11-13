@@ -207,6 +207,9 @@ class SettingsDomainTest {
             "smbHost", "smbShare", "smbPath", "smbUser", "smbPass",
             "davUrl", "davUser", "davPass", "webUrl",
             "facesEnabled", "faceId", "faceSizeIndex",
+            // Caption order + per-line size/weight: a permutation and ten coupled values, edited
+            // as one unit in CaptionStyleActivity (reached via the "captionLayout" NavSpec).
+            "captionOrder", "captionStyles",
             "dismissAppComponent", "dismissHaDashboard",
             "calendarUrl", "calendarEnabled", "calendarRange", "calendarSize", "calendarSide",
         )
@@ -230,6 +233,90 @@ class SettingsDomainTest {
     assertEquals("6 hours", refresh.format(6))
     assertEquals("1 day", refresh.format(24))
     assertEquals("7 days", refresh.format(168))
+  }
+
+  @Test
+  fun captionDefaults_keepTheImmichOnlyLinesOffUntilAskedFor() {
+    // A wall display shows whoever walks past it. The place/date line is the caption the frame
+    // has always had; names of recognised people, a typed description and tag names are not
+    // things to surface by default. Pinned here so a default can't drift back on unnoticed.
+    val d = com.immortal.launcher.ScreensaverConfig.Settings()
+    assertTrue(d.captionLocation)
+    assertTrue(d.captionDate)
+    assertFalse(d.captionDescription)
+    assertFalse(d.captionPeople)
+    assertFalse(d.captionTags)
+    // The switches still exist and still reach both surfaces — only the default changed.
+    val keys = SettingsDomains.screensaver.specs.map { it.key }
+    listOf("captionDescription", "captionPeople", "captionTags").forEach {
+      assertTrue("$it must still be a spec", keys.contains(it))
+    }
+  }
+
+  @Test
+  fun screensaverCaptionLines_onlyOfferWhatTheActiveSourceCanSupply() {
+    // The caption lines are declaratively gated so a control never promises something the source
+    // can't deliver: date + location wherever the photo carries them (own files via EXIF, Immich
+    // via the server), and description/people/tags only on Immich, which alone stores them.
+    val byKey = SettingsDomains.screensaver.specs.associateBy { it.key }
+    val fromImmichOnly = listOf("captionDescription", "captionPeople", "captionTags")
+    val fromAnyOwnPhotos = listOf("captionDate", "captionLocation", "captionIcons", "captionLayout")
+
+    fun visible(keys: List<String>, s: com.immortal.launcher.ScreensaverConfig.Settings) =
+        keys.filter { byKey.getValue(it).visibleWhen(ctx, s) }
+
+    val immich =
+        com.immortal.launcher.ScreensaverConfig.Settings(
+            source = com.immortal.launcher.ScreensaverConfig.SOURCE_IMMICH,
+            immichUrl = "http://immich:2283",
+            immichKey = "secret")
+    assertEquals(fromImmichOnly, visible(fromImmichOnly, immich))
+    assertEquals(fromAnyOwnPhotos, visible(fromAnyOwnPhotos, immich))
+
+    val folder =
+        com.immortal.launcher.ScreensaverConfig.Settings(
+            source = com.immortal.launcher.ScreensaverConfig.SOURCE_FOLDER, folderPath = "/sdcard/Pics")
+    assertEquals(emptyList<String>(), visible(fromImmichOnly, folder))
+    assertEquals(fromAnyOwnPhotos, visible(fromAnyOwnPhotos, folder))
+
+    // The built-in feed carries no metadata at all, so the whole group stays hidden.
+    val builtIn = com.immortal.launcher.ScreensaverConfig.Settings()
+    assertEquals(emptyList<String>(), visible(fromImmichOnly + fromAnyOwnPhotos, builtIn))
+  }
+
+  @Test
+  fun captionLayoutRow_summarisesTheLinesInTheOrderTheyWillBeDrawn() {
+    // The nav row has to say what the caption looks like without opening the editor, so it reads
+    // the SNAPSHOT (no prefs I/O) - which is also why a mock Context is enough here.
+    val nav =
+        SettingsDomains.screensaver.specs.first { it.key == "captionLayout" }
+            as NavSpec<com.immortal.launcher.ScreensaverConfig.Settings>
+
+    // Shipped defaults: place + date only. The three Immich-only lines (description, people,
+    // tags) are off until asked for, so a fresh frame shows the caption it always has.
+    val defaults = com.immortal.launcher.ScreensaverConfig.Settings()
+    assertEquals("Location, Photo date", nav.value(ctx, defaults))
+
+    val allOn = defaults.copy(captionDescription = true, captionPeople = true, captionTags = true)
+    assertEquals("Location, Photo date +3", nav.value(ctx, allOn))
+
+    // Reordered, and down to two lines: both are reflected, in the user's order.
+    val reordered =
+        allOn.copy(
+            captionOrder = "tags,location,date,description,people",
+            captionDate = false,
+            captionDescription = false,
+            captionPeople = false)
+    assertEquals("Tags, Location", nav.value(ctx, reordered))
+
+    val nothing =
+        allOn.copy(
+            captionLocation = false,
+            captionDate = false,
+            captionDescription = false,
+            captionPeople = false,
+            captionTags = false)
+    assertEquals("No caption", nav.value(ctx, nothing))
   }
 
   @Test
