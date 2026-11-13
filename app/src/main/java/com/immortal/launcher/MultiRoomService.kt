@@ -306,9 +306,18 @@ class MultiRoomService : Service() {
     private const val PORT = 1705 // snapserver JSON-RPC control port
     private const val POLL_MA_MS = 4000L // how often to poll MA for the AirPlay-source track
 
-    /** The standalone Snapcast player that actually renders the synced audio. The
-     *  multi-room now-playing UI is gated on this being installed. */
+    /** The standalone Snapcast player that actually renders the synced audio. */
     const val SNAPCAST_PACKAGE = "de.badaix.snapcast"
+
+    /** Players that can render the group's audio on this Portal: Snapcast, or a Sendspin
+     *  client (SendspinDroid, the Music Assistant app). */
+    val PLAYER_PACKAGES =
+        listOf(SNAPCAST_PACKAGE, "com.sendspindroid", "io.music_assistant.client")
+
+    /** Whether to offer the multi-room settings: a player is installed, or multi-room is
+     *  already on (so its settings stay reachable after swapping one player for another). */
+    internal fun isSpeaker(enabled: Boolean, isInstalled: (String) -> Boolean): Boolean =
+        enabled || PLAYER_PACKAGES.any(isInstalled)
 
     /** Start the relay if multi-room is enabled and a server is configured; else stop it. */
     fun sync(context: Context) {
