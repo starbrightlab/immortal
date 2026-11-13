@@ -478,12 +478,14 @@ class FaceRenderer(
     col.orientation = LinearLayout.VERTICAL
     col.gravity = align
     col.visibility = View.GONE
-    val place = text(19f, Color.WHITE, false)
+    val place = text(22f, Color.WHITE, false)
     place.typeface = Typeface.DEFAULT_BOLD
     place.maxLines = 1
     place.ellipsize = TextUtils.TruncateAt.END
     place.gravity = align
-    val date = text(14f, 0xCCFFFFFF.toInt(), true)
+    // Same size as the clock's status line: the date is often the caption's only line (shared
+    // albums carry a capture date but no place), so it has to read on its own from across a room.
+    val date = text(18f, 0xE6FFFFFF.toInt(), true)
     date.maxLines = 1
     date.gravity = align
     col.addView(place, LinearLayout.LayoutParams(WRAP, WRAP))
