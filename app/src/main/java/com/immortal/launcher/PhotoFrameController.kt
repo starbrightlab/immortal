@@ -39,7 +39,10 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import org.json.JSONArray
 import org.json.JSONObject
@@ -78,10 +81,18 @@ class PhotoFrameController(
     private val weatherRefreshMs: Long = 30 * 60_000L,
     private val calendarRefreshMs: Long = 30 * 60_000L,
 ) {
-  private val io = Executors.newSingleThreadExecutor()
+  // The photo pipeline: enumerate the source, fetch, decode. Single-threaded, so whatever is
+  // queued on it FIRST decides how soon the first photo appears.
+  private val io = singleThread()
+  // Everything the frame draws *around* the photo: the weather line, the calendar widget and the
+  // ambient almanac. These reach the open internet, and the frame must still show photos on a
+  // network that can't. On a shared queue, a weather fetch that stalls (a firewalled Portal, or a
+  // fresh install with no cached location) holds up the first photo. Its own thread means a
+  // decoration can never delay the picture.
+  private val sideIo = singleThread()
   // A separate single-thread executor for caption work (EXIF read + the reverse-geocode
   // network call), so an 8s geocode lookup can never stall the image-decode pipeline on [io].
-  private val metaIo = Executors.newSingleThreadExecutor()
+  private val metaIo = singleThread()
   private val ui = Handler(Looper.getMainLooper())
 
   private class PhotoLayer(
@@ -197,7 +208,7 @@ class PhotoFrameController(
   // slideshow plays only the pool. See [startPooled]/[runPoolSync]/[fetchRemoteImage].
   private var mediaCache: MediaCache? = null
   private var transcoder: VideoTranscoder? = null
-  private val transcodeIo = Executors.newSingleThreadExecutor()
+  private val transcodeIo = singleThread()
   private var pool: CachePool? = null
   // Lists the whole source (server call); only invoked by a pool sync or a first-ever start.
   private var poolLister: (() -> List<CachePool.Entry>?)? = null
@@ -520,6 +531,7 @@ class PhotoFrameController(
     smbSource?.let { s -> Thread { runCatching { s.close() } }.start() }
     smbSource = null
     io.shutdownNow()
+    sideIo.shutdownNow()
     metaIo.shutdownNow()
     transcodeIo.shutdownNow()
   }
@@ -994,7 +1006,7 @@ class PhotoFrameController(
     dashWeather.visibility = if (weatherText.isNotBlank()) View.VISIBLE else View.GONE
     dashEvent.visibility = View.GONE
     dashAlmanac.visibility = View.GONE
-    io.execute {
+    sideIo.execute {
       val lines = buildList {
         runCatching { CalendarPacks.headerLines(context) }.getOrDefault(emptyList()).forEach { add(it) }
         val q = DailyContent.quoteOfDay()
@@ -1008,7 +1020,7 @@ class PhotoFrameController(
         }
       }
     }
-    io.execute {
+    sideIo.execute {
       val ev = runCatching {
         if (CalendarHelper.hasPermission(context)) CalendarHelper.upcoming(context).firstOrNull() else null
       }.getOrNull()
@@ -1045,7 +1057,7 @@ class PhotoFrameController(
       }
 
   private fun fetchWeather() {
-    io.execute {
+    sideIo.execute {
       // Shared resilient fetch: cached location + multi-provider geolocation.
       val w = Weather.fetch(context)
       if (w.isNotBlank()) weatherText = w
@@ -1101,7 +1113,7 @@ class PhotoFrameController(
           }
           val url = settings.calendarUrl
           if (settings.usesCalendar && !url.isNullOrBlank()) {
-            io.execute {
+            sideIo.execute {
               val events = CalendarFeed.fetch(url)
               ui.post {
                 calendarEvents = events
@@ -2421,6 +2433,18 @@ class PhotoFrameController(
           Math.round(videoW * scale).toInt().coerceAtLeast(screenW),
           Math.round(videoH * scale).toInt().coerceAtLeast(screenH))
     }
+
+    /**
+     * A single-thread executor that silently drops work submitted after [stop] has shut it down.
+     *
+     * The stock [java.util.concurrent.Executors.newSingleThreadExecutor] throws
+     * RejectedExecutionException instead. A worker still running when the user exits can post
+     * back to the main thread after stop(), and that post may queue more work. Thrown on the main
+     * thread, the exception kills the launcher process. Once stop() has run there is nothing left
+     * for the work to do, so dropping it is the correct outcome.
+     */
+    internal fun singleThread(): ExecutorService =
+        ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue(), ThreadPoolExecutor.DiscardPolicy())
 
     const val TAG = "ImmortalPhotoFrame"
     const val MB = 1024L * 1024L

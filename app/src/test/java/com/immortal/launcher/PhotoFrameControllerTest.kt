@@ -1,6 +1,9 @@
 package com.immortal.launcher
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,5 +41,19 @@ class PhotoFrameControllerTest {
     assertNull(PhotoFrameController.videoCoverSize(0, 0, 1920, 1080))
     assertNull(PhotoFrameController.videoCoverSize(1920, 1080, 0, 0))
     assertNull(PhotoFrameController.videoCoverSize(-1, 1080, 1920, 1080))
+  }
+
+  // Work queued after stop() must be dropped, not thrown on the main thread.
+  @Test
+  fun singleThread_dropsWorkAfterShutdownInsteadOfThrowing() {
+    val ex = PhotoFrameController.singleThread()
+    val ran = CountDownLatch(1)
+    ex.execute { ran.countDown() }
+    assertTrue(ran.await(5, TimeUnit.SECONDS))
+    ex.shutdownNow()
+    var lateRan = false
+    ex.execute { lateRan = true }
+    assertTrue(ex.awaitTermination(5, TimeUnit.SECONDS))
+    assertFalse(lateRan)
   }
 }
