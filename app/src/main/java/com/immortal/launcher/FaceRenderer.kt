@@ -656,6 +656,7 @@ class FaceRenderer(
     val i =
         context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             ?: return -1 to false
+    if (android.os.Build.DEVICE == "crown") return -1 to false
     if (!i.getBooleanExtra(BatteryManager.EXTRA_PRESENT, false)) return -1 to false
     val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
     val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, -1)

@@ -2010,7 +2010,7 @@ private fun batteryState(): BatteryReading {
   var reading by remember { mutableStateOf(BatteryReading(false, 0, false)) }
   DisposableEffect(Unit) {
     fun parse(i: Intent?): BatteryReading {
-      if (i == null) return BatteryReading(false, 0, false)
+      if (i == null || android.os.Build.DEVICE == "crown") return BatteryReading(false, 0, false)
       val present = i.getBooleanExtra(BatteryManager.EXTRA_PRESENT, false)
       val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
       val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
