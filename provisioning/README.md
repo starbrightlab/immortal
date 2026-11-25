@@ -50,6 +50,15 @@ installs → freeze OS updates → set launcher → set screensaver. Each step i
 | `ASSET_DIR` | Photos pushed to the frame (first becomes `frame.jpg`) |
 | `RESTORE_ALEXA`, `INSTALL_ALEXA_WAKE_WORD` | First-gen Alexa restore and the separate opt-in wake-word helper |
 
+Setup grants storage access for local files, log access for Fleet diagnostics, camera and
+microphone access for supported features, and secure settings access to restore Immortal’s
+screensaver settings if needed. It also allows overlays, installs from Immortal, and access
+to recent app and media activity. Setup enables device admin for screen-off controls.
+
+For the device calendar, add `android.permission.READ_CALENDAR` to `PERMISSIONS`. For touch
+sounds, use the **Modify system settings** prompt from Immortal. Android handles that access
+separately from runtime permissions.
+
 Set `ENABLE_MULTI_WINDOW=true` to enable Android's force-resizable-activities setting.
 This asks Android to allow resizing even for apps that opt out of it. It can expose split-screen
 for apps that support it, but an app may render poorly or fail when resized; the setting does not

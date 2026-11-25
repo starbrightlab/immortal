@@ -218,6 +218,15 @@ Most people never need this — the defaults are sensible. But every step is con
 | `BOOT_APPS` | MA player | Apps to relaunch after a reboot (also editable in Settings → Start on boot). |
 | `ENABLE_FLEET` | off | Opt-in always-on WiFi [management agent](features/fleet.md). |
 
+Setup grants storage access for local files, log access for Fleet diagnostics, camera and
+microphone access for supported features, and secure settings access to restore Immortal’s
+screensaver settings if needed. It also allows overlays, installs from Immortal, and access
+to recent app and media activity. Setup enables device admin for screen-off controls.
+
+For the device calendar, add `android.permission.READ_CALENDAR` to `PERMISSIONS`. For touch
+sounds, use the **Modify system settings** prompt from Immortal. Android handles that access
+separately from runtime permissions.
+
 On the first run the kit snapshots the device's real stock launcher and screensaver to
 `/sdcard/immortal_restore.env`, so `--restore` puts the correct components back on any Portal model.
 
