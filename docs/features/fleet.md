@@ -13,6 +13,10 @@ fleet agent lets a laptop tool talk to a Portal over WiFi to:
 - **browse files**
 - **read logcat**
 
+Fleet can change Immortal settings and transfer files in shared storage. Use each third-party
+app’s settings or import feature to change its configuration. For details, see
+[what Fleet can access](https://github.com/starbrightlab/immortal/blob/main/provisioning/README.md#the-fleetctl-cli).
+
 ## Why an in-app service (not adb-over-WiFi)
 
 adb-over-WiFi can't auto-survive a reboot on these non-root Android 9/10 Portals — the TCP port
