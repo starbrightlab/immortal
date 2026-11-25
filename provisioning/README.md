@@ -14,12 +14,14 @@ Portal, and double-click.
 
 ## For the end user
 
-1. **Enable ADB on the Portal** (one time): Settings > Debug > **ADB Enabled**.
-2. **Connect** the Portal to the computer with a USB-C cable.
+1. Connect the Portal to your computer with a USB-C data cable.
+2. On the Portal, open **Settings → Debug** and turn on **ADB Enabled**. On some models, the
+   Debug menu may only appear after you connect the cable and reopen Settings. If the Portal
+   restarts during setup, check **ADB Enabled** again.
 3. **Double-click**:
    - macOS: `Provision-Portal.command`
    - Windows: `Provision-Portal.bat`
-4. When the Portal shows **"Allow USB debugging?"**, tap **Allow** (check "Always allow").
+4. Tap **Allow** if the Portal asks you to approve this computer. You can also check "Always allow".
 5. Wait for "Done." To undo: double-click `Restore-Portal` (`.command` / `.bat`).
 
 > macOS may warn that the file is from an unidentified developer. Right-click → Open the first
@@ -55,6 +57,10 @@ This asks Android to allow resizing even for apps that opt out of it. It can exp
 for apps that support it, but an app may render poorly or fail when resized; the setting does not
 add split-screen controls if the Portal firmware does not provide them. The original setting is
 saved on the device and restored by `--restore`.
+
+**Settings → Start on boot** opens the selected apps after a restart, then returns to Home.
+For a clock you want to keep on screen, try Immortal’s digital clock screensaver or a dedicated
+kiosk setup. Check what is visible after restarting and after waking the display.
 
 To ship your own app instead of the sample, replace `apks/app-debug.apk`, drop photos in
 `assets/`, and update `PKG`/`HOME_ACTIVITY`/`DREAM_SERVICE` in `config.env`.
@@ -311,14 +317,11 @@ Windows: `powershell -ExecutionPolicy Bypass -File provision.ps1 [-Status|-Resto
 - **Enabling on-device installs is a security tradeoff.** It relaxes the device's default
   check that otherwise blocks installing apps that aren't signed by Meta. A production store
   should add its own package verification. Restore puts the default back.
-- **Disabling OS updates (`DISABLE_OTA`)** stops Meta's updater (`alohaotasetup`) and update UI
-  (`otaui`) via reversible `pm disable-user`, so a future OTA can't silently undo this setup or
-  reset your launcher/screensaver. Portal is a discontinued line, so this mainly forgoes
-  (unlikely) future patches; it's the right call to keep a provisioned device stable, but set
-  `DISABLE_OTA=false` if you'd rather keep updates. Restore re-enables them.
+- Firmware updates can change the launcher, screensaver, and install settings. If you keep
+  updates enabled, check Immortal after a firmware update. Blocking firmware updates can also
+  block security fixes. Set `DISABLE_OTA=false` to keep updates enabled. Restore re-enables them.
 - **This is a one-time, per-device step.** It requires the USB/ADB connection once. After
   that, the client app runs normally and can install/update other apps with a single on-screen
   tap — no computer needed again.
 - **Reversible.** Restore puts the stock Aloha launcher and screensaver back and undoes the
   install changes. The client app is left installed (uninstall with `adb uninstall <PKG>`).
-- Portal receives no further OS updates, so the provisioned state is stable.
