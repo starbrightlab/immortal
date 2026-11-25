@@ -105,7 +105,7 @@ object Converter {
   }
 
   /** Frankfurter's `{"rates":{...}}` for [base], or the same shape built from the Bank of
-   * England's daily table (keyless, via allratestoday.com) when Frankfurter is unreachable. */
+   * England's daily spot rates (keyless) when Frankfurter is unreachable. */
   private fun fetchRatesJson(base: String): String? {
     val targets = CURRENCIES.filter { it != base }.joinToString(",")
     runCatching { httpGet("https://api.frankfurter.app/latest?from=$base&to=$targets") }
@@ -117,19 +117,46 @@ object Converter {
     return runCatching { boeRatesJson(base) }.getOrNull()
   }
 
-  /** The Bank of England table lists each pair as "1 base = value quote" against GBP; rebase
-   * it to [base] and re-encode in Frankfurter's shape so the cache and parser stay as they are.
-   * Null when the table has no rate for [base] (e.g. RON, CZK, HUF). */
+  /** Bank of England IADB series for units of each currency per 1 GBP (~16:00 London spot).
+   * The BoE publishes no RON or HUF series, so those bases get no fallback. */
+  private val BOE_SERIES =
+      mapOf(
+          "USD" to "XUDLUSS",
+          "EUR" to "XUDLERS",
+          "PLN" to "XUDLBK47",
+          "CHF" to "XUDLSFS",
+          "SEK" to "XUDLSKS",
+          "NOK" to "XUDLNKS",
+          "DKK" to "XUDLDKS",
+          "CAD" to "XUDLCDS",
+          "AUD" to "XUDLADS",
+          "JPY" to "XUDLJYS",
+          "CZK" to "XUDLBK25")
+
+  /** Reads the last 10 days of the BoE CSV ("DATE,XUDLUSS,..." then "24 Nov 2026,1.3117,...")
+   * straight from bankofengland.co.uk, keeps the newest value per currency, rebases it to
+   * [base] and re-encodes it in Frankfurter's shape so the cache and parser stay as they are.
+   * Null when the BoE has no rate for [base]. */
   private fun boeRatesJson(base: String): String? {
-    val table = JSONObject(httpGet("https://allratestoday.com/api/open/central-bank/boe")).getJSONArray("rates")
+    val from =
+        java.text.SimpleDateFormat("dd/MMM/yyyy", java.util.Locale.UK)
+            .format(java.util.Date(System.currentTimeMillis() - 10L * 24 * 60 * 60 * 1000))
+    val csv =
+        httpGet(
+            "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp" +
+                "?csv.x=yes&Datefrom=$from&Dateto=now&CSVF=TN&UsingCodes=Y" +
+                "&SeriesCodes=${BOE_SERIES.values.joinToString(",")}")
+    val lines = csv.trim().lines()
+    val header = lines.firstOrNull()?.split(",") ?: return null
+    if (header.firstOrNull() != "DATE") return null
+    val codeToCcy = BOE_SERIES.entries.associate { (ccy, code) -> code to ccy }
     val perPound = hashMapOf("GBP" to 1.0)
-    for (i in 0 until table.length()) {
-      val row = table.getJSONObject(i)
-      val value = row.optDouble("value")
-      if (row.optString("type") != "reference" || value.isNaN() || value <= 0.0) continue
-      when {
-        row.optString("base") == "GBP" -> perPound[row.getString("quote")] = value
-        row.optString("quote") == "GBP" -> perPound[row.getString("base")] = 1.0 / value
+    for (line in lines.drop(1)) { // oldest first, so later rows overwrite earlier ones
+      val cells = line.split(",")
+      for (i in 1 until minOf(header.size, cells.size)) {
+        val ccy = codeToCcy[header[i].trim()] ?: continue
+        val value = cells[i].trim().toDoubleOrNull() ?: continue
+        if (value > 0.0) perPound[ccy] = value
       }
     }
     val baseUnits = perPound[base] ?: return null
