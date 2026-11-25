@@ -23,9 +23,8 @@ import android.provider.Settings
  * `View.playSoundEffect`, which is gated on this same flag. The "Touch & keypress
  * sounds" toggle in [ImmortalSettingsActivity] flips it.
  *
- * Writing it needs the WRITE_SETTINGS app-op ("Modify system settings"). The toggle
- * routes the user to [requestWriteAccess] when it isn't held; the provisioning kit
- * can also pre-grant it (`appops set com.immortal.launcher android:write_settings allow`).
+ * Writing it needs the WRITE_SETTINGS app-op ("Modify system settings").
+ * The touch sounds toggle opens Android’s Modify system settings screen when access is missing.
  */
 object SystemSounds {
 
