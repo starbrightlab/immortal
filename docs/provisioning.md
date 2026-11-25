@@ -8,9 +8,9 @@ is **reversible**.
 !!! tip "The short version"
     1. [Download the kit](#step-1-download-the-kit) and open the `provisioning` folder.
     2. [Unblock the files](#step-2-unblock-the-files-first-time-only) (first time only).
-    3. On the Portal, enable **Settings → Debug → ADB Enabled**.
-    4. Connect the Portal over **USB-C**.
-    5. Double-click **`Provision-Portal`** and tap **Allow** on the Portal.
+    3. Connect the Portal to your computer with a USB-C data cable.
+    4. On the Portal, open **Settings → Debug** and turn on **ADB Enabled**.
+    5. Double-click **`Provision-Portal`**. Tap **Allow** if the Portal asks you to approve this computer.
     6. Wait for **"Done."** — the Portal switches to the Immortal home screen.
 
 !!! success "No technical skills required"
@@ -79,21 +79,17 @@ Operating systems flag files downloaded from the internet. Clear that once:
         Get-ChildItem -Recurse | Unblock-File
         ```
 
-## Step 3 — Enable ADB on the Portal
+## Step 3 — Connect the Portal
 
-On the Portal itself, open **Settings → Debug → ADB Enabled** and turn it on. This lets the
-computer talk to the Portal over the cable.
+Connect the Portal to your computer with a USB-C data cable.
 
-!!! question "Can't find the Debug menu?"
-    The exact path varies slightly by model and software version — look under **Settings** for
-    **Debug**, **Developer**, or **System**. It's a one-time toggle; once on, it stays on.
+## Step 4 — Enable ADB on the Portal
+
+On the Portal, open **Settings → Debug** and turn on **ADB Enabled**. On some models, the Debug
+menu may only appear after you connect the cable and reopen Settings. If the Portal restarts
+during setup, check **ADB Enabled** again.
 
 ![The Portal's Settings → Debug screen with ADB Enabled turned on](img/adb-enabled.png)
-
-## Step 4 — Connect the Portal
-
-Plug the Portal into your computer with the **USB-C data cable**. Nothing needs to happen on screen
-yet.
 
 ## Step 5 — Run it
 
@@ -111,8 +107,8 @@ Double-click the file for your OS:
 A console window scrolling through steps like *Installing client APK*, *Granting permissions*, and
 *Setting launcher* is **normal** — leave it running.
 
-Within a few seconds, the **Portal shows a "Allow USB debugging?" prompt**. Tap **Allow**, and tick
-**"Always allow from this computer"** so you won't be asked again.
+Tap **Allow** if the Portal asks you to approve this computer. You can also tick
+**"Always allow from this computer"**.
 
 ## Step 6 — Answer the questions it asks
 
@@ -121,7 +117,7 @@ Enter):
 
 | Prompt | What it means | Suggested answer |
 | --- | --- | --- |
-| **Block Meta OS updates?** | Stops a future Meta update from silently undoing your setup. The Portal is discontinued, so you give up only unlikely future patches. | **Yes** (default) |
+| **Block Meta OS updates?** | Firmware updates can change the launcher, screensaver, and install settings. If you keep updates enabled, check Immortal after a firmware update. Blocking firmware updates can also block security fixes. | **Yes** (default) |
 | **Restore Amazon Alexa?** *(first-gen only)* | Revives the original Alexa client. The always-on "Hey Alexa" wake word installs by default and yields the mic during calls; opt out per-device with `INSTALL_ALEXA_WAKE_WORD=false`. See the [Alexa & voice guide](guides/voice-alexa.md). | Your call — `y` to set up Alexa |
 | **Device name** *(only with `--fleet`)* | A friendly name for [fleet management](features/fleet.md), e.g. "Living Room". | Whatever you like |
 
@@ -164,7 +160,7 @@ own, and updates itself over the air.
 
     1. **Charge-only USB cable.** Many USB-C cables only carry power. Swap to one you know transfers
        data (e.g. the one a phone came with).
-    2. **ADB isn't enabled** on the Portal — see [Step 3](#step-3-enable-adb-on-the-portal).
+    2. **ADB isn't enabled** on the Portal — see [Step 4](#step-4-enable-adb-on-the-portal).
     3. **Re-seat the cable** at both ends, and try a different USB port on the computer.
 
 ??? failure "'unauthorized' or the run stops waiting"
@@ -190,7 +186,8 @@ own, and updates itself over the air.
     normal app instead of the home screen — open it from the stock home.
 
 ??? failure "More than one Android device is connected"
-    The kit expects a single Portal. Disconnect other phones/tablets and re-run.
+    If setup lists several Android devices, choose the Portal by its model and serial number.
+    If you’re unsure which entry to choose, disconnect the other devices and try again.
 
 ## Restoring
 
@@ -215,11 +212,15 @@ Most people never need this — the defaults are sensible. But every step is con
 | `DISABLE_INSTALLER_OVERLAY` | on | Fix the [Gen-1 white-on-white installer dialog](first-gen-portals.md). API < 29 only. |
 | `DISABLE_OTA` | ask | Block Meta OS updates so an OTA can't undo the setup. |
 | Shizuku | installed | Privileged broker — useful for [Aurora's silent installs](guides/installing-apps.md). |
-| `BOOT_APPS` | MA player | Apps to relaunch after a reboot (also editable in Settings → Start on boot). |
+| `BOOT_APPS` | MA player | Apps to open after a restart before returning to Home. |
 | `ENABLE_FLEET` | off | Opt-in always-on WiFi [management agent](features/fleet.md). |
 
 On the first run the kit snapshots the device's real stock launcher and screensaver to
 `/sdcard/immortal_restore.env`, so `--restore` puts the correct components back on any Portal model.
+
+**Settings → Start on boot** opens the selected apps after a restart, then returns to Home.
+For a clock you want to keep on screen, try Immortal’s digital clock screensaver or a dedicated
+kiosk setup. Check what is visible after restarting and after waking the display.
 
 ### Command-line flags
 
