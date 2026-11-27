@@ -160,9 +160,9 @@ class MediaCacheTest {
     val gb = 1024L * 1024 * 1024
     // Plenty free → capped at the ceiling (default 4 GB).
     assertEquals(4 * gb, MediaCache.defaultBudget(100 * gb))
-    // Free space is the binding limit → free minus the 2 GB headroom (8 GB free, 32 GB cap → 6 GB).
-    assertEquals(6 * gb, MediaCache.defaultBudget(8 * gb, ceilingBytes = 32 * gb))
+    // Free space is the binding limit → free minus headroom.
+    assertEquals(8 * gb - MediaCache.HEADROOM_BYTES, MediaCache.defaultBudget(8 * gb, ceilingBytes = 32 * gb))
     // Nearly-full device (free <= headroom) → 0, so caching never fills the disk.
-    assertEquals(0L, MediaCache.defaultBudget(1 * gb, ceilingBytes = 32 * gb))
+    assertEquals(0L, MediaCache.defaultBudget(MediaCache.HEADROOM_BYTES, ceilingBytes = 32 * gb))
   }
 }

@@ -163,7 +163,7 @@ class MediaCache internal constructor(private val dir: File, private val budgetB
     }
 
     /** Storage always left free for the OS (updates, logs), never handed to the cache. */
-    const val HEADROOM_BYTES = 2L * 1024 * 1024 * 1024
+    const val HEADROOM_BYTES = 512L * 1024 * 1024
 
     /**
      * A safe default budget: the user's [ceilingBytes] cap, bounded by what's actually free minus a

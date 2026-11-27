@@ -336,6 +336,20 @@ class PhotoFrameController(
     if (settings.ambientDashboard) ui.postDelayed(dashboardCycle, 45_000L)
 
     if (showWelcome && settings.welcomeEnabled) showWelcomeOverlay()
+    configuredSource = source
+    startConfiguredSource(source)
+  }
+
+  private var configuredSource: PhotoFrameSource = PhotoFrameSource.DefaultFeed
+  private val sourceRetryTick = Runnable {
+    if (configuredSource !is PhotoFrameSource.DefaultFeed) {
+      Log.i(TAG, "retrying configured photo source after fallback")
+      startConfiguredSource(configuredSource)
+    }
+  }
+
+  private fun startConfiguredSource(source: PhotoFrameSource) {
+    ui.removeCallbacks(sourceRetryTick)
     when (source) {
       is PhotoFrameSource.WebPage -> {
         // Web-page source takes over the whole frame — no photo feed, no Immortal overlay.
@@ -1509,6 +1523,11 @@ class PhotoFrameController(
     ui.removeCallbacks(remoteTick)
     ui.removeCallbacks(remoteRefresh)
     ui.removeCallbacks(poolSyncTick)
+    ui.removeCallbacks(sourceRetryTick)
+    if (configuredSource !is PhotoFrameSource.DefaultFeed &&
+        configuredSource !is PhotoFrameSource.WebPage) {
+      ui.postDelayed(sourceRetryTick, 60_000L)
+    }
     stopVideo()
     rotate.run()
   }
@@ -2426,7 +2445,7 @@ class PhotoFrameController(
     const val MB = 1024L * 1024L
     // Below this computed budget the cache isn't worth enabling: every write would evict
     // something at least as warm, so it would only add churn. See [enableMediaCache].
-    const val MIN_CACHE_BUDGET_BYTES = 256L * 1024L * 1024L
+    const val MIN_CACHE_BUDGET_BYTES = 128L * 1024L * 1024L
 
     // Most assets one pool sync lists from the source. The pool is a random draw from this list,
     // so it is set well above the old 1000-item playback cap to make the draw cover the whole
